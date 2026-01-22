@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import type { TableColumn } from "@nuxt/ui";
+
+interface Trade {
+  timestamp: string;
+  epic: string;
+  signal: string;
+  size: number;
+  pnl: number;
+}
+
 const { data: status, refresh: refreshStatus } = await useFetch("/api/status");
 const { data: performance } = await useFetch("/api/performance");
 const { data: trades, refresh: refreshTrades } = await useFetch("/api/trades", {
@@ -20,14 +30,6 @@ onMounted(() => {
   onUnmounted(() => clearInterval(interval));
 });
 
-const columns = [
-  { key: "timestamp", label: "Zeit" },
-  { key: "epic", label: "Pair" },
-  { key: "signal", label: "Signal" },
-  { key: "size", label: "Size" },
-  { key: "pnl", label: "P&L" },
-];
-
 const formatEpic = (epic: string) => {
   // CS.D.EURUSD.CEAM.IP -> EUR/USD
   const match = epic.match(/CS\.D\.(\w{3})(\w{3})/);
@@ -36,6 +38,18 @@ const formatEpic = (epic: string) => {
   }
   return epic;
 };
+
+const columns: TableColumn<Trade>[] = [
+  { accessorKey: "timestamp", header: "Zeit" },
+  {
+    accessorKey: "epic",
+    header: "Pair",
+    cell: ({ row }) => formatEpic(row.original.epic),
+  },
+  { accessorKey: "signal", header: "Signal" },
+  { accessorKey: "size", header: "Size" },
+  { accessorKey: "pnl", header: "P&L" },
+];
 </script>
 
 <template>
@@ -122,26 +136,26 @@ const formatEpic = (epic: string) => {
             <h2 class="text-lg font-semibold text-white">Trade History</h2>
           </template>
 
-          <UTable :columns="columns" :rows="trades?.trades || []">
-            <template #epic-data="{ row }">
-              {{ formatEpic(row.epic) }}
+          <UTable :columns="columns" :data="(trades?.trades as Trade[]) || []">
+            <template #epic-cell="{ row }">
+              {{ formatEpic(row.original.epic) }}
             </template>
-            <template #signal-data="{ row }">
-              <UBadge :color="row.signal === 'BUY' ? 'green' : 'red'">
-                {{ row.signal }}
+            <template #signal-cell="{ row }">
+              <UBadge :color="row.original.signal === 'BUY' ? 'success' : 'error'">
+                {{ row.original.signal }}
               </UBadge>
             </template>
-            <template #pnl-data="{ row }">
+            <template #pnl-cell="{ row }">
               <span
                 :class="[
-                  row.pnl > 0
+                  row.original.pnl > 0
                     ? 'text-green-500'
-                    : row.pnl < 0
+                    : row.original.pnl < 0
                       ? 'text-red-500'
                       : 'text-gray-400',
                 ]"
               >
-                {{ row.pnl === 0 ? "Open" : `${row.pnl > 0 ? "+" : ""}${row.pnl.toFixed(2)} €` }}
+                {{ row.original.pnl === 0 ? "Open" : `${row.original.pnl > 0 ? "+" : ""}${row.original.pnl.toFixed(2)} €` }}
               </span>
             </template>
           </UTable>
