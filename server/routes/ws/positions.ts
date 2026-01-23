@@ -55,6 +55,13 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
 
       // Fetch positions
       const rawPositions = await client.getOpenPositions();
+      // Debug: log all position fields to find P&L
+      if (rawPositions.length > 0) {
+        const p = rawPositions[0];
+        console.log(`[WS] Position fields:`, Object.keys(p.position || {}));
+        console.log(`[WS] Market fields:`, Object.keys(p.market || {}));
+        console.log(`[WS] Full position:`, JSON.stringify(p.position, null, 2));
+      }
       const positions: Position[] = rawPositions.map((p: any) => {
         const direction = p.position?.direction || "";
         const size = parseFloat(p.position?.size || 0);
