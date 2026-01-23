@@ -37,6 +37,37 @@ interface Performance {
   maxDrawdown: number;
 }
 
+interface AccountInfo {
+  balance: number;
+  available: number;
+  profitLoss: number;
+  deposit: number;
+}
+
+interface AccountInfoResult {
+  accountId: string;
+  accountName: string;
+  timestamp?: string;
+  account?: AccountInfo;
+}
+
+interface Position {
+  dealId: string;
+  epic: string;
+  instrumentName: string;
+  direction: string;
+  size: number;
+  openLevel: number;
+  currentLevel: number;
+  stopLevel: number | null;
+  limitLevel: number | null;
+  profitLoss: number;
+  currency: string;
+  createdDate: string;
+  accountId?: string;
+  accountName?: string;
+}
+
 // App version from runtime config
 const { appVersion } = useRuntimeConfig().public;
 
@@ -149,6 +180,33 @@ const { data: performance, refresh: refreshPerformance } = await useFetch<Perfor
   }
 );
 
+// Fetch account info (balance, margin, etc.)
+const { data: accountInfoData, refresh: refreshAccountInfo } = await useFetch<{
+  accounts?: AccountInfoResult[];
+  summary?: AccountInfo;
+} | AccountInfoResult>("/api/account-info", {
+  query: statusQuery,
+  watch: [selectedAccountId],
+});
+
+// Normalize account info for display
+const accountInfo = computed(() => {
+  if (!accountInfoData.value) return null;
+  if ("summary" in accountInfoData.value) {
+    return accountInfoData.value.summary;
+  }
+  return (accountInfoData.value as AccountInfoResult).account;
+});
+
+// Fetch open positions with details
+const { data: positionsData, refresh: refreshPositions } = await useFetch<{
+  positions: Position[];
+  summary?: { totalPositions: number; totalProfitLoss: number };
+}>("/api/positions", {
+  query: statusQuery,
+  watch: [selectedAccountId],
+});
+
 const { data: trades, refresh: refreshTrades } = await useFetch<{ trades: Trade[] }>(
   "/api/trades",
   {
@@ -181,6 +239,8 @@ const refreshAll = () => {
   refreshPerformance();
   refreshTrades();
   refreshLogs();
+  refreshAccountInfo();
+  refreshPositions();
 };
 
 onMounted(() => {
@@ -206,6 +266,38 @@ const columns: TableColumn<Trade>[] = [
   { accessorKey: "signal", header: "Signal" },
   { accessorKey: "size", header: "Size" },
   { accessorKey: "pnl", header: "P&L" },
+];
+
+// Columns for open positions table
+const positionColumns: TableColumn<Position>[] = [
+  {
+    accessorKey: "epic",
+    header: "Pair",
+    cell: ({ row }) => formatEpic(row.original.epic),
+  },
+  { accessorKey: "direction", header: "Richtung" },
+  { accessorKey: "size", header: "Größe" },
+  {
+    accessorKey: "openLevel",
+    header: "Eröffnung",
+    cell: ({ row }) => row.original.openLevel.toFixed(5),
+  },
+  {
+    accessorKey: "currentLevel",
+    header: "Aktuell",
+    cell: ({ row }) => row.original.currentLevel.toFixed(5),
+  },
+  {
+    accessorKey: "stopLevel",
+    header: "Stop",
+    cell: ({ row }) => row.original.stopLevel?.toFixed(5) || "-",
+  },
+  {
+    accessorKey: "limitLevel",
+    header: "Limit",
+    cell: ({ row }) => row.original.limitLevel?.toFixed(5) || "-",
+  },
+  { accessorKey: "profitLoss", header: "G/V" },
 ];
 
 // Add account column when showing all accounts
@@ -315,8 +407,49 @@ const selectedAccount = computed(() =>
         </UButton>
       </div>
 
-      <!-- Status Cards -->
+      <!-- Account Info Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Balance -->
+        <UCard>
+          <p class="text-sm text-gray-400">Kontostand</p>
+          <p class="text-2xl font-bold text-white">
+            {{ accountInfo?.balance?.toFixed(2) || "0.00" }} €
+          </p>
+          <p class="text-xs text-gray-500">
+            Einlage: {{ accountInfo?.deposit?.toFixed(2) || "0.00" }} €
+          </p>
+        </UCard>
+
+        <!-- Available -->
+        <UCard>
+          <p class="text-sm text-gray-400">Verfügbar</p>
+          <p class="text-2xl font-bold text-white">
+            {{ accountInfo?.available?.toFixed(2) || "0.00" }} €
+          </p>
+          <p class="text-xs text-gray-500">
+            Margin gebunden: {{ ((accountInfo?.balance || 0) - (accountInfo?.available || 0)).toFixed(2) }} €
+          </p>
+        </UCard>
+
+        <!-- Unrealized P&L -->
+        <UCard>
+          <p class="text-sm text-gray-400">Offener G/V</p>
+          <p
+            :class="[
+              'text-2xl font-bold',
+              (accountInfo?.profitLoss || 0) >= 0
+                ? 'text-green-500'
+                : 'text-red-500',
+            ]"
+          >
+            {{ (accountInfo?.profitLoss || 0) >= 0 ? "+" : ""
+            }}{{ accountInfo?.profitLoss?.toFixed(2) || "0.00" }} €
+          </p>
+          <p class="text-xs text-gray-500">
+            {{ positionsData?.positions?.length || 0 }} offene Position(en)
+          </p>
+        </UCard>
+
         <!-- Bot Status -->
         <UCard>
           <div class="flex items-center gap-3">
@@ -340,18 +473,10 @@ const selectedAccount = computed(() =>
             </div>
           </div>
         </UCard>
+      </div>
 
-        <!-- Open Positions -->
-        <UCard>
-          <p class="text-sm text-gray-400">Offene Positionen</p>
-          <p class="text-2xl font-bold text-white">
-            {{ accountStatuses.reduce((sum, s) => sum + (s.active_pairs_count || 0), 0) }}
-          </p>
-          <p class="text-xs text-gray-500 truncate">
-            {{ accountStatuses.flatMap(s => s.active_epics || []).map(formatEpic).join(", ") || "-" }}
-          </p>
-        </UCard>
-
+      <!-- Performance Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Win Rate -->
         <UCard>
           <p class="text-sm text-gray-400">Win Rate</p>
@@ -365,7 +490,7 @@ const selectedAccount = computed(() =>
 
         <!-- Total P&L -->
         <UCard>
-          <p class="text-sm text-gray-400">Gesamt P&L</p>
+          <p class="text-sm text-gray-400">Realisierter G/V</p>
           <p
             :class="[
               'text-2xl font-bold',
@@ -382,6 +507,35 @@ const selectedAccount = computed(() =>
           </p>
         </UCard>
       </div>
+
+      <!-- Open Positions Table -->
+      <UCard v-if="positionsData?.positions && positionsData.positions.length > 0">
+        <template #header>
+          <h2 class="text-lg font-semibold text-white">Offene Positionen</h2>
+        </template>
+
+        <UTable :columns="positionColumns" :data="positionsData.positions">
+          <template #direction-cell="{ row }">
+            <UBadge :color="row.original.direction === 'BUY' ? 'success' : 'error'">
+              {{ row.original.direction }}
+            </UBadge>
+          </template>
+          <template #profitLoss-cell="{ row }">
+            <span
+              :class="[
+                'font-semibold',
+                row.original.profitLoss > 0
+                  ? 'text-green-500'
+                  : row.original.profitLoss < 0
+                    ? 'text-red-500'
+                    : 'text-gray-400',
+              ]"
+            >
+              {{ row.original.profitLoss > 0 ? "+" : "" }}{{ row.original.profitLoss.toFixed(2) }} €
+            </span>
+          </template>
+        </UTable>
+      </UCard>
 
       <!-- Main Content -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

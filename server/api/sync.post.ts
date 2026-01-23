@@ -74,6 +74,8 @@ export default defineEventHandler(async (event) => {
           p.position?.direction === "SELL"
             ? parseFloat(p.market?.bid || 0)
             : parseFloat(p.market?.offer || 0),
+        stopLevel: p.position?.stopLevel ? parseFloat(p.position.stopLevel) : null,
+        limitLevel: p.position?.limitLevel ? parseFloat(p.position.limitLevel) : null,
         profitLoss: parseFloat(
           p.position?.profitAndLoss?.replace(/[^0-9.-]/g, "") || 0
         ),
