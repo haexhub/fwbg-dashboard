@@ -59,6 +59,24 @@ const toggleAccount = async (accountId: string) => {
   }
 };
 
+// Sync trades from IG API
+const syncing = ref(false);
+const syncTrades = async () => {
+  syncing.value = true;
+  try {
+    const accountId = selectedAccountId.value !== "all" ? selectedAccountId.value : undefined;
+    const url = accountId ? `/api/sync?accountId=${accountId}` : "/api/sync";
+    await fetch(url, { method: "POST" });
+    // Refresh trades and performance after sync
+    await refreshTrades();
+    await refreshPerformance();
+  } catch (error) {
+    console.error("Failed to sync trades:", error);
+  } finally {
+    syncing.value = false;
+  }
+};
+
 // Build tabs from accounts
 const tabs = computed(() => {
   const allTab = {
@@ -196,9 +214,18 @@ const selectedAccount = computed(() =>
       <!-- Header -->
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-white">FWBG Trading Dashboard</h1>
-        <UButton icon="i-heroicons-arrow-path" @click="refreshAll">
-          Refresh
-        </UButton>
+        <div class="flex gap-2">
+          <UButton
+            icon="i-heroicons-cloud-arrow-down"
+            :loading="syncing"
+            @click="syncTrades"
+          >
+            Sync IG
+          </UButton>
+          <UButton icon="i-heroicons-arrow-path" @click="refreshAll">
+            Refresh
+          </UButton>
+        </div>
       </div>
 
       <!-- Account Tabs -->
