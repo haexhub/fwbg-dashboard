@@ -537,65 +537,62 @@ const selectedAccount = computed(() =>
         </UTable>
       </UCard>
 
-      <!-- Main Content -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Trade History -->
-        <UCard>
-          <template #header>
-            <h2 class="text-lg font-semibold text-white">Trade History</h2>
+      <!-- Trade History -->
+      <UCard>
+        <template #header>
+          <h2 class="text-lg font-semibold text-white">Trade History</h2>
+        </template>
+
+        <UTable :columns="columnsWithAccount" :data="(trades?.trades as Trade[]) || []">
+          <template #epic-cell="{ row }">
+            {{ formatEpic(row.original.epic) }}
           </template>
-
-          <UTable :columns="columnsWithAccount" :data="(trades?.trades as Trade[]) || []">
-            <template #epic-cell="{ row }">
-              {{ formatEpic(row.original.epic) }}
-            </template>
-            <template #signal-cell="{ row }">
-              <UBadge :color="row.original.signal === 'BUY' ? 'success' : 'error'">
-                {{ row.original.signal }}
-              </UBadge>
-            </template>
-            <template #pnl-cell="{ row }">
-              <span
-                :class="[
-                  row.original.pnl > 0
-                    ? 'text-green-500'
-                    : row.original.pnl < 0
-                      ? 'text-red-500'
-                      : 'text-gray-400',
-                ]"
-              >
-                {{ row.original.pnl === 0 ? "Open" : `${row.original.pnl > 0 ? "+" : ""}${row.original.pnl.toFixed(2)} €` }}
-              </span>
-            </template>
-          </UTable>
-        </UCard>
-
-        <!-- Logs -->
-        <UCard>
-          <template #header>
-            <h2 class="text-lg font-semibold text-white">Bot Logs</h2>
+          <template #signal-cell="{ row }">
+            <UBadge :color="row.original.signal === 'BUY' ? 'success' : 'error'">
+              {{ row.original.signal }}
+            </UBadge>
           </template>
-
-          <div
-            class="h-96 overflow-y-auto bg-gray-900 rounded p-3 font-mono text-xs"
-          >
-            <div
-              v-for="(line, i) in logs?.logs"
-              :key="i"
+          <template #pnl-cell="{ row }">
+            <span
               :class="[
-                'py-0.5',
-                line.includes('ERROR')
-                  ? 'text-red-400'
-                  : line.includes('WARNING')
-                    ? 'text-yellow-400'
-                    : 'text-gray-300',
+                row.original.pnl > 0
+                  ? 'text-green-500'
+                  : row.original.pnl < 0
+                    ? 'text-red-500'
+                    : 'text-gray-400',
               ]"
             >
-              {{ line }}
-            </div>
+              {{ row.original.pnl === 0 ? "Open" : `${row.original.pnl > 0 ? "+" : ""}${row.original.pnl.toFixed(2)} €` }}
+            </span>
+          </template>
+        </UTable>
+      </UCard>
+
+      <!-- Bot Logs -->
+      <UCard>
+        <template #header>
+          <h2 class="text-lg font-semibold text-white">Bot Logs</h2>
+        </template>
+
+        <div
+          class="h-96 overflow-y-auto bg-gray-900 rounded p-3 font-mono text-xs"
+        >
+          <div
+            v-for="(line, i) in logs?.logs"
+            :key="i"
+            :class="[
+              'py-0.5',
+              line.includes('ERROR')
+                ? 'text-red-400'
+                : line.includes('WARNING')
+                  ? 'text-yellow-400'
+                  : 'text-gray-300',
+            ]"
+          >
+            {{ line }}
           </div>
-        </UCard>
-      </div>
+        </div>
+      </UCard>
     </div>
   </div>
 </template>
