@@ -39,9 +39,13 @@ const connections = new Map<any, NodeJS.Timeout>();
 
 async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
   const accounts = await loadAccounts();
+  console.log(`[WS] Loaded ${accounts.length} accounts, filtering for active`);
+
   const activeAccounts = accountId
     ? accounts.filter((a) => a.id === accountId && a.isActive)
     : accounts.filter((a) => a.isActive);
+
+  console.log(`[WS] Found ${activeAccounts.length} active accounts to fetch`);
 
   const updates: LiveUpdate[] = [];
 
@@ -87,6 +91,8 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
         deposit: parseFloat(accountInfo?.balance?.deposit || 0),
       };
 
+      console.log(`[WS] ${account.name}: ${positions.length} positions, balance: ${accountData.balance}`);
+
       updates.push({
         type: "positions",
         timestamp: new Date().toISOString(),
@@ -96,6 +102,7 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
         account: accountData,
       });
     } catch (error: any) {
+      console.error(`[WS] Error fetching ${account.name}:`, error.message);
       updates.push({
         type: "error",
         timestamp: new Date().toISOString(),
