@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from "@nuxt/ui";
+import { useLiveData } from "~/composables/useLiveData";
 
 interface Account {
   id: string;
@@ -37,20 +38,6 @@ interface Performance {
   maxDrawdown: number;
 }
 
-interface AccountInfo {
-  balance: number;
-  available: number;
-  profitLoss: number;
-  deposit: number;
-}
-
-interface AccountInfoResult {
-  accountId: string;
-  accountName: string;
-  timestamp?: string;
-  account?: AccountInfo;
-}
-
 interface Position {
   dealId: string;
   epic: string;
@@ -70,6 +57,16 @@ interface Position {
 
 // App version from runtime config
 const { appVersion } = useRuntimeConfig().public;
+
+// Live data via WebSocket
+const {
+  allPositions: livePositions,
+  accountSummary: liveAccountSummary,
+  liveData,
+  isConnected: wsConnected,
+  connect: wsConnect,
+  subscribe: wsSubscribe,
+} = useLiveData();
 
 // Fetch all accounts
 const { data: accountsData } = await useFetch<{ accounts: Account[] }>("/api/accounts");
@@ -180,32 +177,7 @@ const { data: performance, refresh: refreshPerformance } = await useFetch<Perfor
   }
 );
 
-// Fetch account info (balance, margin, etc.)
-const { data: accountInfoData, refresh: refreshAccountInfo } = await useFetch<{
-  accounts?: AccountInfoResult[];
-  summary?: AccountInfo;
-} | AccountInfoResult>("/api/account-info", {
-  query: statusQuery,
-  watch: [selectedAccountId],
-});
-
-// Normalize account info for display
-const accountInfo = computed(() => {
-  if (!accountInfoData.value) return null;
-  if ("summary" in accountInfoData.value) {
-    return accountInfoData.value.summary;
-  }
-  return (accountInfoData.value as AccountInfoResult).account;
-});
-
-// Fetch open positions with details
-const { data: positionsData, refresh: refreshPositions } = await useFetch<{
-  positions: Position[];
-  summary?: { totalPositions: number; totalProfitLoss: number };
-}>("/api/positions", {
-  query: statusQuery,
-  watch: [selectedAccountId],
-});
+// Account info and positions now come from WebSocket (useLiveData)
 
 const { data: trades, refresh: refreshTrades } = await useFetch<{ trades: Trade[] }>(
   "/api/trades",
@@ -233,19 +205,43 @@ const { data: logs, refresh: refreshLogs } = await useFetch<{ logs: string[] }>(
   }
 );
 
-// Auto-refresh every 30 seconds
+// Auto-refresh every 30 seconds (for non-live data)
 const refreshAll = () => {
   refreshStatus();
   refreshPerformance();
   refreshTrades();
   refreshLogs();
-  refreshAccountInfo();
-  refreshPositions();
 };
 
 onMounted(() => {
+  // Start WebSocket connection for live data
+  wsConnect();
+
   const interval = setInterval(refreshAll, 30000);
   onUnmounted(() => clearInterval(interval));
+});
+
+// Subscribe to specific account when selection changes
+watch(selectedAccountId, (newAccountId) => {
+  wsSubscribe(newAccountId);
+});
+
+// Use live data for positions (fallback to API data)
+const displayPositions = computed(() => {
+  if (selectedAccountId.value === "all") {
+    return livePositions.value.length > 0 ? [...livePositions.value] : [];
+  }
+  const accountData = liveData.value.get(selectedAccountId.value);
+  return accountData?.positions ? [...accountData.positions] : [];
+});
+
+// Use live data for account info (fallback to API data)
+const displayAccountInfo = computed(() => {
+  if (selectedAccountId.value === "all") {
+    return liveAccountSummary.value.balance > 0 ? liveAccountSummary.value : null;
+  }
+  const accountData = liveData.value.get(selectedAccountId.value);
+  return accountData?.account || null;
 });
 
 const formatEpic = (epic: string) => {
@@ -407,16 +403,19 @@ const selectedAccount = computed(() =>
         </UButton>
       </div>
 
-      <!-- Account Info Cards -->
+      <!-- Account Info Cards (Live Data) -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Balance -->
         <UCard>
-          <p class="text-sm text-gray-400">Kontostand</p>
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-400">Kontostand</p>
+            <div v-if="wsConnected" class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live" />
+          </div>
           <p class="text-2xl font-bold text-white">
-            {{ accountInfo?.balance?.toFixed(2) || "0.00" }} €
+            {{ displayAccountInfo?.balance?.toFixed(2) || "0.00" }} €
           </p>
           <p class="text-xs text-gray-500">
-            Einlage: {{ accountInfo?.deposit?.toFixed(2) || "0.00" }} €
+            Einlage: {{ displayAccountInfo?.deposit?.toFixed(2) || "0.00" }} €
           </p>
         </UCard>
 
@@ -424,10 +423,10 @@ const selectedAccount = computed(() =>
         <UCard>
           <p class="text-sm text-gray-400">Verfügbar</p>
           <p class="text-2xl font-bold text-white">
-            {{ accountInfo?.available?.toFixed(2) || "0.00" }} €
+            {{ displayAccountInfo?.available?.toFixed(2) || "0.00" }} €
           </p>
           <p class="text-xs text-gray-500">
-            Margin gebunden: {{ ((accountInfo?.balance || 0) - (accountInfo?.available || 0)).toFixed(2) }} €
+            Margin gebunden: {{ ((displayAccountInfo?.balance || 0) - (displayAccountInfo?.available || 0)).toFixed(2) }} €
           </p>
         </UCard>
 
@@ -437,16 +436,16 @@ const selectedAccount = computed(() =>
           <p
             :class="[
               'text-2xl font-bold',
-              (accountInfo?.profitLoss || 0) >= 0
+              (displayAccountInfo?.profitLoss || 0) >= 0
                 ? 'text-green-500'
                 : 'text-red-500',
             ]"
           >
-            {{ (accountInfo?.profitLoss || 0) >= 0 ? "+" : ""
-            }}{{ accountInfo?.profitLoss?.toFixed(2) || "0.00" }} €
+            {{ (displayAccountInfo?.profitLoss || 0) >= 0 ? "+" : ""
+            }}{{ displayAccountInfo?.profitLoss?.toFixed(2) || "0.00" }} €
           </p>
           <p class="text-xs text-gray-500">
-            {{ positionsData?.positions?.length || 0 }} offene Position(en)
+            {{ displayPositions.length }} offene Position(en)
           </p>
         </UCard>
 
@@ -508,13 +507,16 @@ const selectedAccount = computed(() =>
         </UCard>
       </div>
 
-      <!-- Open Positions Table -->
-      <UCard v-if="positionsData?.positions && positionsData.positions.length > 0">
+      <!-- Open Positions Table (Live Data) -->
+      <UCard v-if="displayPositions.length > 0">
         <template #header>
-          <h2 class="text-lg font-semibold text-white">Offene Positionen</h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold text-white">Offene Positionen</h2>
+            <div v-if="wsConnected" class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live" />
+          </div>
         </template>
 
-        <UTable :columns="positionColumns" :data="positionsData.positions">
+        <UTable :columns="positionColumns" :data="displayPositions">
           <template #direction-cell="{ row }">
             <UBadge :color="row.original.direction === 'BUY' ? 'success' : 'error'">
               {{ row.original.direction }}
