@@ -97,15 +97,21 @@ const syncTrades = async () => {
   }
 };
 
-// Build tabs from accounts
+// Build tabs from accounts with onSelect handlers
 const tabs = computed(() => {
   const allTab = {
     label: "Alle Accounts",
     value: "all",
+    onSelect: () => {
+      selectedAccountId.value = "all";
+    },
   };
   const accountTabs = accounts.value.map((acc) => ({
     label: acc.name,
     value: acc.id,
+    onSelect: () => {
+      selectedAccountId.value = acc.id;
+    },
   }));
   return [allTab, ...accountTabs];
 });
