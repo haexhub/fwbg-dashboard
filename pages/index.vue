@@ -150,7 +150,13 @@ const { data: trades, refresh: refreshTrades } = await useFetch<{ trades: Trade[
 const { data: logs, refresh: refreshLogs } = await useFetch<{ logs: string[] }>(
   "/api/logs",
   {
-    query: { lines: 50 },
+    query: computed(() => ({
+      lines: 50,
+      ...(selectedAccountId.value && selectedAccountId.value !== "all"
+        ? { accountId: selectedAccountId.value }
+        : {}),
+    })),
+    watch: [selectedAccountId],
   }
 );
 
