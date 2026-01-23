@@ -89,6 +89,7 @@ export function useLiveData() {
     ws.value.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log("[WS] Received:", data.type, data.accountId, data.account?.balance);
 
         if (data.type === "positions" && data.accountId) {
           liveData.value.set(data.accountId, {
@@ -100,6 +101,7 @@ export function useLiveData() {
           });
           // Trigger reactivity
           liveData.value = new Map(liveData.value);
+          console.log("[WS] Updated liveData, size:", liveData.value.size);
         } else if (data.type === "error") {
           console.error("[WS] Server error:", data.error);
         }
