@@ -55,36 +55,43 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
 
       // Fetch positions
       const rawPositions = await client.getOpenPositions();
-      // Debug: Log first raw position to see structure
-      if (rawPositions.length > 0) {
-        console.log(`[WS] Raw position sample:`, JSON.stringify(rawPositions[0], null, 2));
-      }
-      const positions: Position[] = rawPositions.map((p: any) => ({
-        dealId: p.position?.dealId || "",
-        epic: p.market?.epic || "",
-        instrumentName: p.market?.instrumentName || "",
-        direction: p.position?.direction || "",
-        size: parseFloat(p.position?.size || 0),
-        openLevel: parseFloat(p.position?.level || 0),
-        currentLevel:
-          p.position?.direction === "SELL"
-            ? parseFloat(p.market?.bid || 0)
-            : parseFloat(p.market?.offer || 0),
-        stopLevel: p.position?.stopLevel
-          ? parseFloat(p.position.stopLevel)
-          : null,
-        limitLevel: p.position?.limitLevel
-          ? parseFloat(p.position.limitLevel)
-          : null,
-        profitLoss: parseFloat(
-          String(p.position?.profitAndLoss || "0").replace(/[^0-9.-]/g, "") ||
-            "0"
-        ),
-        currency: p.position?.currency || "EUR",
-        createdDate: p.position?.createdDate || "",
-        accountId: account.id,
-        accountName: account.name,
-      }));
+      const positions: Position[] = rawPositions.map((p: any) => {
+        const direction = p.position?.direction || "";
+        const size = parseFloat(p.position?.size || 0);
+        const openLevel = parseFloat(p.position?.level || 0);
+        const currentLevel = direction === "SELL"
+          ? parseFloat(p.market?.bid || 0)
+          : parseFloat(p.market?.offer || 0);
+        const contractSize = parseFloat(p.position?.contractSize || 1);
+        const scalingFactor = parseFloat(p.market?.scalingFactor || 1);
+
+        // Calculate P&L: (currentLevel - openLevel) * size * contractSize / scalingFactor
+        // For SELL positions, flip the sign
+        let profitLoss = 0;
+        if (openLevel > 0 && currentLevel > 0) {
+          const priceDiff = currentLevel - openLevel;
+          profitLoss = direction === "SELL"
+            ? -priceDiff * size * contractSize / scalingFactor
+            : priceDiff * size * contractSize / scalingFactor;
+        }
+
+        return {
+          dealId: p.position?.dealId || "",
+          epic: p.market?.epic || "",
+          instrumentName: p.market?.instrumentName || "",
+          direction,
+          size,
+          openLevel,
+          currentLevel,
+          stopLevel: p.position?.stopLevel ? parseFloat(p.position.stopLevel) : null,
+          limitLevel: p.position?.limitLevel ? parseFloat(p.position.limitLevel) : null,
+          profitLoss,
+          currency: p.position?.currency || "EUR",
+          createdDate: p.position?.createdDate || "",
+          accountId: account.id,
+          accountName: account.name,
+        };
+      });
 
       // Fetch account info
       const accountInfo = await client.getAccountInfo();
