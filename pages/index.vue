@@ -45,23 +45,15 @@ const accounts = computed(() => accountsData.value?.accounts || []);
 const route = useRoute();
 const router = useRouter();
 
-// Initialize from URL on first load
-const selectedAccountId = ref<string>((route.query.account as string) || "all");
-
-// Sync URL -> ref when navigating
-watch(
-  () => route.query.account,
-  (newAccount) => {
-    selectedAccountId.value = (newAccount as string) || "all";
-  }
-);
-
-// Sync ref -> URL when tab changes
-watch(selectedAccountId, (newValue) => {
-  const currentQuery = (route.query.account as string) || "all";
-  if (newValue !== currentQuery) {
-    router.push({ query: newValue === "all" ? {} : { account: newValue } });
-  }
+const selectedAccountId = computed({
+  get() {
+    return (route.query.account as string) || "all";
+  },
+  set(account) {
+    router.push({
+      query: account === "all" ? {} : { account },
+    });
+  },
 });
 
 // Toggle account active state
@@ -109,11 +101,6 @@ const tabs = computed(() => {
   }));
   return [allTab, ...accountTabs];
 });
-
-// Handle tab change
-const onTabChange = (value: string | number) => {
-  selectedAccountId.value = String(value);
-};
 
 // Fetch data based on selected account
 const statusQuery = computed(() =>
@@ -262,10 +249,9 @@ const selectedAccount = computed(() =>
       <!-- Account Tabs -->
       <UTabs
         v-if="accounts.length > 0"
-        :model-value="selectedAccountId"
+        v-model="selectedAccountId"
         :items="tabs"
         class="mb-4"
-        @update:model-value="onTabChange"
       />
 
       <!-- Account Overview (when "Alle Accounts" selected) -->
