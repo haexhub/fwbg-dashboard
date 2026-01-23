@@ -37,6 +37,9 @@ interface Performance {
   maxDrawdown: number;
 }
 
+// App version from runtime config
+const { appVersion } = useRuntimeConfig().public;
+
 // Fetch all accounts
 const { data: accountsData } = await useFetch<{ accounts: Account[] }>("/api/accounts");
 const accounts = computed(() => accountsData.value?.accounts || []);
@@ -231,7 +234,10 @@ const selectedAccount = computed(() =>
     <div class="max-w-7xl mx-auto space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-white">FWBG Trading Dashboard</h1>
+        <div class="flex items-baseline gap-3">
+          <h1 class="text-2xl font-bold text-white">FWBG Trading Dashboard</h1>
+          <span class="text-xs text-gray-500">v{{ appVersion }}</span>
+        </div>
         <div class="flex gap-2">
           <UButton
             icon="i-heroicons-cloud-arrow-down"

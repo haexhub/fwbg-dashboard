@@ -1,5 +1,6 @@
 {
   "name": "fwbg-dashboard",
+  "version": "1.0.10",
   "private": true,
   "type": "module",
   "scripts": {
