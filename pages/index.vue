@@ -97,24 +97,23 @@ const syncTrades = async () => {
   }
 };
 
-// Build tabs from accounts with onSelect handlers
+// Build tabs from accounts
 const tabs = computed(() => {
   const allTab = {
     label: "Alle Accounts",
     value: "all",
-    onSelect: () => {
-      selectedAccountId.value = "all";
-    },
   };
   const accountTabs = accounts.value.map((acc) => ({
     label: acc.name,
     value: acc.id,
-    onSelect: () => {
-      selectedAccountId.value = acc.id;
-    },
   }));
   return [allTab, ...accountTabs];
 });
+
+// Handle tab change
+const onTabChange = (value: string | number) => {
+  selectedAccountId.value = String(value);
+};
 
 // Fetch data based on selected account
 const statusQuery = computed(() =>
@@ -263,9 +262,10 @@ const selectedAccount = computed(() =>
       <!-- Account Tabs -->
       <UTabs
         v-if="accounts.length > 0"
-        v-model="selectedAccountId"
+        :model-value="selectedAccountId"
         :items="tabs"
         class="mb-4"
+        @update:model-value="onTabChange"
       />
 
       <!-- Account Overview (when "Alle Accounts" selected) -->
