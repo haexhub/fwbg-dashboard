@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    preset: "bun",
     experimental: {
       websocket: true,
     },
