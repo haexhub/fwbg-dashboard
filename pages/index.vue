@@ -41,8 +41,18 @@ interface Performance {
 const { data: accountsData } = await useFetch<{ accounts: Account[] }>("/api/accounts");
 const accounts = computed(() => accountsData.value?.accounts || []);
 
-// Selected account ("all" = all accounts)
-const selectedAccountId = ref<string>("all");
+// Selected account from URL query param ("all" = all accounts)
+const route = useRoute();
+const router = useRouter();
+
+const selectedAccountId = computed({
+  get: () => (route.query.account as string) || "all",
+  set: (value: string) => {
+    router.replace({
+      query: value === "all" ? {} : { account: value },
+    });
+  },
+});
 
 // Toggle account active state
 const togglingAccount = ref<string | null>(null);
