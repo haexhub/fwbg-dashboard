@@ -202,9 +202,15 @@ export class IGClient {
  * Get accounts directory path
  */
 function getAccountsDir(): string {
-  const config = useRuntimeConfig();
-  const dataPath = config.dataPath || "/app/data";
-  return join(dataPath, "accounts");
+  try {
+    const config = useRuntimeConfig();
+    const dataPath = config.dataPath || "/app/data";
+    return join(dataPath, "accounts");
+  } catch {
+    // Fallback for WebSocket handlers where useRuntimeConfig might not work
+    const dataPath = process.env.DATA_PATH || "/app/data";
+    return join(dataPath, "accounts");
+  }
 }
 
 /**
