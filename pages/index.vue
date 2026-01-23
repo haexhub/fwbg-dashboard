@@ -252,6 +252,21 @@ const formatEpic = (epic: string) => {
   return epic;
 };
 
+// Format number with thousand separators (German locale)
+const formatNumber = (value: number, decimals: number = 2) => {
+  return value.toLocaleString('de-DE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
+// Format P&L with currency symbol
+const formatPnL = (value: number, currency: string) => {
+  const symbol = currency === 'JPY' ? '¥' : currency === 'GBP' ? '£' : currency === 'CHF' ? 'CHF' : currency === 'USD' ? '$' : '€';
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${formatNumber(value)} ${symbol}`;
+};
+
 const columns: TableColumn<Trade>[] = [
   { accessorKey: "timestamp", header: "Zeit" },
   {
@@ -412,10 +427,10 @@ const selectedAccount = computed(() =>
             <div v-if="wsConnected" class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live" />
           </div>
           <p class="text-2xl font-bold text-white">
-            {{ displayAccountInfo?.balance?.toFixed(2) || "0.00" }} €
+            {{ formatNumber(displayAccountInfo?.balance || 0) }} €
           </p>
           <p class="text-xs text-gray-500">
-            Einlage: {{ displayAccountInfo?.deposit?.toFixed(2) || "0.00" }} €
+            Einlage: {{ formatNumber(displayAccountInfo?.deposit || 0) }} €
           </p>
         </UCard>
 
@@ -423,10 +438,10 @@ const selectedAccount = computed(() =>
         <UCard>
           <p class="text-sm text-gray-400">Verfügbar</p>
           <p class="text-2xl font-bold text-white">
-            {{ displayAccountInfo?.available?.toFixed(2) || "0.00" }} €
+            {{ formatNumber(displayAccountInfo?.available || 0) }} €
           </p>
           <p class="text-xs text-gray-500">
-            Margin gebunden: {{ ((displayAccountInfo?.balance || 0) - (displayAccountInfo?.available || 0)).toFixed(2) }} €
+            Margin gebunden: {{ formatNumber((displayAccountInfo?.balance || 0) - (displayAccountInfo?.available || 0)) }} €
           </p>
         </UCard>
 
@@ -441,8 +456,7 @@ const selectedAccount = computed(() =>
                 : 'text-red-500',
             ]"
           >
-            {{ (displayAccountInfo?.profitLoss || 0) >= 0 ? "+" : ""
-            }}{{ displayAccountInfo?.profitLoss?.toFixed(2) || "0.00" }} €
+            {{ formatPnL(displayAccountInfo?.profitLoss || 0, 'EUR') }}
           </p>
           <p class="text-xs text-gray-500">
             {{ displayPositions.length }} offene Position(en)
@@ -480,7 +494,7 @@ const selectedAccount = computed(() =>
         <UCard>
           <p class="text-sm text-gray-400">Win Rate</p>
           <p class="text-2xl font-bold text-white">
-            {{ performance?.winRate?.toFixed(1) || 0 }}%
+            {{ formatNumber(performance?.winRate || 0, 1) }}%
           </p>
           <p class="text-xs text-gray-500">
             {{ performance?.closedTrades || 0 }} Trades geschlossen
@@ -498,11 +512,10 @@ const selectedAccount = computed(() =>
                 : 'text-red-500',
             ]"
           >
-            {{ (performance?.totalPnl || 0) >= 0 ? "+" : ""
-            }}{{ performance?.totalPnl?.toFixed(2) || "0.00" }} €
+            {{ formatPnL(performance?.totalPnl || 0, 'EUR') }}
           </p>
           <p class="text-xs text-gray-500">
-            Max Drawdown: {{ performance?.maxDrawdown?.toFixed(2) || "0.00" }} €
+            Max Drawdown: {{ formatNumber(performance?.maxDrawdown || 0) }} €
           </p>
         </UCard>
       </div>
@@ -533,7 +546,7 @@ const selectedAccount = computed(() =>
                     : 'text-gray-400',
               ]"
             >
-              {{ row.original.profitLoss > 0 ? "+" : "" }}{{ row.original.profitLoss.toFixed(2) }} {{ row.original.currency === 'JPY' ? '¥' : row.original.currency === 'GBP' ? '£' : row.original.currency === 'CHF' ? 'CHF' : row.original.currency === 'USD' ? '$' : '€' }}
+              {{ formatPnL(row.original.profitLoss, row.original.currency) }}
             </span>
           </template>
         </UTable>
