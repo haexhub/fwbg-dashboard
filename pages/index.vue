@@ -1,26 +1,145 @@
 <script setup lang="ts">
 import type { TableColumn } from "@nuxt/ui";
 
+interface Account {
+  id: string;
+  name: string;
+  isActive: boolean;
+  accType: "DEMO" | "LIVE" | "UNKNOWN";
+  pairsCount: number;
+}
+
+interface AccountStatus {
+  accountId: string;
+  accountName: string;
+  isAlive: boolean;
+  lastHeartbeatAgo: number;
+  status: string;
+  active_pairs_count: number;
+  active_epics: string[];
+  account_mode: string;
+}
+
 interface Trade {
   timestamp: string;
   epic: string;
   signal: string;
   size: number;
   pnl: number;
+  accountId?: string;
+  accountName?: string;
 }
 
-const { data: status, refresh: refreshStatus } = await useFetch("/api/status");
-const { data: performance } = await useFetch("/api/performance");
-const { data: trades, refresh: refreshTrades } = await useFetch("/api/trades", {
-  query: { limit: 20 },
+interface Performance {
+  winRate: number;
+  totalPnl: number;
+  closedTrades: number;
+  maxDrawdown: number;
+}
+
+// Fetch all accounts
+const { data: accountsData } = await useFetch<{ accounts: Account[] }>("/api/accounts");
+const accounts = computed(() => accountsData.value?.accounts || []);
+
+// Selected account ("all" = all accounts)
+const selectedAccountId = ref<string>("all");
+
+// Toggle account active state
+const togglingAccount = ref<string | null>(null);
+const toggleAccount = async (accountId: string) => {
+  togglingAccount.value = accountId;
+  try {
+    await fetch(`/api/accounts/${accountId}/toggle`, { method: "POST" });
+    // Refresh accounts list
+    await refreshNuxtData("accounts");
+  } catch (error) {
+    console.error("Failed to toggle account:", error);
+  } finally {
+    togglingAccount.value = null;
+  }
+};
+
+// Build tabs from accounts
+const tabs = computed(() => {
+  const allTab = {
+    label: "Alle Accounts",
+    value: "all",
+  };
+  const accountTabs = accounts.value.map((acc) => ({
+    label: acc.name,
+    value: acc.id,
+  }));
+  return [allTab, ...accountTabs];
 });
-const { data: logs, refresh: refreshLogs } = await useFetch("/api/logs", {
-  query: { lines: 50 },
+
+// Fetch data based on selected account
+const statusQuery = computed(() =>
+  selectedAccountId.value && selectedAccountId.value !== "all"
+    ? { accountId: selectedAccountId.value }
+    : {}
+);
+const { data: statusData, refresh: refreshStatus } = await useFetch<{
+  accounts?: AccountStatus[];
+  summary?: { total: number; online: number; offline: number };
+} | AccountStatus>("/api/status", {
+  query: statusQuery,
+  watch: [selectedAccountId],
 });
+
+// Normalize status data for display
+const accountStatuses = computed(() => {
+  if (!statusData.value) return [];
+  if ("accounts" in statusData.value) {
+    return statusData.value.accounts || [];
+  }
+  return [statusData.value as AccountStatus];
+});
+
+const statusSummary = computed(() => {
+  if (!statusData.value) return { total: 0, online: 0, offline: 0 };
+  if ("summary" in statusData.value) {
+    return statusData.value.summary || { total: 0, online: 0, offline: 0 };
+  }
+  const status = statusData.value as AccountStatus;
+  return {
+    total: 1,
+    online: status.isAlive ? 1 : 0,
+    offline: status.isAlive ? 0 : 1,
+  };
+});
+
+const { data: performance, refresh: refreshPerformance } = await useFetch<Performance>(
+  "/api/performance",
+  {
+    query: statusQuery,
+    watch: [selectedAccountId],
+  }
+);
+
+const { data: trades, refresh: refreshTrades } = await useFetch<{ trades: Trade[] }>(
+  "/api/trades",
+  {
+    query: computed(() => ({
+      limit: 20,
+      ...(selectedAccountId.value && selectedAccountId.value !== "all"
+        ? { accountId: selectedAccountId.value }
+        : {}),
+    })),
+    watch: [selectedAccountId],
+  }
+);
+
+const { data: logs, refresh: refreshLogs } = await useFetch<{ logs: string[] }>(
+  "/api/logs",
+  {
+    query: { lines: 50 },
+  }
+);
 
 // Auto-refresh every 30 seconds
 const refreshAll = () => {
   refreshStatus();
+  refreshPerformance();
   refreshTrades();
   refreshLogs();
 };
@@ -31,7 +150,6 @@ onMounted(() => {
 });
 
 const formatEpic = (epic: string) => {
-  // CS.D.EURUSD.CEAM.IP -> EUR/USD
   const match = epic.match(/CS\.D\.(\w{3})(\w{3})/);
   if (match) {
     return `${match[1]}/${match[2]}`;
@@ -50,6 +168,26 @@ const columns: TableColumn<Trade>[] = [
   { accessorKey: "size", header: "Size" },
   { accessorKey: "pnl", header: "P&L" },
 ];
+
+// Add account column when showing all accounts
+const columnsWithAccount = computed(() => {
+  if (selectedAccountId.value && selectedAccountId.value !== "all") return columns;
+  return [
+    ...columns.slice(0, 1),
+    { accessorKey: "accountName", header: "Account" },
+    ...columns.slice(1),
+  ];
+});
+
+// Get account by ID
+const getAccountById = (id: string) => accounts.value.find((a) => a.id === id);
+
+// Currently selected account details
+const selectedAccount = computed(() =>
+  selectedAccountId.value && selectedAccountId.value !== "all"
+    ? getAccountById(selectedAccountId.value)
+    : null
+);
 </script>
 
 <template>
@@ -63,6 +201,70 @@ const columns: TableColumn<Trade>[] = [
         </UButton>
       </div>
 
+      <!-- Account Tabs -->
+      <UTabs
+        v-if="accounts.length > 0"
+        :items="tabs"
+        :model-value="selectedAccountId"
+        @update:model-value="selectedAccountId = String($event)"
+        class="mb-4"
+      />
+
+      <!-- Account Overview (when "Alle Accounts" selected) -->
+      <div v-if="selectedAccountId === 'all'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        <UCard v-for="acc in accounts" :key="acc.id">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div
+                :class="[
+                  'w-3 h-3 rounded-full',
+                  acc.isActive ? 'bg-green-500' : 'bg-gray-500',
+                ]"
+              />
+              <div>
+                <p class="text-lg font-semibold text-white">{{ acc.name }}</p>
+                <p class="text-xs text-gray-500">
+                  {{ acc.accType }} | {{ acc.pairsCount }} Pairs
+                </p>
+              </div>
+            </div>
+            <UButton
+              :color="acc.isActive ? 'success' : 'neutral'"
+              :variant="acc.isActive ? 'solid' : 'outline'"
+              :loading="togglingAccount === acc.id"
+              size="sm"
+              @click="toggleAccount(acc.id)"
+            >
+              {{ acc.isActive ? "Aktiv" : "Inaktiv" }}
+            </UButton>
+          </div>
+        </UCard>
+      </div>
+
+      <!-- Single Account Header (when specific account selected) -->
+      <div v-if="selectedAccount" class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div
+            :class="[
+              'w-3 h-3 rounded-full',
+              selectedAccount.isActive ? 'bg-green-500' : 'bg-gray-500',
+            ]"
+          />
+          <div>
+            <p class="text-sm text-gray-400">{{ selectedAccount.accType }}</p>
+            <p class="text-xs text-gray-500">{{ selectedAccount.pairsCount }} Pairs konfiguriert</p>
+          </div>
+        </div>
+        <UButton
+          :color="selectedAccount.isActive ? 'success' : 'neutral'"
+          :variant="selectedAccount.isActive ? 'solid' : 'outline'"
+          :loading="togglingAccount === selectedAccount.id"
+          @click="toggleAccount(selectedAccount.id)"
+        >
+          {{ selectedAccount.isActive ? "Aktiv" : "Inaktiv" }}
+        </UButton>
+      </div>
+
       <!-- Status Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Bot Status -->
@@ -71,16 +273,19 @@ const columns: TableColumn<Trade>[] = [
             <div
               :class="[
                 'w-3 h-3 rounded-full',
-                status?.isAlive ? 'bg-green-500 animate-pulse' : 'bg-red-500',
+                statusSummary.online > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500',
               ]"
             />
             <div>
               <p class="text-sm text-gray-400">Bot Status</p>
               <p class="text-lg font-semibold text-white">
-                {{ status?.isAlive ? "Online" : "Offline" }}
+                {{ statusSummary.online > 0 ? "Online" : "Offline" }}
               </p>
-              <p class="text-xs text-gray-500">
-                {{ status?.account_mode?.toUpperCase() }} Mode
+              <p v-if="selectedAccountId === 'all'" class="text-xs text-gray-500">
+                {{ statusSummary.online }}/{{ statusSummary.total }} Accounts aktiv
+              </p>
+              <p v-else class="text-xs text-gray-500">
+                {{ accountStatuses[0]?.account_mode || 'UNKNOWN' }} Mode
               </p>
             </div>
           </div>
@@ -90,10 +295,10 @@ const columns: TableColumn<Trade>[] = [
         <UCard>
           <p class="text-sm text-gray-400">Offene Positionen</p>
           <p class="text-2xl font-bold text-white">
-            {{ status?.active_pairs_count || 0 }}
+            {{ accountStatuses.reduce((sum, s) => sum + (s.active_pairs_count || 0), 0) }}
           </p>
-          <p class="text-xs text-gray-500">
-            {{ status?.active_epics?.map(formatEpic).join(", ") || "-" }}
+          <p class="text-xs text-gray-500 truncate">
+            {{ accountStatuses.flatMap(s => s.active_epics || []).map(formatEpic).join(", ") || "-" }}
           </p>
         </UCard>
 
@@ -136,7 +341,7 @@ const columns: TableColumn<Trade>[] = [
             <h2 class="text-lg font-semibold text-white">Trade History</h2>
           </template>
 
-          <UTable :columns="columns" :data="(trades?.trades as Trade[]) || []">
+          <UTable :columns="columnsWithAccount" :data="(trades?.trades as Trade[]) || []">
             <template #epic-cell="{ row }">
               {{ formatEpic(row.original.epic) }}
             </template>

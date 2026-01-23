@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
+import { loadAccounts } from "../utils/ig-client";
 
 interface Trade {
   timestamp: string;
@@ -8,113 +9,161 @@ interface Trade {
   signal: "BUY" | "SELL";
   size: number;
   pnl: number;
+  accountId?: string;
+  accountName?: string;
 }
 
-function parseCSV(content: string): Trade[] {
-  const lines = content.trim().split("\n");
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(",");
-  const trades: Trade[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",");
-    if (values.length !== headers.length) continue;
-
-    trades.push({
-      timestamp: values[0],
-      epic: values[1],
-      deal_id: values[2],
-      signal: values[3] as "BUY" | "SELL",
-      size: parseFloat(values[4]),
-      pnl: parseFloat(values[5]),
-    });
-  }
-
-  return trades;
+interface IGTransaction {
+  date: string;
+  reference: string;
+  instrumentName: string;
+  profitAndLoss: string;
+  size: string;
 }
 
-export default defineEventHandler(async () => {
+function parseIGTransaction(tx: IGTransaction, accountId?: string, accountName?: string): Trade {
+  const pnlMatch = tx.profitAndLoss?.match(/[+-]?[\d.]+/);
+  const pnl = pnlMatch ? parseFloat(pnlMatch[0]) : 0;
+  const sizeNum = parseFloat(tx.size) || 0;
+
+  return {
+    timestamp: tx.date || "",
+    epic: tx.instrumentName || "",
+    deal_id: tx.reference || "",
+    signal: sizeNum < 0 ? "SELL" : "BUY",
+    size: Math.abs(sizeNum),
+    pnl,
+    accountId,
+    accountName,
+  };
+}
+
+/**
+ * GET /api/performance
+ * Returns performance metrics for all accounts or a specific account
+ * Query params:
+ *   - accountId: Filter by specific account
+ */
+export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
-  const tradesPath = join(config.dataPath, "trade_history.csv");
+  const query = getQuery(event);
+  const accountIdFilter = query.accountId as string | undefined;
 
-  try {
-    const content = await readFile(tradesPath, "utf-8");
-    const trades = parseCSV(content);
+  let allTrades: Trade[] = [];
 
-    // Only consider closed trades (pnl != 0)
-    const closedTrades = trades.filter((t) => t.pnl !== 0);
+  // Get all configured accounts
+  const accounts = await loadAccounts();
 
-    if (closedTrades.length === 0) {
-      return {
-        totalTrades: trades.length,
-        closedTrades: 0,
-        openTrades: trades.filter((t) => t.pnl === 0).length,
-        winRate: 0,
-        totalPnl: 0,
-        avgPnl: 0,
-        profitFactor: 0,
-        maxDrawdown: 0,
-        equityCurve: [],
-      };
-    }
+  // Filter accounts if specific one requested
+  const accountsToQuery = accountIdFilter
+    ? accounts.filter((a) => a.id === accountIdFilter)
+    : accounts;
 
-    const wins = closedTrades.filter((t) => t.pnl > 0);
-    const losses = closedTrades.filter((t) => t.pnl < 0);
-
-    const totalPnl = closedTrades.reduce((sum, t) => sum + t.pnl, 0);
-    const grossProfit = wins.reduce((sum, t) => sum + t.pnl, 0);
-    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.pnl, 0));
-
-    // Calculate equity curve and max drawdown
-    let equity = 0;
-    let peak = 0;
-    let maxDrawdown = 0;
-    const equityCurve: number[] = [];
-
-    // Sort by timestamp
-    closedTrades.sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  // Read transactions from each account
+  for (const account of accountsToQuery) {
+    const txHistoryPath = join(
+      config.dataPath,
+      "stats_export",
+      account.id,
+      "transaction_history.json"
     );
 
-    for (const trade of closedTrades) {
-      equity += trade.pnl;
-      equityCurve.push(equity);
+    try {
+      const txContent = await readFile(txHistoryPath, "utf-8");
+      const txData = JSON.parse(txContent);
 
-      if (equity > peak) {
-        peak = equity;
+      if (txData.transactions && Array.isArray(txData.transactions)) {
+        const accountTrades = txData.transactions.map((tx: IGTransaction) =>
+          parseIGTransaction(tx, account.id, account.name)
+        );
+        allTrades.push(...accountTrades);
       }
-
-      const drawdown = peak - equity;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
-      }
+    } catch {
+      // No transaction data for this account yet
     }
+  }
 
+  // If no accounts configured, try legacy location
+  if (accounts.length === 0) {
+    const legacyPath = join(
+      config.dataPath,
+      "stats_export",
+      "transaction_history.json"
+    );
+
+    try {
+      const txContent = await readFile(legacyPath, "utf-8");
+      const txData = JSON.parse(txContent);
+
+      if (txData.transactions && Array.isArray(txData.transactions)) {
+        allTrades = txData.transactions.map((tx: IGTransaction) =>
+          parseIGTransaction(tx)
+        );
+      }
+    } catch {
+      // No legacy data either
+    }
+  }
+
+  // Only consider trades with P&L (closed trades)
+  const closedTrades = allTrades.filter((t) => t.pnl !== 0);
+
+  if (closedTrades.length === 0) {
     return {
-      totalTrades: trades.length,
-      closedTrades: closedTrades.length,
-      openTrades: trades.filter((t) => t.pnl === 0).length,
-      winRate: (wins.length / closedTrades.length) * 100,
-      totalPnl: Math.round(totalPnl * 100) / 100,
-      avgPnl: Math.round((totalPnl / closedTrades.length) * 100) / 100,
-      profitFactor: grossLoss > 0 ? Math.round((grossProfit / grossLoss) * 100) / 100 : 0,
-      maxDrawdown: Math.round(maxDrawdown * 100) / 100,
-      equityCurve,
-    };
-  } catch (error) {
-    return {
-      totalTrades: 0,
+      totalTrades: allTrades.length,
       closedTrades: 0,
-      openTrades: 0,
+      openTrades: allTrades.filter((t) => t.pnl === 0).length,
       winRate: 0,
       totalPnl: 0,
       avgPnl: 0,
       profitFactor: 0,
       maxDrawdown: 0,
       equityCurve: [],
-      error: "Could not calculate performance",
     };
   }
+
+  const wins = closedTrades.filter((t) => t.pnl > 0);
+  const losses = closedTrades.filter((t) => t.pnl < 0);
+
+  const totalPnl = closedTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const grossProfit = wins.reduce((sum, t) => sum + t.pnl, 0);
+  const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.pnl, 0));
+
+  // Calculate equity curve and max drawdown
+  let equity = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  const equityCurve: number[] = [];
+
+  // Sort by timestamp
+  closedTrades.sort(
+    (a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  for (const trade of closedTrades) {
+    equity += trade.pnl;
+    equityCurve.push(equity);
+
+    if (equity > peak) {
+      peak = equity;
+    }
+
+    const drawdown = peak - equity;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+
+  return {
+    totalTrades: allTrades.length,
+    closedTrades: closedTrades.length,
+    openTrades: allTrades.filter((t) => t.pnl === 0).length,
+    winRate: Math.round((wins.length / closedTrades.length) * 100 * 100) / 100,
+    totalPnl: Math.round(totalPnl * 100) / 100,
+    avgPnl: Math.round((totalPnl / closedTrades.length) * 100) / 100,
+    profitFactor: grossLoss > 0 ? Math.round((grossProfit / grossLoss) * 100) / 100 : 0,
+    maxDrawdown: Math.round(maxDrawdown * 100) / 100,
+    equityCurve,
+  };
 });
