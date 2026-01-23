@@ -55,6 +55,10 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
 
       // Fetch positions
       const rawPositions = await client.getOpenPositions();
+      // Debug: Log first raw position to see structure
+      if (rawPositions.length > 0) {
+        console.log(`[WS] Raw position sample:`, JSON.stringify(rawPositions[0], null, 2));
+      }
       const positions: Position[] = rawPositions.map((p: any) => ({
         dealId: p.position?.dealId || "",
         epic: p.market?.epic || "",
