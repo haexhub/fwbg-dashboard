@@ -62,7 +62,7 @@ const { appVersion } = useRuntimeConfig().public;
 const {
   allPositions: livePositions,
   accountSummary: liveAccountSummary,
-  liveData,
+  liveDataObj,
   isConnected: wsConnected,
   connect: wsConnect,
   subscribe: wsSubscribe,
@@ -231,7 +231,7 @@ const displayPositions = computed(() => {
   if (selectedAccountId.value === "all") {
     return livePositions.value.length > 0 ? [...livePositions.value] : [];
   }
-  const accountData = liveData.value.get(selectedAccountId.value);
+  const accountData = liveDataObj.value[selectedAccountId.value];
   return accountData?.positions ? [...accountData.positions] : [];
 });
 
@@ -240,7 +240,7 @@ const displayAccountInfo = computed(() => {
   if (selectedAccountId.value === "all") {
     return liveAccountSummary.value.balance > 0 ? liveAccountSummary.value : null;
   }
-  const accountData = liveData.value.get(selectedAccountId.value);
+  const accountData = liveDataObj.value[selectedAccountId.value];
   return accountData?.account || null;
 });
 

@@ -36,19 +36,9 @@ export function useLiveData() {
   const isConnected = ref(false);
   const error = ref<string | null>(null);
   const ws = ref<WebSocket | null>(null);
-  const updateCounter = ref(0);
-
-  // Convert to Map for compatibility
-  const liveData = computed(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _ = updateCounter.value; // trigger reactivity
-    return new Map(Object.entries(liveDataObj.value));
-  });
 
   // Combined positions from all accounts
   const allPositions = computed(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _ = updateCounter.value; // trigger reactivity
     const positions: Position[] = [];
     for (const data of Object.values(liveDataObj.value)) {
       positions.push(...data.positions);
@@ -58,8 +48,6 @@ export function useLiveData() {
 
   // Combined account summary
   const accountSummary = computed(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _ = updateCounter.value; // trigger reactivity
     let balance = 0;
     let available = 0;
     let profitLoss = 0;
@@ -75,9 +63,9 @@ export function useLiveData() {
     return { balance, available, profitLoss, deposit };
   });
 
-  // Get data for a specific account
-  const getAccountData = (accountId: string) => {
-    return computed(() => liveData.value.get(accountId) || null);
+  // Get data for a specific account - returns the account data directly
+  const getAccountData = (accountId: string): AccountLiveData | null => {
+    return liveDataObj.value[accountId] || null;
   };
 
   function connect(accountId?: string) {
@@ -105,17 +93,18 @@ export function useLiveData() {
         console.log("[WS] Received:", data.type, data.accountId, data.account?.balance);
 
         if (data.type === "positions" && data.accountId) {
-          // Update the reactive object directly
-          liveDataObj.value[data.accountId] = {
-            accountId: data.accountId,
-            accountName: data.accountName,
-            positions: data.positions || [],
-            account: data.account || { balance: 0, available: 0, profitLoss: 0, deposit: 0 },
-            lastUpdate: data.timestamp,
+          // Create a new object to trigger Vue reactivity
+          liveDataObj.value = {
+            ...liveDataObj.value,
+            [data.accountId]: {
+              accountId: data.accountId,
+              accountName: data.accountName,
+              positions: data.positions || [],
+              account: data.account || { balance: 0, available: 0, profitLoss: 0, deposit: 0 },
+              lastUpdate: data.timestamp,
+            },
           };
-          // Increment counter to trigger computed updates
-          updateCounter.value++;
-          console.log("[WS] Updated liveData, accounts:", Object.keys(liveDataObj.value).length);
+          console.log("[WS] Updated liveData, accounts:", Object.keys(liveDataObj.value).length, "balance:", data.account?.balance);
         } else if (data.type === "error") {
           console.error("[WS] Server error:", data.error);
         }
@@ -162,7 +151,7 @@ export function useLiveData() {
   }
 
   return {
-    liveData: readonly(liveData),
+    liveDataObj: readonly(liveDataObj),
     allPositions,
     accountSummary,
     getAccountData,
