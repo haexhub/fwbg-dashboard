@@ -45,13 +45,14 @@ const accounts = computed(() => accountsData.value?.accounts || []);
 const route = useRoute();
 const router = useRouter();
 
-const selectedAccountId = computed(() => (route.query.account as string) || "all");
-
-const setSelectedAccount = (value: string) => {
-  router.replace({
-    query: value === "all" ? {} : { account: value },
-  });
-};
+const selectedAccountId = computed({
+  get() {
+    return (route.query.account as string) || "all";
+  },
+  set(value: string) {
+    router.push({ query: value === "all" ? {} : { account: value } });
+  },
+});
 
 // Toggle account active state
 const togglingAccount = ref<string | null>(null);
@@ -248,7 +249,7 @@ const selectedAccount = computed(() =>
         v-if="accounts.length > 0"
         :items="tabs"
         :model-value="selectedAccountId"
-        @update:model-value="setSelectedAccount(String($event))"
+        @update:model-value="selectedAccountId = String($event)"
         class="mb-4"
       />
 
