@@ -533,7 +533,7 @@ const selectedAccount = computed(() =>
                     : 'text-gray-400',
               ]"
             >
-              {{ row.original.profitLoss > 0 ? "+" : "" }}{{ row.original.profitLoss.toFixed(2) }} €
+              {{ row.original.profitLoss > 0 ? "+" : "" }}{{ row.original.profitLoss.toFixed(2) }} {{ row.original.currency === 'JPY' ? '¥' : row.original.currency === 'GBP' ? '£' : row.original.currency === 'CHF' ? 'CHF' : row.original.currency === 'USD' ? '$' : '€' }}
             </span>
           </template>
         </UTable>

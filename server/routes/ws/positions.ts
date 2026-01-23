@@ -55,13 +55,6 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
 
       // Fetch positions
       const rawPositions = await client.getOpenPositions();
-      // Debug: log all position fields to find P&L
-      if (rawPositions.length > 0) {
-        const p = rawPositions[0];
-        console.log(`[WS] Position fields:`, Object.keys(p.position || {}));
-        console.log(`[WS] Market fields:`, Object.keys(p.market || {}));
-        console.log(`[WS] Full position:`, JSON.stringify(p.position, null, 2));
-      }
       const positions: Position[] = rawPositions.map((p: any) => {
         const direction = p.position?.direction || "";
         const size = parseFloat(p.position?.size || 0);
@@ -70,16 +63,16 @@ async function fetchLiveData(accountId?: string): Promise<LiveUpdate[]> {
           ? parseFloat(p.market?.bid || 0)
           : parseFloat(p.market?.offer || 0);
         const contractSize = parseFloat(p.position?.contractSize || 1);
-        const scalingFactor = parseFloat(p.market?.scalingFactor || 1);
 
-        // Calculate P&L: (currentLevel - openLevel) * size * contractSize / scalingFactor
+        // Calculate P&L: (currentLevel - openLevel) * size * contractSize
         // For SELL positions, flip the sign
+        // Note: scalingFactor is for display precision, not P&L calculation
         let profitLoss = 0;
         if (openLevel > 0 && currentLevel > 0) {
           const priceDiff = currentLevel - openLevel;
           profitLoss = direction === "SELL"
-            ? -priceDiff * size * contractSize / scalingFactor
-            : priceDiff * size * contractSize / scalingFactor;
+            ? -priceDiff * size * contractSize
+            : priceDiff * size * contractSize;
         }
 
         return {
