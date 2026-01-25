@@ -352,6 +352,11 @@ const selectedAccount = computed(() =>
           <UButton icon="i-heroicons-arrow-path" @click="refreshAll">
             Refresh
           </UButton>
+          <NuxtLink to="/settings">
+            <UButton icon="i-heroicons-cog-6-tooth" variant="ghost">
+              Settings
+            </UButton>
+          </NuxtLink>
         </div>
       </div>
 

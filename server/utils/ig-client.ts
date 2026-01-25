@@ -196,6 +196,65 @@ export class IGClient {
     );
     return cfdAccount || null;
   }
+
+  /**
+   * Close a single position by deal ID
+   */
+  async closePosition(dealId: string, direction: string, size: number) {
+    const headers = await this.getAuthHeaders();
+
+    // For closing, direction needs to be opposite
+    const closeDirection = direction === "BUY" ? "SELL" : "BUY";
+
+    const response = await fetch(`${this.apiUrl}/positions/otc`, {
+      method: "DELETE",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        VERSION: "1",
+        _method: "DELETE",
+      },
+      body: JSON.stringify({
+        dealId,
+        direction: closeDirection,
+        size: String(size),
+        orderType: "MARKET",
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to close position ${dealId}: ${error}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Close all open positions (emergency stop)
+   */
+  async closeAllPositions(): Promise<{ closed: number; errors: string[] }> {
+    const positions = await this.getOpenPositions();
+    const errors: string[] = [];
+    let closed = 0;
+
+    for (const pos of positions) {
+      try {
+        await this.closePosition(
+          pos.position.dealId,
+          pos.position.direction,
+          pos.position.size
+        );
+        closed++;
+      } catch (error) {
+        errors.push(
+          `${pos.market.instrumentName}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    return { closed, errors };
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     dataPath: process.env.DATA_PATH || "./data",
+    accountsPath: process.env.ACCOUNTS_PATH || "/app/accounts",
     public: {
       appVersion: pkg.version,
     },
