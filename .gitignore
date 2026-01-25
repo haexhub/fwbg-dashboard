@@ -5,5 +5,16 @@ node_modules
 data/
 .DS_Store
 
+# Test artifacts
 playwright-report/
 test-results/
+playwright/.cache/
+
+# Local config
+.nuxtrc
+*.local.*
+
+# Lock files (use bun.lock)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
