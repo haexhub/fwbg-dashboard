@@ -260,6 +260,7 @@ const toggleHour = (assetName: string, hour: number) => {
   if (!editingAssets.value) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   const index = asset.good_hours.indexOf(hour);
   if (index >= 0) {
     asset.good_hours.splice(index, 1);
@@ -275,6 +276,7 @@ const addFeature = (assetName: string) => {
   if (!editingAssets.value || !newFeature.value[assetName]) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   if (!asset.features.includes(newFeature.value[assetName])) {
     asset.features.push(newFeature.value[assetName]);
   }
@@ -286,6 +288,7 @@ const removeFeature = (assetName: string, feature: string) => {
   if (!editingAssets.value) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   const index = asset.features.indexOf(feature);
   if (index >= 0) {
     asset.features.splice(index, 1);
@@ -297,6 +300,7 @@ const addEnsemble = (assetName: string) => {
   if (!editingAssets.value) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   asset.ensemble.push({
     tp_mult: asset.tp_mult,
     sl_mult: asset.sl_mult,
@@ -310,6 +314,7 @@ const removeEnsemble = (assetName: string, index: number) => {
   if (!editingAssets.value) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   asset.ensemble.splice(index, 1);
 };
 
@@ -325,6 +330,7 @@ const addDdScaling = (assetName: string) => {
     return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   asset.dd_scaling[newDdLevel.value[assetName]] = newDdScale.value[assetName];
   newDdLevel.value[assetName] = "";
   newDdScale.value[assetName] = 0.5;
@@ -335,6 +341,7 @@ const removeDdScaling = (assetName: string, level: string) => {
   if (!editingAssets.value) return;
 
   const asset = editingAssets.value[assetName];
+  if (!asset) return;
   delete asset.dd_scaling[level];
 };
 
