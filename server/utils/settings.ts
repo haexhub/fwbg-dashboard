@@ -3,7 +3,7 @@
  * Reads from fwbg accounts/[accountName]/ structure
  */
 
-import { readFile, writeFile, readdir, stat } from "fs/promises";
+import { readFile, writeFile, readdir, stat, mkdir } from "fs/promises";
 import { join } from "path";
 import type { AccountInfo, AssetsConfig } from "./settings-types";
 
@@ -138,6 +138,40 @@ export async function accountExists(accountName: string): Promise<boolean> {
     return folderStat.isDirectory();
   } catch {
     return false;
+  }
+}
+
+/**
+ * Create a new account folder with account_info.json and empty assets.json
+ */
+export async function createAccount(
+  folderName: string,
+  info: AccountInfo
+): Promise<boolean> {
+  const accountsPath = getAccountsPath();
+  const folderPath = join(accountsPath, folderName);
+
+  try {
+    // Check if folder already exists
+    if (await accountExists(folderName)) {
+      throw new Error(`Account folder "${folderName}" already exists`);
+    }
+
+    // Create folder
+    await mkdir(folderPath, { recursive: true });
+
+    // Save account_info.json
+    const infoPath = join(folderPath, "account_info.json");
+    await writeFile(infoPath, JSON.stringify(info, null, 2), "utf-8");
+
+    // Create empty assets.json
+    const assetsPath = join(folderPath, "assets.json");
+    await writeFile(assetsPath, JSON.stringify({}, null, 4), "utf-8");
+
+    return true;
+  } catch (error) {
+    console.error(`Error creating account ${folderName}:`, error);
+    throw error;
   }
 }
 

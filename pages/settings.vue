@@ -391,6 +391,81 @@ const envOptions = [
 
 // Hours array for grid
 const hours = Array.from({ length: 24 }, (_, i) => i);
+
+// New account form
+const showNewAccountForm = ref(false);
+const creatingAccount = ref(false);
+const newAccountFolderName = ref("");
+const newAccountInfo = ref<AccountInfo>({
+  credentials: {
+    api_key: "",
+    username: "",
+    password: "",
+    env: "DEMO",
+  },
+  money_management: {
+    max_margin_usage: 0.9,
+    min_lot_size: 0.1,
+    emergency_stop_pct: 0.15,
+  },
+  metadata: {
+    account_name: "",
+    currency: "EUR",
+    is_active: false,
+  },
+});
+
+const resetNewAccountForm = () => {
+  newAccountFolderName.value = "";
+  newAccountInfo.value = {
+    credentials: {
+      api_key: "",
+      username: "",
+      password: "",
+      env: "DEMO",
+    },
+    money_management: {
+      max_margin_usage: 0.9,
+      min_lot_size: 0.1,
+      emergency_stop_pct: 0.15,
+    },
+    metadata: {
+      account_name: "",
+      currency: "EUR",
+      is_active: false,
+    },
+  };
+};
+
+const createNewAccount = async () => {
+  if (!newAccountFolderName.value || !newAccountInfo.value.metadata.account_name) {
+    alert("Bitte Ordnernamen und Account-Namen eingeben");
+    return;
+  }
+
+  creatingAccount.value = true;
+  try {
+    await $fetch("/api/settings/accounts", {
+      method: "POST",
+      body: {
+        folderName: newAccountFolderName.value,
+        info: newAccountInfo.value,
+      },
+    });
+    await refreshAccounts();
+    showNewAccountForm.value = false;
+    resetNewAccountForm();
+    // Select the new account
+    selectedAccount.value = newAccountFolderName.value;
+  } catch (error) {
+    console.error("Failed to create account:", error);
+    alert(
+      `Fehler beim Erstellen des Accounts: ${error instanceof Error ? error.message : String(error)}`
+    );
+  } finally {
+    creatingAccount.value = false;
+  }
+};
 </script>
 
 <template>
@@ -399,12 +474,155 @@ const hours = Array.from({ length: 24 }, (_, i) => i);
       <!-- Header -->
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-white">Settings</h1>
-        <NuxtLink to="/">
-          <UButton icon="i-heroicons-arrow-left" variant="ghost">
-            Zurück zum Dashboard
+        <div class="flex gap-2">
+          <UButton
+            icon="i-heroicons-plus"
+            @click="showNewAccountForm = true"
+          >
+            Neuer Account
           </UButton>
-        </NuxtLink>
+          <NuxtLink to="/">
+            <UButton icon="i-heroicons-arrow-left" variant="ghost">
+              Zurück zum Dashboard
+            </UButton>
+          </NuxtLink>
+        </div>
       </div>
+
+      <!-- New Account Modal -->
+      <UModal v-model:open="showNewAccountForm">
+        <template #content>
+          <UCard class="w-full max-w-2xl">
+            <template #header>
+              <div class="flex items-center gap-2">
+                <UIcon name="i-heroicons-user-plus" class="w-6 h-6 text-primary" />
+                <span class="text-lg font-bold text-white">Neuen Account erstellen</span>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <UFormField label="Ordnername" hint="Wird als Ordnername verwendet (z.B. main_demo, live_account)">
+                <UInput
+                  v-model="newAccountFolderName"
+                  placeholder="z.B. main_demo"
+                  class="w-full font-mono"
+                />
+              </UFormField>
+
+              <div class="border-t border-gray-700 pt-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-3">Account Info</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <UFormField label="Account Name">
+                    <UInput
+                      v-model="newAccountInfo.metadata.account_name"
+                      placeholder="z.B. Demo Account"
+                      class="w-full"
+                    />
+                  </UFormField>
+
+                  <UFormField label="Währung">
+                    <USelect
+                      v-model="newAccountInfo.metadata.currency"
+                      :items="currencyOptions"
+                      class="w-full"
+                    />
+                  </UFormField>
+
+                  <UFormField label="Umgebung">
+                    <USelect
+                      v-model="newAccountInfo.credentials.env"
+                      :items="envOptions"
+                      class="w-full"
+                    />
+                  </UFormField>
+                </div>
+              </div>
+
+              <div class="border-t border-gray-700 pt-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-3">Credentials</h4>
+                <div class="space-y-4">
+                  <UFormField label="API Key">
+                    <UInput
+                      v-model="newAccountInfo.credentials.api_key"
+                      placeholder="IG API Key"
+                      class="w-full font-mono"
+                    />
+                  </UFormField>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <UFormField label="Username">
+                      <UInput
+                        v-model="newAccountInfo.credentials.username"
+                        placeholder="IG Username"
+                        class="w-full"
+                      />
+                    </UFormField>
+
+                    <UFormField label="Password">
+                      <UInput
+                        v-model="newAccountInfo.credentials.password"
+                        type="password"
+                        placeholder="IG Password"
+                        class="w-full"
+                      />
+                    </UFormField>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border-t border-gray-700 pt-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-3">Money Management</h4>
+                <div class="grid grid-cols-3 gap-4">
+                  <UFormField label="Max Margin Usage">
+                    <UInput
+                      v-model.number="newAccountInfo.money_management.max_margin_usage"
+                      type="number"
+                      step="0.01"
+                      class="w-full"
+                    />
+                  </UFormField>
+
+                  <UFormField label="Min Lot Size">
+                    <UInput
+                      v-model.number="newAccountInfo.money_management.min_lot_size"
+                      type="number"
+                      step="0.01"
+                      class="w-full"
+                    />
+                  </UFormField>
+
+                  <UFormField label="Emergency Stop %">
+                    <UInput
+                      v-model.number="newAccountInfo.money_management.emergency_stop_pct"
+                      type="number"
+                      step="0.01"
+                      class="w-full"
+                    />
+                  </UFormField>
+                </div>
+              </div>
+            </div>
+
+            <template #footer>
+              <div class="flex justify-end gap-2">
+                <UButton
+                  variant="ghost"
+                  @click="showNewAccountForm = false; resetNewAccountForm()"
+                >
+                  Abbrechen
+                </UButton>
+                <UButton
+                  color="primary"
+                  :loading="creatingAccount"
+                  @click="createNewAccount"
+                >
+                  Account erstellen
+                </UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+      </UModal>
 
       <!-- Account Tabs -->
       <UTabs
