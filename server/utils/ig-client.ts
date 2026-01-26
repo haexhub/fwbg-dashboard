@@ -225,6 +225,133 @@ export class IGClient {
 
     return { closed, errors };
   }
+
+  /**
+   * Get market navigation tree (for browsing available markets)
+   * @param nodeId - Optional node ID to get children of (root if not provided)
+   */
+  async getMarketNavigation(nodeId?: string): Promise<{
+    nodes: Array<{ id: string; name: string }>;
+    markets: Array<{ epic: string; instrumentName: string; expiry: string; instrumentType: string }>;
+  }> {
+    const headers = await this.getAuthHeaders();
+
+    const url = nodeId
+      ? `${this.apiUrl}/marketnavigation/${nodeId}`
+      : `${this.apiUrl}/marketnavigation`;
+
+    const response = await fetch(url, {
+      headers: {
+        ...headers,
+        VERSION: "1",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch market navigation: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      nodes: data.nodes || [],
+      markets: data.markets || [],
+    };
+  }
+
+  /**
+   * Search for markets by term
+   * @param searchTerm - Search term (e.g., "EUR", "GOLD", "DAX")
+   */
+  async searchMarkets(searchTerm: string): Promise<Array<{
+    epic: string;
+    instrumentName: string;
+    instrumentType: string;
+    expiry: string;
+    high: number;
+    low: number;
+    percentageChange: number;
+    netChange: number;
+    bid: number;
+    offer: number;
+    scalingFactor: number;
+  }>> {
+    const headers = await this.getAuthHeaders();
+
+    const response = await fetch(
+      `${this.apiUrl}/markets?searchTerm=${encodeURIComponent(searchTerm)}`,
+      {
+        headers: {
+          ...headers,
+          VERSION: "1",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to search markets: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.markets || [];
+  }
+
+  /**
+   * Get watchlists (user's saved market lists)
+   */
+  async getWatchlists(): Promise<Array<{
+    id: string;
+    name: string;
+    editable: boolean;
+    deleteable: boolean;
+    defaultSystemWatchlist: boolean;
+  }>> {
+    const headers = await this.getAuthHeaders();
+
+    const response = await fetch(`${this.apiUrl}/watchlists`, {
+      headers: {
+        ...headers,
+        VERSION: "1",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch watchlists: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.watchlists || [];
+  }
+
+  /**
+   * Get markets in a watchlist
+   */
+  async getWatchlistMarkets(watchlistId: string): Promise<Array<{
+    epic: string;
+    instrumentName: string;
+    instrumentType: string;
+    expiry: string;
+    high: number;
+    low: number;
+    bid: number;
+    offer: number;
+    scalingFactor: number;
+  }>> {
+    const headers = await this.getAuthHeaders();
+
+    const response = await fetch(`${this.apiUrl}/watchlists/${watchlistId}`, {
+      headers: {
+        ...headers,
+        VERSION: "1",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch watchlist markets: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.markets || [];
+  }
 }
 
 
