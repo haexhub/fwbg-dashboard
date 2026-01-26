@@ -52,16 +52,26 @@ export class IGClient {
         : "https://api.ig.com/gateway/deal";
   }
 
-  private async getAuthHeaders(): Promise<Record<string, string>> {
+  /**
+   * Invalidate cached session (call when API returns 401/403)
+   */
+  public invalidateSession(): void {
+    sessionCache.delete(this.accountId);
+  }
+
+  private async getAuthHeaders(forceRefresh = false): Promise<Record<string, string>> {
     const cached = sessionCache.get(this.accountId);
 
-    if (cached && cached.expiresAt > Date.now()) {
+    if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
       return {
         "X-IG-API-KEY": this.apiKey,
         CST: cached.cst,
         "X-SECURITY-TOKEN": cached.securityToken,
       };
     }
+
+    // Clear old session before requesting new one
+    sessionCache.delete(this.accountId);
 
     const response = await fetch(`${this.apiUrl}/session`, {
       method: "POST",
@@ -102,14 +112,26 @@ export class IGClient {
   }
 
   async getOpenPositions() {
-    const headers = await this.getAuthHeaders();
+    let headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${this.apiUrl}/positions`, {
+    let response = await fetch(`${this.apiUrl}/positions`, {
       headers: {
         ...headers,
         VERSION: "2",
       },
     });
+
+    // Retry with fresh session on auth failure
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(`${this.apiUrl}/positions`, {
+        headers: {
+          ...headers,
+          VERSION: "2",
+        },
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch positions: ${response.statusText}`);
@@ -120,21 +142,32 @@ export class IGClient {
   }
 
   async getTransactionHistory(days: number = 30) {
-    const headers = await this.getAuthHeaders();
+    let headers = await this.getAuthHeaders();
 
     const toDate = new Date();
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
 
-    const response = await fetch(
-      `${this.apiUrl}/history/transactions?from=${fromDate.toISOString()}&to=${toDate.toISOString()}&type=ALL`,
-      {
+    const url = `${this.apiUrl}/history/transactions?from=${fromDate.toISOString()}&to=${toDate.toISOString()}&type=ALL`;
+
+    let response = await fetch(url, {
+      headers: {
+        ...headers,
+        VERSION: "2",
+      },
+    });
+
+    // Retry with fresh session on auth failure
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(url, {
         headers: {
           ...headers,
           VERSION: "2",
         },
-      }
-    );
+      });
+    }
 
     if (!response.ok) {
       throw new Error(
@@ -147,14 +180,26 @@ export class IGClient {
   }
 
   async getAccountInfo() {
-    const headers = await this.getAuthHeaders();
+    let headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${this.apiUrl}/accounts`, {
+    let response = await fetch(`${this.apiUrl}/accounts`, {
       headers: {
         ...headers,
         VERSION: "1",
       },
     });
+
+    // Retry with fresh session on auth failure
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(`${this.apiUrl}/accounts`, {
+        headers: {
+          ...headers,
+          VERSION: "1",
+        },
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch account info: ${response.statusText}`);
@@ -275,17 +320,28 @@ export class IGClient {
     offer: number;
     scalingFactor: number;
   }>> {
-    const headers = await this.getAuthHeaders();
+    let headers = await this.getAuthHeaders();
 
-    const response = await fetch(
-      `${this.apiUrl}/markets?searchTerm=${encodeURIComponent(searchTerm)}`,
-      {
+    const url = `${this.apiUrl}/markets?searchTerm=${encodeURIComponent(searchTerm)}`;
+
+    let response = await fetch(url, {
+      headers: {
+        ...headers,
+        VERSION: "1",
+      },
+    });
+
+    // Retry with fresh session on auth failure
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(url, {
         headers: {
           ...headers,
           VERSION: "1",
         },
-      }
-    );
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to search markets: ${response.statusText}`);
