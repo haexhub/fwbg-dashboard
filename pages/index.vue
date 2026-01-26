@@ -10,6 +10,15 @@ interface Account {
   pairsCount: number;
 }
 
+interface SlippageWarning {
+  symbol: string;
+  timestamp: string;
+  expected_price: number;
+  actual_price: number;
+  slippage_pct: number;
+  direction: string;
+}
+
 interface AccountStatus {
   accountId: string;
   accountName: string;
@@ -19,6 +28,7 @@ interface AccountStatus {
   active_pairs_count: number;
   active_epics: string[];
   account_mode: string;
+  slippage_warnings: SlippageWarning[];
 }
 
 interface Trade {
@@ -167,6 +177,20 @@ const statusSummary = computed(() => {
     online: status.isAlive ? 1 : 0,
     offline: status.isAlive ? 0 : 1,
   };
+});
+
+// Slippage warnings from all accounts (or selected account)
+const slippageWarnings = computed(() => {
+  const warnings: (SlippageWarning & { accountName: string })[] = [];
+  for (const status of accountStatuses.value) {
+    if (status.slippage_warnings && status.slippage_warnings.length > 0) {
+      for (const warning of status.slippage_warnings) {
+        warnings.push({ ...warning, accountName: status.accountName });
+      }
+    }
+  }
+  // Sort by timestamp descending (newest first)
+  return warnings.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 });
 
 const { data: performance, refresh: refreshPerformance } = await useFetch<Performance>(
@@ -370,6 +394,46 @@ const selectedAccount = computed(() =>
         :items="tabs"
         class="mb-4"
       />
+
+      <!-- SLIPPAGE WARNINGS - Prominent Alert -->
+      <UCard v-if="slippageWarnings.length > 0" class="border-2 border-orange-500 bg-orange-950/30">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-exclamation-triangle" class="w-6 h-6 text-orange-500" />
+            <h2 class="text-lg font-bold text-orange-500">Slippage-Warnungen ({{ slippageWarnings.length }})</h2>
+          </div>
+        </template>
+
+        <div class="space-y-2">
+          <div
+            v-for="(warning, idx) in slippageWarnings"
+            :key="idx"
+            class="flex items-center justify-between p-3 bg-orange-900/20 rounded-lg border border-orange-800"
+          >
+            <div class="flex items-center gap-4">
+              <UBadge :color="warning.direction === 'BUY' ? 'success' : 'error'" size="sm">
+                {{ warning.direction }}
+              </UBadge>
+              <span class="font-semibold text-white">{{ warning.symbol }}</span>
+              <span class="text-gray-400 text-sm">{{ warning.accountName }}</span>
+            </div>
+            <div class="flex items-center gap-6 text-sm">
+              <div class="text-gray-400">
+                <span class="text-gray-500">Erwartet:</span> {{ warning.expected_price?.toFixed(5) }}
+              </div>
+              <div class="text-gray-400">
+                <span class="text-gray-500">Ausgeführt:</span> {{ warning.actual_price?.toFixed(5) }}
+              </div>
+              <div class="text-orange-400 font-bold">
+                {{ warning.slippage_pct?.toFixed(2) }}% Slippage
+              </div>
+              <div class="text-gray-500 text-xs">
+                {{ new Date(warning.timestamp).toLocaleString('de-DE') }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </UCard>
 
       <!-- Account Overview (when "Alle Accounts" selected) -->
       <div v-if="selectedAccountId === 'all'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">

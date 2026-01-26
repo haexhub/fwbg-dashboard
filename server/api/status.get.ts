@@ -2,6 +2,15 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { loadAccounts } from "../utils/ig-client";
 
+interface SlippageWarning {
+  symbol: string;
+  timestamp: string;
+  expected_price: number;
+  actual_price: number;
+  slippage_pct: number;
+  direction: string;
+}
+
 interface BotStatus {
   last_heartbeat: string;
   status: string;
@@ -9,6 +18,7 @@ interface BotStatus {
   active_epics: string[];
   account_id?: string;
   account_mode: string;
+  slippage_warnings?: SlippageWarning[];
 }
 
 interface AccountStatus extends BotStatus {
@@ -16,6 +26,7 @@ interface AccountStatus extends BotStatus {
   accountName: string;
   isAlive: boolean;
   lastHeartbeatAgo: number;
+  slippage_warnings: SlippageWarning[];
 }
 
 /**
@@ -61,6 +72,7 @@ export default defineEventHandler(async (event) => {
         accountName: account.name,
         isAlive,
         lastHeartbeatAgo: Math.round(diffMinutes),
+        slippage_warnings: status.slippage_warnings || [],
       });
     } catch {
       // No status file for this account yet
@@ -73,7 +85,8 @@ export default defineEventHandler(async (event) => {
         last_heartbeat: "",
         active_pairs_count: 0,
         active_epics: [],
-        account_mode: account.isDemo ? "DEMO" : "LIVE",
+        account_mode: "UNKNOWN",
+        slippage_warnings: [],
       });
     }
   }
@@ -97,6 +110,7 @@ export default defineEventHandler(async (event) => {
         accountName: "Default Account",
         isAlive,
         lastHeartbeatAgo: Math.round(diffMinutes),
+        slippage_warnings: status.slippage_warnings || [],
       });
     } catch {
       statuses.push({
@@ -109,6 +123,7 @@ export default defineEventHandler(async (event) => {
         active_pairs_count: 0,
         active_epics: [],
         account_mode: "unknown",
+        slippage_warnings: [],
       });
     }
   }
