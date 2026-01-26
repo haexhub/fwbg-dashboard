@@ -2,10 +2,14 @@
  * IG Markets API Client
  * Handles authentication and API calls to IG trading platform
  * Supports multiple accounts with individual configurations
+ *
+ * Account structure: ACCOUNTS_PATH/[accountName]/account_info.json
  */
 
-import { readFile, writeFile, readdir } from "fs/promises";
+import { readFile, writeFile, readdir, stat } from "fs/promises";
 import { join } from "path";
+import type { AccountInfo, AssetsConfig } from "./settings-types";
+import { getAccountsPath } from "./accounts-path";
 
 export interface IGAccountConfig {
   id: string;
@@ -17,42 +21,8 @@ export interface IGAccountConfig {
     password: string;
     acc_type: "DEMO" | "LIVE";
   };
-  bot: {
-    resolution: string;
-    lookback: number;
-    data_source: string;
-    risk_size: number;
-    log_file: string;
-  };
-  xgb_settings: {
-    n_estimators: number;
-    max_depth: number;
-    learning_rate: number;
-    n_jobs: number;
-    random_state: number;
-  };
-  money_management: {
-    max_risk_pct: number;
-    kelly_multiplier: number;
-  };
-  strategy: {
-    conf_thresh: number;
-    adx_thresh: number;
-    sl_atr_mult: number;
-    tp_atr_mult: number;
-  };
-  pairs: Record<
-    string,
-    {
-      epic: string;
-      conf_thresh?: number;
-      adx_thresh?: number;
-      sl_atr_mult?: number;
-      tp_atr_mult?: number;
-      stability?: number;
-    }
-  >;
-  _config_file?: string;
+  pairs: Record<string, { epic: string }>;
+  _folder_path?: string;
 }
 
 interface IGSession {
@@ -257,49 +227,67 @@ export class IGClient {
   }
 }
 
-/**
- * Get accounts directory path
- */
-function getAccountsDir(): string {
-  try {
-    const config = useRuntimeConfig();
-    const dataPath = config.dataPath || "/app/data";
-    return join(dataPath, "accounts");
-  } catch {
-    // Fallback for WebSocket handlers where useRuntimeConfig might not work
-    const dataPath = process.env.DATA_PATH || "/app/data";
-    return join(dataPath, "accounts");
-  }
-}
 
 /**
- * Load all account configurations from accounts/*.json files
+ * Load all account configurations from accounts/[accountName]/account_info.json
  */
 export async function loadAccounts(): Promise<IGAccountConfig[]> {
-  const accountsDir = getAccountsDir();
+  const accountsDir = getAccountsPath();
   const accounts: IGAccountConfig[] = [];
 
   try {
-    const files = await readdir(accountsDir);
+    const entries = await readdir(accountsDir);
 
-    for (const file of files) {
-      // Skip non-JSON and example files
-      if (!file.endsWith(".json") || file.includes(".example.")) {
-        continue;
-      }
+    for (const entry of entries) {
+      const entryPath = join(accountsDir, entry);
 
       try {
-        const filePath = join(accountsDir, file);
-        const content = await readFile(filePath, "utf-8");
-        const config = JSON.parse(content) as IGAccountConfig;
-        config._config_file = filePath;
+        const entryStat = await stat(entryPath);
+        if (!entryStat.isDirectory()) continue;
+
+        // Try to load account_info.json from folder
+        const infoPath = join(entryPath, "account_info.json");
+        const content = await readFile(infoPath, "utf-8");
+        const info = JSON.parse(content) as AccountInfo;
+
+        // Load assets.json for pairs
+        let pairs: Record<string, { epic: string }> = {};
+        try {
+          const assetsPath = join(entryPath, "assets.json");
+          const assetsContent = await readFile(assetsPath, "utf-8");
+          const assets = JSON.parse(assetsContent) as AssetsConfig;
+          // Convert assets to pairs format (epic is the asset key)
+          for (const assetName of Object.keys(assets)) {
+            pairs[assetName] = { epic: assetName };
+          }
+        } catch {
+          // No assets.json yet
+        }
+
+        // Convert to IGAccountConfig format
+        const config: IGAccountConfig = {
+          id: entry,
+          name: info.metadata.account_name || entry,
+          isActive: info.metadata.is_active ?? true,
+          credentials: {
+            api_key: info.credentials.api_key,
+            username: info.credentials.username,
+            password: info.credentials.password,
+            acc_type: info.credentials.env,
+          },
+          pairs,
+          _folder_path: entryPath,
+        };
+
         accounts.push(config);
       } catch (e) {
-        console.error(`Error loading ${file}:`, e);
+        // Skip folders without valid account_info.json
+        console.error(`Error loading account from ${entry}:`, e);
       }
     }
-  } catch {
+  } catch (e) {
     // accounts directory doesn't exist yet
+    console.error("Error reading accounts directory:", e);
   }
 
   return accounts;
@@ -324,16 +312,34 @@ export async function getAccount(
 }
 
 /**
- * Save account configuration
+ * Save account configuration (saves to account_info.json)
  */
 export async function saveAccount(account: IGAccountConfig): Promise<void> {
-  const accountsDir = getAccountsDir();
-  const filePath = account._config_file || join(accountsDir, `${account.id}.json`);
+  const accountsDir = getAccountsPath();
+  const folderPath = account._folder_path || join(accountsDir, account.id);
+  const filePath = join(folderPath, "account_info.json");
 
-  // Remove internal field before saving
-  const { _config_file, ...accountData } = account;
+  // Convert back to AccountInfo format
+  const info: AccountInfo = {
+    credentials: {
+      api_key: account.credentials.api_key,
+      username: account.credentials.username,
+      password: account.credentials.password,
+      env: account.credentials.acc_type,
+    },
+    money_management: {
+      max_margin_usage: 0.9,
+      min_lot_size: 0.1,
+      emergency_stop_pct: 0.15,
+    },
+    metadata: {
+      account_name: account.name,
+      currency: "EUR",
+      is_active: account.isActive,
+    },
+  };
 
-  await writeFile(filePath, JSON.stringify(accountData, null, 2), "utf-8");
+  await writeFile(filePath, JSON.stringify(info, null, 2), "utf-8");
 }
 
 /**
@@ -349,9 +355,22 @@ export async function toggleAccountActive(
     return null;
   }
 
-  account.isActive = isActive;
-  await saveAccount(account);
-  return account;
+  // Load and update account_info.json directly
+  const accountsDir = getAccountsPath();
+  const infoPath = join(accountsDir, accountId, "account_info.json");
+
+  try {
+    const content = await readFile(infoPath, "utf-8");
+    const info = JSON.parse(content) as AccountInfo;
+    info.metadata.is_active = isActive;
+    await writeFile(infoPath, JSON.stringify(info, null, 2), "utf-8");
+
+    account.isActive = isActive;
+    return account;
+  } catch (e) {
+    console.error(`Error toggling account ${accountId}:`, e);
+    return null;
+  }
 }
 
 /**

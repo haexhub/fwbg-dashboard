@@ -718,14 +718,19 @@ const createNewAccount = async () => {
                     : "Aktivieren"
                 }}
               </UButton>
-              <UButton
-                color="error"
-                variant="solid"
-                icon="i-heroicons-exclamation-triangle"
-                @click="showEmergencyConfirm = true"
+              <UTooltip
+                :text="`Schließt alle offenen Positionen sofort zum Marktpreis und deaktiviert den Account. Zukünftige Trades werden verhindert, bis der Account wieder aktiviert wird.`"
               >
-                Notschalter
-              </UButton>
+                <UButton
+                  color="error"
+                  variant="solid"
+                  icon="i-heroicons-exclamation-triangle"
+                  @click="showEmergencyConfirm = true"
+                >
+                  Notschalter
+                  <UIcon name="i-heroicons-information-circle" class="ml-1 w-4 h-4" />
+                </UButton>
+              </UTooltip>
             </div>
           </div>
         </UCard>

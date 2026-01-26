@@ -1,8 +1,5 @@
-import {
-  accountExists,
-  setAccountActive,
-  createSettingsIGClient,
-} from "~/server/utils/settings";
+import { accountExists, setAccountActive } from "~/server/utils/settings";
+import { createIGClient } from "~/server/utils/ig-client";
 
 export default defineEventHandler(async (event) => {
   const accountName = getRouterParam(event, "account");
@@ -23,15 +20,17 @@ export default defineEventHandler(async (event) => {
   }
 
   // Create IG client and close all positions
-  const client = await createSettingsIGClient(accountName);
-  if (!client) {
+  let client;
+  try {
+    client = await createIGClient(accountName);
+  } catch (error) {
     throw createError({
       statusCode: 500,
-      statusMessage: `Failed to create IG client for '${accountName}'`,
+      statusMessage: `Failed to create IG client for '${accountName}': ${error instanceof Error ? error.message : String(error)}`,
     });
   }
 
-  let closeResult = { closed: 0, failed: 0, errors: [] as string[] };
+  let closeResult = { closed: 0, errors: [] as string[] };
 
   try {
     closeResult = await client.closeAllPositions();
@@ -49,7 +48,7 @@ export default defineEventHandler(async (event) => {
     success: true,
     accountDeactivated: deactivated,
     positionsClosed: closeResult.closed,
-    positionsFailed: closeResult.failed,
+    positionsFailed: closeResult.errors.length,
     errors: closeResult.errors,
   };
 });
