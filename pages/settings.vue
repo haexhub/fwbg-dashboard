@@ -103,6 +103,13 @@ const expandedAssets = ref<Set<string>>(new Set());
 const togglingActive = ref(false);
 const emergencyStopping = ref(false);
 const showEmergencyConfirm = ref(false);
+const resettingAccount = ref(false);
+const showResetConfirm = ref(false);
+const resetResult = ref<{
+  currentBalance: number;
+  suggestedResetAmount: number;
+  manualResetUrl: string;
+} | null>(null);
 
 // Initialize editing state when data loads
 watch(
@@ -203,6 +210,50 @@ const emergencyStop = async () => {
     );
   } finally {
     emergencyStopping.value = false;
+  }
+};
+
+// Reset account - close all positions and show balance reset info
+const resetAccount = async () => {
+  if (!selectedAccount.value) return;
+
+  resettingAccount.value = true;
+  try {
+    const result = await $fetch<{
+      positionsClosed: number;
+      positionsFailed: number;
+      errors: string[];
+      currentBalance: number;
+      suggestedResetAmount: number;
+      manualResetUrl: string;
+      isDemoAccount: boolean;
+    }>(`/api/settings/${selectedAccount.value}/reset`, {
+      method: "POST",
+      body: { closePositions: true },
+    });
+
+    showResetConfirm.value = false;
+
+    // Show result with balance info
+    if (result.positionsFailed > 0) {
+      alert(
+        `Account Reset durchgeführt!\n\nPositionen geschlossen: ${result.positionsClosed}\nFehlgeschlagen: ${result.positionsFailed}\n\nFehler:\n${result.errors.join("\n")}`
+      );
+    }
+
+    // Store result for showing manual reset info
+    resetResult.value = {
+      currentBalance: result.currentBalance,
+      suggestedResetAmount: result.suggestedResetAmount,
+      manualResetUrl: result.manualResetUrl,
+    };
+  } catch (error) {
+    console.error("Account reset failed:", error);
+    alert(
+      `Account Reset fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+    );
+  } finally {
+    resettingAccount.value = false;
   }
 };
 
@@ -846,9 +897,126 @@ const createNewAccount = async () => {
                   <UIcon name="i-heroicons-information-circle" class="ml-1 w-4 h-4" />
                 </UButton>
               </UTooltip>
+              <UTooltip
+                v-if="editingInfo.credentials.env === 'DEMO'"
+                text="Schließt alle Positionen und zeigt Anleitung zum Zurücksetzen des Kontostands"
+              >
+                <UButton
+                  color="warning"
+                  variant="soft"
+                  icon="i-heroicons-arrow-path"
+                  @click="showResetConfirm = true"
+                >
+                  Reset
+                </UButton>
+              </UTooltip>
             </div>
           </div>
         </UCard>
+
+        <!-- Account Reset Confirmation Modal -->
+        <UModal v-model:open="showResetConfirm">
+          <template #content>
+            <UCard>
+              <template #header>
+                <div class="flex items-center gap-2 text-yellow-500">
+                  <UIcon name="i-heroicons-arrow-path" class="w-6 h-6" />
+                  <span class="text-lg font-bold">Demo-Account zurücksetzen?</span>
+                </div>
+              </template>
+
+              <div class="space-y-4">
+                <p class="text-gray-300">
+                  Diese Aktion wird:
+                </p>
+                <ul class="list-disc list-inside text-gray-400 space-y-1">
+                  <li>Alle offenen Positionen sofort zum Marktpreis schließen</li>
+                </ul>
+                <p class="text-blue-400 text-sm">
+                  Nach dem Schließen der Positionen erhältst du einen Link, um den Kontostand manuell auf der IG-Plattform zurückzusetzen (30.000€ oder nächste 10k-Grenze).
+                </p>
+              </div>
+
+              <template #footer>
+                <div class="flex justify-end gap-2">
+                  <UButton
+                    variant="ghost"
+                    @click="showResetConfirm = false"
+                  >
+                    Abbrechen
+                  </UButton>
+                  <UButton
+                    color="warning"
+                    :loading="resettingAccount"
+                    @click="resetAccount"
+                  >
+                    Positionen schließen
+                  </UButton>
+                </div>
+              </template>
+            </UCard>
+          </template>
+        </UModal>
+
+        <!-- Account Reset Result Modal -->
+        <UModal v-model:open="resetResult">
+          <template #content>
+            <UCard>
+              <template #header>
+                <div class="flex items-center gap-2 text-green-500">
+                  <UIcon name="i-heroicons-check-circle" class="w-6 h-6" />
+                  <span class="text-lg font-bold">Positionen geschlossen</span>
+                </div>
+              </template>
+
+              <div class="space-y-4" v-if="resetResult">
+                <p class="text-gray-300">
+                  Alle Positionen wurden geschlossen. Um den Kontostand zurückzusetzen:
+                </p>
+
+                <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+                  <p class="text-sm text-gray-400">Aktueller Kontostand:</p>
+                  <p class="text-xl font-bold text-white">{{ resetResult.currentBalance.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) }}</p>
+                  <p class="text-sm text-gray-400 mt-2">Empfohlener Reset-Betrag:</p>
+                  <p class="text-xl font-bold text-green-400">{{ resetResult.suggestedResetAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) }}</p>
+                </div>
+
+                <div class="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
+                  <p class="text-sm text-blue-300 mb-2">
+                    <strong>Anleitung:</strong>
+                  </p>
+                  <ol class="list-decimal list-inside text-sm text-gray-300 space-y-1">
+                    <li>Öffne die IG-Plattform über den Link unten</li>
+                    <li>Gehe zu "Mein IG" → "Live-Konten"</li>
+                    <li>Wähle dein Demo-Konto aus</li>
+                    <li>Klicke auf "Guthaben zurücksetzen"</li>
+                  </ol>
+                </div>
+              </div>
+
+              <template #footer>
+                <div class="flex justify-between items-center">
+                  <UButton
+                    v-if="resetResult"
+                    color="primary"
+                    variant="solid"
+                    icon="i-heroicons-arrow-top-right-on-square"
+                    :to="resetResult.manualResetUrl"
+                    target="_blank"
+                  >
+                    IG-Plattform öffnen
+                  </UButton>
+                  <UButton
+                    variant="ghost"
+                    @click="resetResult = null"
+                  >
+                    Schließen
+                  </UButton>
+                </div>
+              </template>
+            </UCard>
+          </template>
+        </UModal>
 
         <!-- Emergency Stop Confirmation Modal -->
         <UModal v-model:open="showEmergencyConfirm">
