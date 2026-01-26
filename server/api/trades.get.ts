@@ -27,9 +27,29 @@ interface IGTransaction {
 }
 
 function parseIGTransaction(tx: IGTransaction, accountId?: string, accountName?: string): Trade {
-  // Parse P&L from string like "E-3.78" or "E40.82"
-  const pnlMatch = tx.profitAndLoss?.match(/[+-]?[\d.]+/);
-  const pnl = pnlMatch ? parseFloat(pnlMatch[0]) : 0;
+  // Parse P&L from string like "E-3.78", "E40.82", or "E-3,307.31" (European format)
+  // Remove currency symbol and normalize: replace comma with dot for decimals, handle thousands
+  const pnlStr = tx.profitAndLoss?.replace(/[^0-9.,-]/g, "") || "0";
+  // Handle European format: "3,307.31" or "-3,307.31" -> normalize to "3307.31"
+  // If there's both comma and dot, comma is thousands separator
+  // If only comma, it could be decimal separator (e.g., "3,78" = 3.78)
+  let normalizedPnl = pnlStr;
+  if (pnlStr.includes(",") && pnlStr.includes(".")) {
+    // Both present: comma is thousands separator (e.g., "3,307.31")
+    normalizedPnl = pnlStr.replace(/,/g, "");
+  } else if (pnlStr.includes(",")) {
+    // Only comma: could be decimal (e.g., "3,78") - check position
+    const commaPos = pnlStr.lastIndexOf(",");
+    const afterComma = pnlStr.slice(commaPos + 1);
+    if (afterComma.length <= 2) {
+      // Likely decimal separator
+      normalizedPnl = pnlStr.replace(",", ".");
+    } else {
+      // Likely thousands separator
+      normalizedPnl = pnlStr.replace(/,/g, "");
+    }
+  }
+  const pnl = parseFloat(normalizedPnl) || 0;
 
   // Determine signal from size (negative = SELL, positive = BUY)
   const sizeNum = parseFloat(tx.size) || 0;
