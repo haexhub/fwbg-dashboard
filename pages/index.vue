@@ -217,6 +217,9 @@ onMounted(() => {
   // Start WebSocket connection for live data
   wsConnect();
 
+  // Initial sync to fetch latest data from IG API
+  syncTrades();
+
   const interval = setInterval(refreshAll, 30000);
   onUnmounted(() => clearInterval(interval));
 });
