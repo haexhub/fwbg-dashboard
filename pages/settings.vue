@@ -105,6 +105,7 @@ const emergencyStopping = ref(false);
 const showEmergencyConfirm = ref(false);
 const resettingAccount = ref(false);
 const showResetConfirm = ref(false);
+const showResetResult = ref(false);
 const resetResult = ref<{
   currentBalance: number;
   suggestedResetAmount: number;
@@ -247,6 +248,7 @@ const resetAccount = async () => {
       suggestedResetAmount: result.suggestedResetAmount,
       manualResetUrl: result.manualResetUrl,
     };
+    showResetResult.value = true;
   } catch (error) {
     console.error("Account reset failed:", error);
     alert(
@@ -959,7 +961,7 @@ const createNewAccount = async () => {
         </UModal>
 
         <!-- Account Reset Result Modal -->
-        <UModal v-model:open="resetResult">
+        <UModal v-model:open="showResetResult">
           <template #content>
             <UCard>
               <template #header>
@@ -1008,7 +1010,7 @@ const createNewAccount = async () => {
                   </UButton>
                   <UButton
                     variant="ghost"
-                    @click="resetResult = null"
+                    @click="showResetResult = false"
                   >
                     Schließen
                   </UButton>
