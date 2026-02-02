@@ -216,18 +216,36 @@ const { data: trades, refresh: refreshTrades } = await useFetch<{ trades: Trade[
   }
 );
 
-const { data: logs, refresh: refreshLogs } = await useFetch<{ logs: string[] }>(
-  "/api/logs",
-  {
-    query: computed(() => ({
-      lines: 50,
-      ...(selectedAccountId.value && selectedAccountId.value !== "all"
-        ? { accountId: selectedAccountId.value }
-        : {}),
-    })),
-    watch: [selectedAccountId],
+const { data: logs, refresh: refreshLogs } = await useFetch<{
+  logs: string[];
+  fileSize?: number;
+  totalLines?: number;
+}>("/api/logs", {
+  query: computed(() => ({
+    lines: 50,
+    ...(selectedAccountId.value && selectedAccountId.value !== "all"
+      ? { accountId: selectedAccountId.value }
+      : {}),
+  })),
+  watch: [selectedAccountId],
+});
+
+const clearingLogs = ref(false);
+
+const clearLogs = async () => {
+  if (!confirm("Alle Bot-Logs wirklich löschen?")) return;
+
+  clearingLogs.value = true;
+  try {
+    await $fetch("/api/logs", { method: "DELETE" });
+    await refreshLogs();
+  } catch (error) {
+    console.error("Failed to clear logs:", error);
+    alert(`Logs löschen fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    clearingLogs.value = false;
   }
-);
+};
 
 // Auto-refresh every 30 seconds (for non-live data)
 const refreshAll = () => {
@@ -658,7 +676,24 @@ const selectedAccount = computed(() =>
       <!-- Bot Logs -->
       <UCard>
         <template #header>
-          <h2 class="text-lg font-semibold text-white">Bot Logs</h2>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <h2 class="text-lg font-semibold text-white">Bot Logs</h2>
+              <UBadge v-if="logs?.fileSize" color="neutral" variant="subtle">
+                {{ (logs.fileSize / 1024 / 1024).toFixed(2) }} MB
+              </UBadge>
+            </div>
+            <UButton
+              size="sm"
+              color="error"
+              variant="ghost"
+              icon="i-heroicons-trash"
+              :loading="clearingLogs"
+              @click="clearLogs"
+            >
+              Logs löschen
+            </UButton>
+          </div>
         </template>
 
         <div
