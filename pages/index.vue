@@ -290,7 +290,7 @@ const selectedAccount = computed(() =>
       />
 
       <!-- Performance Cards -->
-      <DashboardPerformanceCards :performance="performance" />
+      <DashboardPerformanceCards :performance="performance ?? null" />
 
       <!-- Open Positions Table -->
       <DashboardOpenPositionsTable
@@ -305,7 +305,7 @@ const selectedAccount = computed(() =>
       />
 
       <!-- Bot Logs -->
-      <DashboardBotLogsCard :logs="logs" @refresh="refreshLogs" />
+      <DashboardBotLogsCard :logs="logs ?? null" @refresh="refreshLogs" />
     </div>
   </div>
 </template>
