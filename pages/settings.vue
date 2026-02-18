@@ -170,26 +170,20 @@ const updateAsset = (assetName: string, asset: AssetConfig) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 text-white p-4 md:p-8">
-    <div class="max-w-6xl mx-auto space-y-4">
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">Settings</h1>
-        <div class="flex gap-2">
-          <UButton
-            icon="i-heroicons-plus"
-            color="primary"
-            @click="showNewAccountModal = true"
-          >
-            New Account
-          </UButton>
-          <NuxtLink to="/">
-            <UButton variant="ghost" icon="i-heroicons-arrow-left">
-              Zurück
-            </UButton>
-          </NuxtLink>
-        </div>
+  <div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-white">Settings</h1>
+      <div class="flex gap-2">
+        <UButton
+          icon="i-heroicons-plus"
+          color="primary"
+          @click="showNewAccountModal = true"
+        >
+          New Account
+        </UButton>
       </div>
+    </div>
 
       <!-- New Account Modal -->
       <SettingsNewAccountModal
@@ -289,6 +283,5 @@ const updateAsset = (assetName: string, asset: AssetConfig) => {
           />
         </div>
       </template>
-    </div>
   </div>
 </template>

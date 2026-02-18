@@ -16,6 +16,9 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.4.0",
+    "@vue-dnd-kit/core": "^2.0.0-alpha10",
+    "@vueuse/core": "^14.2.1",
+    "klinecharts": "^10.0.0-beta1",
     "nuxt": "^4.2.2",
     "tailwindcss": "^4.1.18",
     "vue": "^3.5.13",

@@ -12,9 +12,6 @@ import type {
 } from "~/types/dashboard";
 import { useLiveData } from "~/composables/useLiveData";
 
-// App version from runtime config
-const { appVersion } = useRuntimeConfig().public;
-
 // Live data via WebSocket
 const {
   allPositions: livePositions,
@@ -221,91 +218,81 @@ const selectedAccount = computed(() =>
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 p-6">
-    <div class="max-w-7xl mx-auto space-y-6">
-      <!-- Header -->
-      <DashboardHeader
-        :app-version="appVersion"
-        :syncing="syncing"
-        @sync="syncTrades"
-        @refresh="refreshAll"
-      />
+  <div class="space-y-6">
+    <!-- Account Tabs -->
+    <UTabs
+      v-if="accounts.length > 0"
+      v-model="selectedAccountId"
+      :items="tabs"
+      class="mb-4"
+    />
 
-      <!-- Account Tabs -->
-      <UTabs
-        v-if="accounts.length > 0"
-        v-model="selectedAccountId"
-        :items="tabs"
-        class="mb-4"
-      />
+    <!-- Slippage Warnings -->
+    <DashboardSlippageWarningsCard :warnings="slippageWarnings" />
 
-      <!-- Slippage Warnings -->
-      <DashboardSlippageWarningsCard :warnings="slippageWarnings" />
+    <!-- Account Overview (when "Alle Accounts" selected) -->
+    <DashboardAccountOverviewGrid
+      v-if="selectedAccountId === 'all'"
+      :accounts="accounts"
+      :toggling-account="togglingAccount"
+      @toggle="toggleAccount"
+    />
 
-      <!-- Account Overview (when "Alle Accounts" selected) -->
-      <DashboardAccountOverviewGrid
-        v-if="selectedAccountId === 'all'"
-        :accounts="accounts"
-        :toggling-account="togglingAccount"
-        @toggle="toggleAccount"
-      />
-
-      <!-- Single Account Header (when specific account selected) -->
-      <div
-        v-if="selectedAccount"
-        class="flex items-center justify-between mb-4"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            :class="[
-              'w-3 h-3 rounded-full',
-              selectedAccount.isActive ? 'bg-green-500' : 'bg-gray-500',
-            ]"
-          />
-          <div>
-            <p class="text-sm text-gray-400">{{ selectedAccount.accType }}</p>
-            <p class="text-xs text-gray-500">
-              {{ selectedAccount.pairsCount }} Pairs konfiguriert
-            </p>
-          </div>
+    <!-- Single Account Header (when specific account selected) -->
+    <div
+      v-if="selectedAccount"
+      class="flex items-center justify-between mb-4"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          :class="[
+            'w-3 h-3 rounded-full',
+            selectedAccount.isActive ? 'bg-green-500' : 'bg-gray-500',
+          ]"
+        />
+        <div>
+          <p class="text-sm text-gray-400">{{ selectedAccount.accType }}</p>
+          <p class="text-xs text-gray-500">
+            {{ selectedAccount.pairsCount }} Pairs konfiguriert
+          </p>
         </div>
-        <UButton
-          :color="selectedAccount.isActive ? 'success' : 'neutral'"
-          :variant="selectedAccount.isActive ? 'solid' : 'outline'"
-          :loading="togglingAccount === selectedAccount.id"
-          @click="toggleAccount(selectedAccount.id)"
-        >
-          {{ selectedAccount.isActive ? "Aktiv" : "Inaktiv" }}
-        </UButton>
       </div>
-
-      <!-- Live Account Info Cards -->
-      <DashboardLiveAccountCards
-        :account-info="displayAccountInfo"
-        :positions-count="displayPositions.length"
-        :status-summary="statusSummary"
-        :account-statuses="accountStatuses"
-        :ws-connected="wsConnected"
-        :show-all-accounts="selectedAccountId === 'all'"
-      />
-
-      <!-- Performance Cards -->
-      <DashboardPerformanceCards :performance="performance ?? null" />
-
-      <!-- Open Positions Table -->
-      <DashboardOpenPositionsTable
-        :positions="displayPositions"
-        :ws-connected="wsConnected"
-      />
-
-      <!-- Trade History -->
-      <DashboardTradeHistoryTable
-        :trades="trades?.trades || []"
-        :show-account-column="selectedAccountId === 'all'"
-      />
-
-      <!-- Bot Logs -->
-      <DashboardBotLogsCard :logs="logs ?? null" @refresh="refreshLogs" />
+      <UButton
+        :color="selectedAccount.isActive ? 'success' : 'neutral'"
+        :variant="selectedAccount.isActive ? 'solid' : 'outline'"
+        :loading="togglingAccount === selectedAccount.id"
+        @click="toggleAccount(selectedAccount.id)"
+      >
+        {{ selectedAccount.isActive ? "Aktiv" : "Inaktiv" }}
+      </UButton>
     </div>
+
+    <!-- Live Account Info Cards -->
+    <DashboardLiveAccountCards
+      :account-info="displayAccountInfo"
+      :positions-count="displayPositions.length"
+      :status-summary="statusSummary"
+      :account-statuses="accountStatuses"
+      :ws-connected="wsConnected"
+      :show-all-accounts="selectedAccountId === 'all'"
+    />
+
+    <!-- Performance Cards -->
+    <DashboardPerformanceCards :performance="performance ?? null" />
+
+    <!-- Open Positions Table -->
+    <DashboardOpenPositionsTable
+      :positions="displayPositions"
+      :ws-connected="wsConnected"
+    />
+
+    <!-- Trade History -->
+    <DashboardTradeHistoryTable
+      :trades="trades?.trades || []"
+      :show-account-column="selectedAccountId === 'all'"
+    />
+
+    <!-- Bot Logs -->
+    <DashboardBotLogsCard :logs="logs ?? null" @refresh="refreshLogs" />
   </div>
 </template>

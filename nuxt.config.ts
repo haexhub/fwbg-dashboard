@@ -8,6 +8,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     dataPath: process.env.DATA_PATH || "./data",
     accountsPath: process.env.ACCOUNTS_PATH || "/app/accounts",
+    fwbgApiUrl: process.env.FWBG_API_URL || "http://localhost:8420",
     public: {
       appVersion: pkg.version,
     },
