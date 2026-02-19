@@ -3,9 +3,24 @@ import { init, dispose } from "klinecharts";
 import type {
   Chart,
   KLineData,
+  Crosshair,
   DataLoaderGetBarsParams,
+  DataLoaderSubscribeBarParams,
+  DataLoaderUnsubscribeBarParams,
 } from "klinecharts";
 import type { OhlcvResponse } from "~/types/chart";
+import type { ChartTick } from "~/composables/useChartStream";
+
+export interface CrosshairData {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  timestamp: number;
+  change: number;
+  changePercent: number;
+}
 
 const props = defineProps<{
   source: string;
@@ -13,10 +28,39 @@ const props = defineProps<{
   timeframe: string;
   pricePrecision: number;
   activeDrawingTool: string | null;
+  chartType: "candle_solid" | "ohlc" | "area";
+}>();
+
+const emit = defineEmits<{
+  "crosshair-change": [data: CrosshairData | null];
+  "drawing-cancelled": [];
 }>();
 
 const chartContainer = ref<HTMLDivElement | null>(null);
 let chart: Chart | null = null;
+
+// ── Live price streaming for broker sources ──
+const {
+  isConnected: streamConnected,
+  connect: streamConnect,
+  disconnect: streamDisconnect,
+  resubscribe: streamResubscribe,
+  onTick,
+} = useChartStream();
+
+// KLineChart's subscribeBar callback — set by the DataLoader, called with each tick
+let barCallback: ((data: KLineData) => void) | null = null;
+
+onTick((tick: ChartTick) => {
+  if (!barCallback) return;
+  barCallback({
+    timestamp: tick.timestamp,
+    open: tick.open,
+    high: tick.high,
+    low: tick.low,
+    close: tick.close,
+  });
+});
 
 // Map timeframe strings to KLineChart Period format
 const PERIOD_MAP: Record<string, { type: string; span: number }> = {
@@ -28,6 +72,43 @@ const PERIOD_MAP: Record<string, { type: string; span: number }> = {
   HOUR_4: { type: "hour", span: 4 },
   DAY: { type: "day", span: 1 },
 };
+
+/**
+ * Custom x-axis date formatter — less noise per timeframe.
+ * Hourly: only show "HH:mm", with date only when day changes.
+ * Daily: only show "DD.MM", with year only when year changes.
+ */
+function formatDate(params: {
+  timestamp: number;
+  template: string;
+  type: "tooltip" | "crosshair" | "xAxis";
+}): string {
+  const d = new Date(params.timestamp);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+
+  // Crosshair/tooltip — always show full date+time
+  if (params.type === "crosshair" || params.type === "tooltip") {
+    return `${dd}.${mo}.${yyyy} ${hh}:${mm}`;
+  }
+
+  const tf = props.timeframe;
+  if (tf.startsWith("MINUTE") || tf === "HOUR" || tf === "HOUR_4") {
+    // Intraday: show only time, add date at day boundaries
+    if (hh === "00" && mm === "00") {
+      return `${dd}.${mo}`;
+    }
+    return `${hh}:${mm}`;
+  }
+  // Daily+: show only date
+  if (dd === "01") {
+    return `${mo}/${yyyy}`;
+  }
+  return `${dd}.${mo}`;
+}
 
 /**
  * Fetch OHLCV data from the API.
@@ -56,10 +137,29 @@ async function fetchOhlcvData(
   return response.data as KLineData[];
 }
 
+/**
+ * Manage streaming connection based on current source.
+ * Connects for broker sources, disconnects for CSV sources.
+ */
+function updateStreamConnection() {
+  if (props.source.startsWith("broker:")) {
+    if (streamConnected.value) {
+      streamResubscribe(props.source, props.symbol, props.timeframe);
+    } else {
+      streamConnect(props.source, props.symbol, props.timeframe);
+    }
+  } else {
+    streamDisconnect();
+  }
+}
+
 onMounted(() => {
   if (!chartContainer.value) return;
 
   chart = init(chartContainer.value, {
+    formatter: {
+      formatDate,
+    },
     styles: {
       grid: {
         show: true,
@@ -98,7 +198,7 @@ onMounted(() => {
 
   if (!chart) return;
 
-  // Set data loader
+  // Set data loader with subscribeBar for live updates
   chart.setDataLoader({
     getBars: async (params: DataLoaderGetBarsParams) => {
       // Only load on init; ignore forward/backward for now
@@ -114,10 +214,20 @@ onMounted(() => {
           props.source
         );
         params.callback(data, false);
+
+        // Start streaming after initial data is loaded
+        nextTick(updateStreamConnection);
       } catch (e) {
         console.error("Failed to load chart data:", e);
         params.callback([], false);
       }
+    },
+    subscribeBar: (params: DataLoaderSubscribeBarParams) => {
+      // KLineChart calls this when it wants real-time bar updates
+      barCallback = params.callback;
+    },
+    unsubscribeBar: (_params: DataLoaderUnsubscribeBarParams) => {
+      barCallback = null;
     },
   });
 
@@ -137,9 +247,35 @@ onMounted(() => {
   });
   observer.observe(chartContainer.value);
   onBeforeUnmount(() => observer.disconnect());
+
+  // Crosshair data subscription
+  const crosshairHandler = (data: unknown) => {
+    const bar = (data as Crosshair).kLineData;
+    if (!bar) {
+      emit("crosshair-change", null);
+      return;
+    }
+    const change = bar.close - bar.open;
+    const changePercent = bar.open !== 0 ? (change / bar.open) * 100 : 0;
+    emit("crosshair-change", {
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+      volume: bar.volume ?? 0,
+      timestamp: bar.timestamp,
+      change,
+      changePercent,
+    });
+  };
+  chart.subscribeAction("onCrosshairChange", crosshairHandler);
+  onBeforeUnmount(() => {
+    chart?.unsubscribeAction("onCrosshairChange", crosshairHandler);
+  });
 });
 
 onBeforeUnmount(() => {
+  streamDisconnect();
   if (chartContainer.value) {
     dispose(chartContainer.value);
     chart = null;
@@ -156,6 +292,7 @@ watch(
       pricePrecision: props.pricePrecision,
       volumePrecision: 0,
     });
+    // Stream resubscribe happens after data reload in getBars callback
   }
 );
 
@@ -166,6 +303,7 @@ watch(
     if (!chart) return;
     const period = PERIOD_MAP[newTf] ?? { type: "hour", span: 1 };
     chart.setPeriod(period as any);
+    // Stream resubscribe happens after data reload in getBars callback
   }
 );
 
@@ -187,6 +325,8 @@ watch(
   () => props.source,
   () => {
     if (!chart) return;
+    // Disconnect stream first — will reconnect after data reload
+    streamDisconnect();
     // Re-set symbol to trigger DataLoader reload
     chart.setSymbol({
       ticker: props.symbol,
@@ -196,23 +336,73 @@ watch(
   }
 );
 
-// Watch drawing tool changes
+// Watch chart type changes
+watch(
+  () => props.chartType,
+  (type) => {
+    if (!chart) return;
+    chart.setStyles({ candle: { type } });
+  }
+);
+
+// Watch drawing tool changes — keep creating new overlays while tool is active
+function createDrawingOverlay(tool: string) {
+  if (!chart) return;
+  let completed = false;
+  chart.createOverlay({
+    name: tool,
+    onDrawEnd: () => {
+      completed = true;
+      if (props.activeDrawingTool === tool) {
+        createDrawingOverlay(tool);
+      }
+    },
+    onRemoved: () => {
+      // Right-click cancels an in-progress overlay — deselect the tool
+      if (!completed && props.activeDrawingTool === tool) {
+        emit("drawing-cancelled");
+      }
+    },
+  });
+}
+
 watch(
   () => props.activeDrawingTool,
   (tool) => {
     if (!chart) return;
     if (tool) {
-      chart.createOverlay(tool);
+      createDrawingOverlay(tool);
     }
   }
 );
 
-// Expose chart instance for parent component access
+// Expose chart instance + utility methods
 function getChart(): Chart | null {
   return chart;
 }
 
-defineExpose({ getChart });
+function screenshot(): string | null {
+  if (!chart) return null;
+  return chart.getConvertPictureUrl(true, "png", "#030712");
+}
+
+function zoomIn() {
+  chart?.zoomAtCoordinate(1.2);
+}
+
+function zoomOut() {
+  chart?.zoomAtCoordinate(0.8);
+}
+
+function resetZoom() {
+  chart?.scrollToRealTime();
+}
+
+function scrollToTimestamp(timestamp: number) {
+  chart?.scrollToTimestamp(timestamp, 300);
+}
+
+defineExpose({ getChart, screenshot, zoomIn, zoomOut, resetZoom, scrollToTimestamp });
 </script>
 
 <template>

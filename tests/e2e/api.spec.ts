@@ -1,4 +1,4 @@
-import { test, expect, APIRequestContext } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
 
 // Test account name (created in fwbg/accounts/test/)
 const TEST_ACCOUNT = "test";
@@ -36,16 +36,15 @@ test.describe("Settings API", () => {
       expect(response.ok()).toBeTruthy();
 
       const data = await response.json();
+      expect(data).toHaveProperty("broker_type");
       expect(data).toHaveProperty("credentials");
       expect(data).toHaveProperty("money_management");
       expect(data).toHaveProperty("metadata");
-      expect(data.credentials).toHaveProperty("api_key");
-      expect(data.credentials).toHaveProperty("username");
-      expect(data.credentials).toHaveProperty("password");
-      expect(data.credentials).toHaveProperty("env");
-      expect(data.credentials.env).toMatch(/^(DEMO|LIVE)$/);
+      expect(typeof data.credentials).toBe("object");
       expect(data.metadata).toHaveProperty("account_name");
       expect(data.metadata).toHaveProperty("currency");
+      expect(data.metadata).toHaveProperty("env");
+      expect(data.metadata.env).toMatch(/^(DEMO|LIVE)$/);
       expect(data.metadata).toHaveProperty("is_active");
     });
 

@@ -151,7 +151,7 @@ const restartBot = async () => {
             <span :class="isActive ? 'text-green-400' : 'text-red-400'">
               {{ isActive ? "Aktiv" : "Inaktiv" }}
             </span>
-            | {{ accountInfo.credentials.env }}
+            | {{ accountInfo.metadata.env }}
           </p>
         </div>
       </div>

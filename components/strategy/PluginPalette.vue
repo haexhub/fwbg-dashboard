@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { makeDroppable } from "@vue-dnd-kit/core";
 import {
   PIPELINE_PHASES,
   PHASE_LABELS,
   PHASE_ICONS,
-  PHASE_COLORS,
 } from "~/types/strategy";
 import type { PluginInfo, PipelinePhase } from "~/types/strategy";
 
@@ -13,7 +13,28 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   selectPlugin: [plugin: PluginInfo];
+  removeLanePlugin: [phase: PipelinePhase, instanceId: string];
 }>();
+
+const paletteRef = ref<HTMLElement | null>(null);
+
+const { isDragOver } = makeDroppable(
+  paletteRef,
+  {
+    groups: ["lane-reorder"],
+    events: {
+      onDrop: (event) => {
+        const dropData = event.payload?.dropData as
+          | { source: "lane"; instanceId: string; phase: PipelinePhase }
+          | undefined;
+        if (dropData?.source === "lane") {
+          emit("removeLanePlugin", dropData.phase, dropData.instanceId);
+        }
+      },
+    },
+  },
+  () => [props.plugins]
+);
 
 const searchQuery = ref("");
 const selectedPhases = ref<PipelinePhase[]>([]);
@@ -57,7 +78,11 @@ const phaseOptions = PIPELINE_PHASES.map((phase) => ({
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
+  <div
+    ref="paletteRef"
+    class="flex flex-col h-full transition-colors"
+    :class="{ 'bg-red-950/30 border-red-500/40': isDragOver }"
+  >
     <div class="space-y-2 p-3 border-b border-gray-800">
       <UInput
         v-model="searchQuery"

@@ -17,7 +17,16 @@ const emit = defineEmits<{
 }>();
 
 const asset = computed({
-  get: () => props.modelValue,
+  get: () => {
+    const v = props.modelValue;
+    return {
+      ...v,
+      ensemble: v.ensemble ?? [],
+      dd_scaling: v.dd_scaling ?? {},
+      features: v.features ?? [],
+      good_hours: v.good_hours ?? [],
+    };
+  },
   set: (value) => emit("update:modelValue", value),
 });
 

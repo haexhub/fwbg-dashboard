@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const isDemoAccount = accountInfo.credentials.env === "DEMO";
+  const isDemoAccount = accountInfo.metadata.env === "DEMO";
 
   // Parse request body
   const body = await readBody<ResetOptions>(event);

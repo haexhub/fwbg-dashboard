@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody<AccountInfo>(event);
 
-  if (!body || !body.credentials || !body.money_management || !body.metadata) {
+  if (!body || !body.broker_type || !body.credentials || !body.money_management || !body.metadata) {
     throw createError({
       statusCode: 400,
       statusMessage: "Invalid account info structure",

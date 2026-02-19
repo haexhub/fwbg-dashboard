@@ -6,7 +6,7 @@ import type {
 
 export function useChart() {
   // ── Source, Symbol & Timeframe ──
-  const source = ref("forexsb");
+  const source = ref("");
   const symbol = ref("EURUSD");
   const timeframe = ref("HOUR");
 
@@ -14,6 +14,15 @@ export function useChart() {
   const { data: sources } = useFetch<ChartSource[]>("/api/chart/sources", {
     default: () => [],
   });
+
+  // Auto-select first source once sources are loaded
+  watch(sources, (list) => {
+    if (list && list.length > 0 && !list.find((s) => s.name === source.value)) {
+      source.value = list[0]!.name;
+      const firstSymbol = list[0]!.symbols[0]?.symbol;
+      if (firstSymbol) symbol.value = firstSymbol;
+    }
+  }, { immediate: true });
 
   // ── Derived: current source, symbols, timeframes ──
   const currentSource = computed(
@@ -41,6 +50,13 @@ export function useChart() {
 
   function removeIndicator(id: string) {
     activeIndicators.value = activeIndicators.value.filter((i) => i.id !== id);
+  }
+
+  // ── Chart Type ──
+  const chartType = ref<"candle_solid" | "ohlc" | "area">("candle_solid");
+
+  function setChartType(type: "candle_solid" | "ohlc" | "area") {
+    chartType.value = type;
   }
 
   // ── Drawing Tools ──
@@ -81,9 +97,11 @@ export function useChart() {
     availableTimeframes,
     activeIndicators,
     activeDrawingTool,
+    chartType: readonly(chartType),
     setSource,
     setSymbol,
     setTimeframe,
+    setChartType,
     addIndicator,
     removeIndicator,
     setDrawingTool,

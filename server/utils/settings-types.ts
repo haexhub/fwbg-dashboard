@@ -4,13 +4,6 @@
  */
 
 // account_info.json structure
-export interface AccountCredentials {
-  api_key: string;
-  username: string;
-  password: string;
-  env: "DEMO" | "LIVE";
-}
-
 export interface MoneyManagement {
   max_margin_usage: number;
   min_lot_size: number;
@@ -20,11 +13,13 @@ export interface MoneyManagement {
 export interface AccountMetadata {
   account_name: string;
   currency: string;
+  env: string;
   is_active: boolean;
 }
 
 export interface AccountInfo {
-  credentials: AccountCredentials;
+  broker_type: string;
+  credentials: Record<string, string>;
   money_management: MoneyManagement;
   metadata: AccountMetadata;
 }

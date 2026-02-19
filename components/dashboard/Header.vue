@@ -14,6 +14,7 @@ const navItems = [
   { label: "Chart", to: "/chart", icon: "i-heroicons-chart-bar-square" },
   { label: "Strategies", to: "/strategy", icon: "i-heroicons-puzzle-piece" },
   { label: "Runs", to: "/runs", icon: "i-heroicons-play-circle" },
+  { label: "Exploration", to: "/exploration", icon: "i-heroicons-magnifying-glass-circle" },
   { label: "Plugins", to: "/plugins", icon: "i-heroicons-cube" },
 ];
 

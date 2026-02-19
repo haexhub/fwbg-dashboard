@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { watchDebounced } from "@vueuse/core";
 import type { AccountInfo } from "~/types/settings";
-import { defaultAccountInfo, currencyOptions, envOptions } from "~/types/settings";
+import {
+  BROKER_DEFINITIONS,
+  currencyOptions,
+  defaultMoneyManagement,
+} from "~/types/settings";
 
-const props = defineProps<{
+defineProps<{
   open: boolean;
 }>();
 
@@ -12,44 +17,131 @@ const emit = defineEmits<{
 }>();
 
 const creatingAccount = ref(false);
-const folderName = ref("");
-const accountInfo = ref<AccountInfo>(JSON.parse(JSON.stringify(defaultAccountInfo)));
+const errorMessage = ref("");
 
-const resetForm = () => {
-  folderName.value = "";
-  accountInfo.value = JSON.parse(JSON.stringify(defaultAccountInfo));
-};
+// ── Form State ──
+const accountName = ref("");
+const brokerType = ref(BROKER_DEFINITIONS[0]!.type);
+const env = ref(BROKER_DEFINITIONS[0]!.envOptions?.[0]?.value ?? "");
+const currency = ref("EUR");
+const credentials = ref<Record<string, string>>({});
 
-const createAccount = async () => {
-  if (!folderName.value || !accountInfo.value.metadata.account_name) {
-    alert("Bitte Ordnernamen und Account-Namen eingeben");
-    return;
+const selectedBroker = computed(
+  () => BROKER_DEFINITIONS.find((b) => b.type === brokerType.value)!
+);
+
+const brokerOptions = BROKER_DEFINITIONS.map((b) => ({
+  label: b.label,
+  value: b.type,
+}));
+
+// Reset credentials when broker changes
+watch(brokerType, () => {
+  credentials.value = {};
+  env.value = selectedBroker.value.envOptions?.[0]?.value ?? "";
+});
+
+// ── Folder Name ──
+function toFolderName(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .toLowerCase();
+}
+
+const folderName = computed(() => toFolderName(accountName.value));
+
+// ── Availability Check ──
+const nameAvailable = ref<boolean | null>(null);
+const checkingName = ref(false);
+
+watchDebounced(
+  folderName,
+  async (name) => {
+    if (!name) {
+      nameAvailable.value = null;
+      return;
+    }
+    checkingName.value = true;
+    try {
+      const result = await $fetch<{ available: boolean }>(
+        "/api/settings/accounts-check",
+        { query: { name } }
+      );
+      nameAvailable.value = result.available;
+    } catch {
+      nameAvailable.value = null;
+    } finally {
+      checkingName.value = false;
+    }
+  },
+  { debounce: 300 }
+);
+
+// ── Validation ──
+const canCreate = computed(() => {
+  if (!folderName.value) return false;
+  if (nameAvailable.value === false) return false;
+  if (checkingName.value) return false;
+
+  for (const field of selectedBroker.value.credentialFields) {
+    if (field.required && !credentials.value[field.key]?.trim()) return false;
   }
+  return true;
+});
 
+// ── Actions ──
+function resetForm() {
+  accountName.value = "";
+  brokerType.value = BROKER_DEFINITIONS[0]!.type;
+  env.value = BROKER_DEFINITIONS[0]!.envOptions?.[0]?.value ?? "";
+  currency.value = "EUR";
+  credentials.value = {};
+  nameAvailable.value = null;
+  errorMessage.value = "";
+}
+
+async function createAccount() {
+  if (!canCreate.value) return;
+  errorMessage.value = "";
   creatingAccount.value = true;
+
+  const accountInfo: AccountInfo = {
+    broker_type: brokerType.value,
+    credentials: { ...credentials.value },
+    money_management: { ...defaultMoneyManagement },
+    metadata: {
+      account_name: accountName.value.trim(),
+      currency: currency.value,
+      env: env.value,
+      is_active: false,
+    },
+  };
+
   try {
     await $fetch("/api/settings/accounts", {
       method: "POST",
       body: {
         folderName: folderName.value,
-        accountInfo: accountInfo.value,
+        accountInfo,
       },
     });
     emit("created", folderName.value);
     emit("update:open", false);
     resetForm();
   } catch (error) {
-    console.error("Failed to create account:", error);
-    alert(`Fehler beim Erstellen des Accounts: ${error instanceof Error ? error.message : String(error)}`);
+    errorMessage.value =
+      error instanceof Error ? error.message : String(error);
   } finally {
     creatingAccount.value = false;
   }
-};
+}
 
-const close = () => {
+function close() {
   emit("update:open", false);
   resetForm();
-};
+}
 </script>
 
 <template>
@@ -64,108 +156,93 @@ const close = () => {
         </template>
 
         <div class="space-y-4">
-          <!-- Folder Name -->
-          <UFormField label="Ordnername" required>
-            <UInput
-              v-model="folderName"
-              placeholder="z.B. demo oder live_main"
-              class="w-full font-mono"
-            />
-            <template #hint>
-              <span class="text-xs text-gray-500">
-                Der Ordnername wird im Dateisystem verwendet (keine Leerzeichen)
-              </span>
-            </template>
-          </UFormField>
+          <!-- Error Message -->
+          <UAlert
+            v-if="errorMessage"
+            color="error"
+            variant="subtle"
+            icon="i-heroicons-exclamation-triangle"
+            :title="errorMessage"
+            :close-button="{ onClick: () => (errorMessage = '') }"
+          />
 
           <!-- Account Name -->
           <UFormField label="Account Name" required>
             <UInput
-              v-model="accountInfo.metadata.account_name"
+              v-model="accountName"
               placeholder="z.B. Demo Account"
               class="w-full"
+              :color="nameAvailable === false ? 'error' : undefined"
             />
+            <template #hint>
+              <div class="flex items-center gap-2 text-xs">
+                <template v-if="folderName">
+                  <span class="text-gray-500">Ordner:</span>
+                  <code class="font-mono text-gray-400">{{ folderName }}</code>
+                  <UIcon
+                    v-if="checkingName"
+                    name="i-heroicons-arrow-path"
+                    class="animate-spin text-gray-500"
+                  />
+                  <UIcon
+                    v-else-if="nameAvailable === true"
+                    name="i-heroicons-check-circle"
+                    class="text-green-500"
+                  />
+                  <span
+                    v-else-if="nameAvailable === false"
+                    class="text-red-400"
+                  >
+                    Name bereits vergeben
+                  </span>
+                </template>
+              </div>
+            </template>
           </UFormField>
 
-          <div class="grid grid-cols-2 gap-4">
-            <UFormField label="Umgebung">
+          <!-- Broker + Environment + Currency -->
+          <div class="grid grid-cols-3 gap-4">
+            <UFormField label="Broker">
               <USelect
-                v-model="accountInfo.credentials.env"
-                :items="envOptions"
+                v-model="brokerType"
+                :items="brokerOptions"
                 class="w-full"
               />
             </UFormField>
 
-            <UFormField label="Währung">
+            <UFormField v-if="selectedBroker.envOptions" label="Umgebung">
               <USelect
-                v-model="accountInfo.metadata.currency"
+                v-model="env"
+                :items="selectedBroker.envOptions"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UFormField label="Waehrung">
+              <USelect
+                v-model="currency"
                 :items="currencyOptions"
                 class="w-full"
               />
             </UFormField>
           </div>
 
-          <!-- Credentials -->
+          <!-- Dynamic Credentials -->
           <div class="border-t border-gray-700 pt-4">
-            <h4 class="text-sm font-medium text-gray-400 mb-3">Credentials</h4>
-            <div class="space-y-4">
-              <UFormField label="API Key">
+            <h4 class="text-sm font-medium text-gray-400 mb-3">Zugangsdaten</h4>
+            <div class="space-y-3">
+              <UFormField
+                v-for="field in selectedBroker.credentialFields"
+                :key="field.key"
+                :label="field.label"
+                :required="field.required"
+              >
                 <UInput
-                  v-model="accountInfo.credentials.api_key"
-                  placeholder="IG API Key"
+                  :model-value="credentials[field.key] ?? ''"
+                  :type="field.type"
+                  :placeholder="field.placeholder"
                   class="w-full font-mono"
-                />
-              </UFormField>
-
-              <div class="grid grid-cols-2 gap-4">
-                <UFormField label="Username">
-                  <UInput
-                    v-model="accountInfo.credentials.username"
-                    placeholder="IG Username"
-                    class="w-full"
-                  />
-                </UFormField>
-
-                <UFormField label="Password">
-                  <UInput
-                    v-model="accountInfo.credentials.password"
-                    type="password"
-                    placeholder="IG Password"
-                    class="w-full"
-                  />
-                </UFormField>
-              </div>
-            </div>
-          </div>
-
-          <!-- Money Management -->
-          <div class="border-t border-gray-700 pt-4">
-            <h4 class="text-sm font-medium text-gray-400 mb-3">Money Management</h4>
-            <div class="grid grid-cols-3 gap-4">
-              <UFormField label="Max Margin Usage">
-                <UInput
-                  v-model.number="accountInfo.money_management.max_margin_usage"
-                  type="number"
-                  step="0.01"
-                  class="w-full"
-                />
-              </UFormField>
-
-              <UFormField label="Min Lot Size">
-                <UInput
-                  v-model.number="accountInfo.money_management.min_lot_size"
-                  type="number"
-                  step="0.01"
-                  class="w-full"
-                />
-              </UFormField>
-
-              <UFormField label="Emergency Stop %">
-                <UInput
-                  v-model.number="accountInfo.money_management.emergency_stop_pct"
-                  type="number"
-                  step="0.01"
-                  class="w-full"
+                  @update:model-value="credentials[field.key] = $event as string"
                 />
               </UFormField>
             </div>
@@ -180,6 +257,7 @@ const close = () => {
             <UButton
               color="primary"
               :loading="creatingAccount"
+              :disabled="!canCreate"
               @click="createAccount"
             >
               Account erstellen

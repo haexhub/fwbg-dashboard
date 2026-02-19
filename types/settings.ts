@@ -1,21 +1,59 @@
-export interface AccountInfo {
-  credentials: {
-    api_key: string;
-    username: string;
-    password: string;
-    env: "DEMO" | "LIVE";
-  };
-  money_management: {
-    max_margin_usage: number;
-    min_lot_size: number;
-    emergency_stop_pct: number;
-  };
-  metadata: {
-    account_name: string;
-    currency: string;
-    is_active: boolean;
-  };
+// ── Broker Definitions ──
+
+export interface BrokerCredentialField {
+  key: string;
+  label: string;
+  type: "text" | "password";
+  placeholder?: string;
+  required?: boolean;
 }
+
+export interface BrokerDefinition {
+  type: string;
+  label: string;
+  credentialFields: BrokerCredentialField[];
+  envOptions?: { label: string; value: string }[];
+}
+
+export const BROKER_DEFINITIONS: BrokerDefinition[] = [
+  {
+    type: "ig",
+    label: "IG Markets",
+    credentialFields: [
+      { key: "api_key", label: "API Key", type: "text", placeholder: "API Key", required: true },
+      { key: "username", label: "Username", type: "text", placeholder: "Username", required: true },
+      { key: "password", label: "Password", type: "password", placeholder: "Password", required: true },
+    ],
+    envOptions: [
+      { label: "Demo", value: "DEMO" },
+      { label: "Live", value: "LIVE" },
+    ],
+  },
+];
+
+// ── Account Info (account_info.json) ──
+
+export interface MoneyManagement {
+  max_margin_usage: number;
+  min_lot_size: number;
+  emergency_stop_pct: number;
+}
+
+export interface AccountMetadata {
+  account_name: string;
+  currency: string;
+  env: string;
+  is_active: boolean;
+}
+
+export interface AccountInfo {
+  broker_type: string;
+  credentials: Record<string, string>;
+  money_management: MoneyManagement;
+  metadata: AccountMetadata;
+}
+
+// ── Assets ──
 
 export interface EnsembleModel {
   tp_mult: number;
@@ -46,6 +84,8 @@ export interface MarketInfo {
   expiry: string;
 }
 
+// ── Options ──
+
 export const currencyOptions = [
   { label: "EUR", value: "EUR" },
   { label: "USD", value: "USD" },
@@ -54,10 +94,7 @@ export const currencyOptions = [
   { label: "JPY", value: "JPY" },
 ];
 
-export const envOptions = [
-  { label: "DEMO", value: "DEMO" },
-  { label: "LIVE", value: "LIVE" },
-];
+// ── Defaults ──
 
 export const defaultAssetConfig: AssetConfig = {
   kelly_risk: 0.02,
@@ -72,21 +109,20 @@ export const defaultAssetConfig: AssetConfig = {
   dd_scaling: { "10": 0.5, "20": 0.25 },
 };
 
+export const defaultMoneyManagement: MoneyManagement = {
+  max_margin_usage: 0.9,
+  min_lot_size: 0.1,
+  emergency_stop_pct: 0.15,
+};
+
 export const defaultAccountInfo: AccountInfo = {
-  credentials: {
-    api_key: "",
-    username: "",
-    password: "",
-    env: "DEMO",
-  },
-  money_management: {
-    max_margin_usage: 0.9,
-    min_lot_size: 0.1,
-    emergency_stop_pct: 0.15,
-  },
+  broker_type: "ig",
+  credentials: {},
+  money_management: { ...defaultMoneyManagement },
   metadata: {
     account_name: "",
     currency: "EUR",
+    env: "DEMO",
     is_active: false,
   },
 };

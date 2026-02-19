@@ -86,6 +86,9 @@ export interface PluginInfo {
   cacheable: boolean;
   param_schema: Record<string, ParamSchema>;
   defaults: Record<string, unknown>;
+  feature_columns?: string[];
+  signal_columns?: string[];
+  plot_columns?: string[];
 }
 
 // ──────────────────────────────────────────────

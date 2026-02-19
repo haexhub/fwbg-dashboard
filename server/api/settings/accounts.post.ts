@@ -1,10 +1,16 @@
 import { createAccount } from "~/server/utils/settings";
 import type { AccountInfo } from "~/server/utils/settings-types";
 
+const DEFAULT_MONEY_MANAGEMENT = {
+  max_margin_usage: 0.9,
+  min_lot_size: 0.1,
+  emergency_stop_pct: 0.15,
+};
+
 export default defineEventHandler(async (event) => {
   const body = await readBody<{
     folderName: string;
-    info: AccountInfo;
+    accountInfo: AccountInfo;
   }>(event);
 
   if (!body.folderName) {
@@ -14,10 +20,17 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  if (!body.info) {
+  if (!body.accountInfo) {
     throw createError({
       statusCode: 400,
-      message: "info is required",
+      message: "accountInfo is required",
+    });
+  }
+
+  if (!body.accountInfo.broker_type) {
+    throw createError({
+      statusCode: 400,
+      message: "broker_type is required",
     });
   }
 
@@ -30,8 +43,17 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  // Ensure money_management has defaults if not provided
+  const info: AccountInfo = {
+    ...body.accountInfo,
+    money_management: {
+      ...DEFAULT_MONEY_MANAGEMENT,
+      ...body.accountInfo.money_management,
+    },
+  };
+
   try {
-    await createAccount(body.folderName, body.info);
+    await createAccount(body.folderName, info);
     return { success: true, folderName: body.folderName };
   } catch (error) {
     throw createError({

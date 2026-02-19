@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AccountInfo } from "~/types/settings";
-import { currencyOptions, envOptions } from "~/types/settings";
+import { BROKER_DEFINITIONS, currencyOptions } from "~/types/settings";
 
 const props = defineProps<{
   modelValue: AccountInfo;
@@ -19,6 +19,10 @@ const localInfo = computed({
   get: () => props.modelValue,
   set: (value) => emit("update:modelValue", value),
 });
+
+const brokerDef = computed(() =>
+  BROKER_DEFINITIONS.find((b) => b.type === localInfo.value.broker_type)
+);
 
 const saveAccountInfo = async () => {
   saving.value = true;
@@ -41,7 +45,12 @@ const saveAccountInfo = async () => {
     <!-- Account Info -->
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold text-white">Account Info</h2>
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-white">Account Info</h2>
+          <UBadge v-if="brokerDef" variant="subtle" size="xs">
+            {{ brokerDef.label }}
+          </UBadge>
+        </div>
       </template>
 
       <div class="space-y-4">
@@ -52,7 +61,7 @@ const saveAccountInfo = async () => {
           />
         </UFormField>
 
-        <UFormField label="Währung">
+        <UFormField label="Waehrung">
           <USelect
             v-model="localInfo.metadata.currency"
             :items="currencyOptions"
@@ -60,10 +69,10 @@ const saveAccountInfo = async () => {
           />
         </UFormField>
 
-        <UFormField label="Umgebung">
+        <UFormField v-if="brokerDef?.envOptions" label="Umgebung">
           <USelect
-            v-model="localInfo.credentials.env"
-            :items="envOptions"
+            v-model="localInfo.metadata.env"
+            :items="brokerDef.envOptions"
             class="w-full"
           />
         </UFormField>
@@ -128,30 +137,20 @@ const saveAccountInfo = async () => {
       </template>
 
       <div class="space-y-4">
-        <UFormField label="API Key">
-          <UInput
-            v-model="localInfo.credentials.api_key"
-            :type="showPassword ? 'text' : 'password'"
-            class="w-full font-mono"
-          />
-        </UFormField>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <UFormField label="Username">
+        <template v-if="brokerDef">
+          <UFormField
+            v-for="field in brokerDef.credentialFields"
+            :key="field.key"
+            :label="field.label"
+          >
             <UInput
-              v-model="localInfo.credentials.username"
-              class="w-full"
+              :model-value="localInfo.credentials[field.key] ?? ''"
+              :type="field.type === 'password' && !showPassword ? 'password' : 'text'"
+              class="w-full font-mono"
+              @update:model-value="localInfo.credentials[field.key] = $event as string"
             />
           </UFormField>
-
-          <UFormField label="Password">
-            <UInput
-              v-model="localInfo.credentials.password"
-              :type="showPassword ? 'text' : 'password'"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
+        </template>
 
         <div class="flex items-center gap-4">
           <UButton

@@ -8,8 +8,6 @@ import { join } from "path";
 import type { AccountInfo, AssetsConfig } from "./settings-types";
 import { getAccountsPath } from "./accounts-path";
 
-// Re-export for convenience
-export { getAccountsPath } from "./accounts-path";
 
 /**
  * List all account folders in the accounts directory
@@ -18,6 +16,12 @@ export { getAccountsPath } from "./accounts-path";
 export async function listAccountFolders(): Promise<string[]> {
   const accountsPath = getAccountsPath();
   const accounts: string[] = [];
+
+  try {
+    await stat(accountsPath);
+  } catch {
+    return accounts;
+  }
 
   try {
     const entries = await readdir(accountsPath);
@@ -186,5 +190,3 @@ export async function setAccountActive(
   return await saveAccountInfo(accountName, info);
 }
 
-// Re-export IGClient from ig-client.ts for convenience
-export { IGClient, createIGClient } from "./ig-client";

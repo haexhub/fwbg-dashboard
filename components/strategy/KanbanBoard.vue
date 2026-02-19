@@ -8,7 +8,8 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  addPlugin: [phase: PipelinePhase, plugin: PluginInfo];
+  addPlugin: [phase: PipelinePhase, plugin: PluginInfo, index: number | undefined];
+  movePlugin: [phase: PipelinePhase, instanceId: string, targetIndex: number];
   removePlugin: [phase: PipelinePhase, instanceId: string];
   configurePlugin: [instance: PluginInstance];
 }>();
@@ -22,7 +23,8 @@ const emit = defineEmits<{
       :phase="phase"
       :items="lanes[phase]"
       :available-count="plugins.filter((p) => p.phase === phase).length"
-      @add-plugin="(plugin: PluginInfo) => emit('addPlugin', phase, plugin)"
+      @add-plugin="(plugin: PluginInfo, index: number | undefined) => emit('addPlugin', phase, plugin, index)"
+      @move-plugin="(id: string, idx: number) => emit('movePlugin', phase, id, idx)"
       @remove-plugin="(id: string) => emit('removePlugin', phase, id)"
       @configure-plugin="(inst: PluginInstance) => emit('configurePlugin', inst)"
     />

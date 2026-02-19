@@ -11,6 +11,72 @@ import { join } from "path";
 import type { AccountInfo, AssetsConfig } from "./settings-types";
 import { getAccountsPath } from "./accounts-path";
 
+/**
+ * Symbol → IG Epic mapping (mirrors fwbg Python's SYMBOL_TO_EPIC)
+ */
+export const SYMBOL_TO_EPIC: Record<string, string> = {
+  // Forex Majors
+  EURUSD: "CS.D.EURUSD.CFD.IP",
+  GBPUSD: "CS.D.GBPUSD.CFD.IP",
+  USDJPY: "CS.D.USDJPY.CFD.IP",
+  USDCHF: "CS.D.USDCHF.CFD.IP",
+  USDCAD: "CS.D.USDCAD.CFD.IP",
+  AUDUSD: "CS.D.AUDUSD.CFD.IP",
+  NZDUSD: "CS.D.NZDUSD.CFD.IP",
+  // Forex Crosses - EUR
+  EURCAD: "CS.D.EURCAD.CFD.IP",
+  EURCHF: "CS.D.EURCHF.CFD.IP",
+  EURGBP: "CS.D.EURGBP.CFD.IP",
+  EURJPY: "CS.D.EURJPY.CFD.IP",
+  EURAUD: "CS.D.EURAUD.CFD.IP",
+  EURNZD: "CS.D.EURNZD.CFD.IP",
+  // Forex Crosses - GBP
+  GBPAUD: "CS.D.GBPAUD.CFD.IP",
+  GBPCAD: "CS.D.GBPCAD.CFD.IP",
+  GBPCHF: "CS.D.GBPCHF.CFD.IP",
+  GBPJPY: "CS.D.GBPJPY.CFD.IP",
+  GBPNZD: "CS.D.GBPNZD.CFD.IP",
+  // Forex Crosses - AUD
+  AUDCAD: "CS.D.AUDCAD.CFD.IP",
+  AUDCHF: "CS.D.AUDCHF.CFD.IP",
+  AUDJPY: "CS.D.AUDJPY.CFD.IP",
+  AUDNZD: "CS.D.AUDNZD.CFD.IP",
+  // Forex Crosses - NZD
+  NZDCAD: "CS.D.NZDCAD.CFD.IP",
+  NZDCHF: "CS.D.NZDCHF.CFD.IP",
+  NZDJPY: "CS.D.NZDJPY.CFD.IP",
+  // Forex Crosses - CAD/CHF
+  CADCHF: "CS.D.CADCHF.CFD.IP",
+  CADJPY: "CS.D.CADJPY.CFD.IP",
+  CHFJPY: "CS.D.CHFJPY.CFD.IP",
+  // Indices
+  DAX: "IX.D.DAX.DAILY.IP",
+  DOW30: "IX.D.DOW.DAILY.IP",
+  NAS100: "IX.D.NASDAQ.DAILY.IP",
+  SPX500: "IX.D.SPTRD.DAILY.IP",
+  FTSE100: "IX.D.FTSE.DAILY.IP",
+  // Commodities
+  XAUUSD: "CS.D.CFDGOLD.CFD.IP",
+  XAGUSD: "CS.D.CFDSILVER.CFD.IP",
+  BRENT: "CC.D.LCO.UNC.IP",
+  WTI: "CC.D.CL.UNC.IP",
+  // Crypto
+  BTCUSD: "CS.D.BITCOIN.CFD.IP",
+  ETHUSD: "CS.D.ETHUSD.CFD.IP",
+};
+
+/**
+ * Timeframe → IG resolution mapping
+ */
+export const TIMEFRAME_TO_IG_RESOLUTION: Record<string, string> = {
+  MINUTE_1: "MINUTE",
+  MINUTE_5: "MINUTE_5",
+  MINUTE_15: "MINUTE_15",
+  MINUTE_30: "MINUTE_30",
+  HOUR: "HOUR",
+  DAY: "DAY",
+};
+
 export interface IGAccountConfig {
   id: string;
   name: string;
@@ -408,6 +474,146 @@ export class IGClient {
     const data = await response.json();
     return data.markets || [];
   }
+
+  /**
+   * Fetch current market snapshot from /markets/{epic}.
+   * Does NOT count against the historical data allowance.
+   *
+   * Price handling differs by instrument type:
+   * - CURRENCIES (Forex): bid/offer are in "points", real price is in
+   *   instrument.currencies[0].baseExchangeRate
+   * - Other types (Indices, Commodities): bid/offer are already real prices
+   */
+  async fetchMarketSnapshot(epic: string): Promise<{
+    mid: number;
+    bid: number;
+    offer: number;
+    updateTime: string;
+  }> {
+    let headers = await this.getAuthHeaders();
+    const url = `${this.apiUrl}/markets/${epic}`;
+
+    let response = await fetch(url, {
+      headers: {
+        ...headers,
+        VERSION: "3",
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(url, {
+        headers: {
+          ...headers,
+          VERSION: "3",
+        },
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch market snapshot for ${epic}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const snap = data.snapshot;
+    const instrument = data.instrument;
+
+    let bid: number;
+    let offer: number;
+    let mid: number;
+
+    if (instrument?.type === "CURRENCIES") {
+      // Forex: snapshot.bid/offer are in points, not real prices.
+      // The real mid-price is in currencies[0].baseExchangeRate.
+      const currencies = instrument.currencies || [];
+      const baseRate = currencies[0]?.baseExchangeRate;
+
+      if (baseRate) {
+        mid = Number(baseRate);
+        // Derive bid/offer from spread in points using scalingFactor
+        const sf = snap.scalingFactor || 10000;
+        const spreadReal = (snap.offer - snap.bid) / sf;
+        bid = mid - spreadReal / 2;
+        offer = mid + spreadReal / 2;
+      } else {
+        // Fallback: divide by scalingFactor
+        const sf = snap.scalingFactor || 10000;
+        bid = snap.bid / sf;
+        offer = snap.offer / sf;
+        mid = (bid + offer) / 2;
+      }
+    } else {
+      // Indices, Commodities, Crypto: bid/offer are already real prices
+      bid = snap.bid;
+      offer = snap.offer;
+      mid = (bid + offer) / 2;
+    }
+
+    return { mid, bid, offer, updateTime: snap.updateTime };
+  }
+
+  /**
+   * Fetch latest price bars for an epic from IG historical prices API.
+   * Returns OHLC candle data with bid/ask midpoint prices.
+   * NOTE: Counts against the IG historical data allowance!
+   */
+  async fetchLatestPrices(
+    epic: string,
+    resolution: string,
+    numPoints: number = 2
+  ): Promise<Array<{
+    timestamp: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }>> {
+    let headers = await this.getAuthHeaders();
+
+    // V1 URL format: /prices/{epic}/{resolution}/{numPoints}
+    const url = `${this.apiUrl}/prices/${epic}/${resolution}/${numPoints}`;
+
+    let response = await fetch(url, {
+      headers: {
+        ...headers,
+        VERSION: "1",
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      this.invalidateSession();
+      headers = await this.getAuthHeaders(true);
+      response = await fetch(url, {
+        headers: {
+          ...headers,
+          VERSION: "1",
+        },
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch prices for ${epic}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const prices = data.prices || [];
+
+    return prices.map((p: any) => {
+      const snap = p.snapshotTimeUTC || p.snapshotTime;
+      const o = (p.openPrice.bid + p.openPrice.ask) / 2;
+      const h = (p.highPrice.bid + p.highPrice.ask) / 2;
+      const l = (p.lowPrice.bid + p.lowPrice.ask) / 2;
+      const c = (p.closePrice.bid + p.closePrice.ask) / 2;
+      return {
+        timestamp: new Date(snap).getTime(),
+        open: o,
+        high: h,
+        low: l,
+        close: c,
+      };
+    });
+  }
 }
 
 
@@ -417,6 +623,12 @@ export class IGClient {
 export async function loadAccounts(): Promise<IGAccountConfig[]> {
   const accountsDir = getAccountsPath();
   const accounts: IGAccountConfig[] = [];
+
+  try {
+    await stat(accountsDir);
+  } catch {
+    return accounts;
+  }
 
   try {
     const entries = await readdir(accountsDir);
@@ -453,10 +665,10 @@ export async function loadAccounts(): Promise<IGAccountConfig[]> {
           name: info.metadata.account_name || entry,
           isActive: info.metadata.is_active ?? true,
           credentials: {
-            api_key: info.credentials.api_key,
-            username: info.credentials.username,
-            password: info.credentials.password,
-            acc_type: info.credentials.env,
+            api_key: info.credentials.api_key ?? "",
+            username: info.credentials.username ?? "",
+            password: info.credentials.password ?? "",
+            acc_type: (info.metadata.env as "DEMO" | "LIVE") ?? "DEMO",
           },
           pairs,
           _folder_path: entryPath,
@@ -502,22 +714,32 @@ export async function saveAccount(account: IGAccountConfig): Promise<void> {
   const folderPath = account._folder_path || join(accountsDir, account.id);
   const filePath = join(folderPath, "account_info.json");
 
+  // Load existing info to preserve money_management and other fields
+  let existing: AccountInfo | null = null;
+  try {
+    const content = await readFile(filePath, "utf-8");
+    existing = JSON.parse(content) as AccountInfo;
+  } catch {
+    // File doesn't exist yet
+  }
+
   // Convert back to AccountInfo format
   const info: AccountInfo = {
+    broker_type: existing?.broker_type ?? "ig",
     credentials: {
       api_key: account.credentials.api_key,
       username: account.credentials.username,
       password: account.credentials.password,
-      env: account.credentials.acc_type,
     },
-    money_management: {
+    money_management: existing?.money_management ?? {
       max_margin_usage: 0.9,
       min_lot_size: 0.1,
       emergency_stop_pct: 0.15,
     },
     metadata: {
       account_name: account.name,
-      currency: "EUR",
+      currency: existing?.metadata.currency ?? "EUR",
+      env: account.credentials.acc_type,
       is_active: account.isActive,
     },
   };

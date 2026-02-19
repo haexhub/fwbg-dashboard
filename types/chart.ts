@@ -54,6 +54,7 @@ export interface IndicatorResponse {
   fqn: string;
   columns: string[];
   plot_columns: string[];
+  signal_columns: string[];
   timestamps: number[];
   data: Record<string, (number | null)[]>;
 }
@@ -67,4 +68,8 @@ export interface ActiveIndicator {
   params: Record<string, unknown>;
   columns: string[];
   paneId: string;
+  isSignal?: boolean;
+  signalTimestamps?: number[];
+  /** Maps signal timestamp → value at that transition (e.g. -1, 0, 1) */
+  signalValueMap?: Map<number, number>;
 }

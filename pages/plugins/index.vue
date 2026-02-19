@@ -83,6 +83,12 @@ const phaseOptions = computed(() => [
               >
                 {{ PHASE_LABELS[plugin.phase] }}
               </UBadge>
+              <span
+                v-if="plugin.signal_columns?.length"
+                class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400"
+              >
+                SIG
+              </span>
               <span class="text-xs text-gray-500">{{ plugin.namespace }}</span>
             </div>
             <p v-if="plugin.description" class="text-sm text-gray-400 mt-1">

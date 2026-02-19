@@ -74,7 +74,7 @@ function handleReset() {
           v-for="name in paramNames"
           :key="name"
           :name="name"
-          :schema="schema[name]"
+          :schema="schema[name]!"
           :model-value="localParams[name]"
           @update:model-value="localParams[name] = $event"
         />
@@ -82,18 +82,17 @@ function handleReset() {
     </template>
 
     <template #footer>
-      <div class="flex justify-between">
+      <div class="flex items-center gap-2 w-full">
+        <UButton @click="handleSave">
+          Apply
+        </UButton>
+        <UButton variant="outline" @click="emit('update:open', false)">
+          Cancel
+        </UButton>
+        <div class="flex-1" />
         <UButton variant="ghost" @click="handleReset">
           Reset to Defaults
         </UButton>
-        <div class="flex gap-2">
-          <UButton variant="outline" @click="emit('update:open', false)">
-            Cancel
-          </UButton>
-          <UButton @click="handleSave">
-            Apply
-          </UButton>
-        </div>
       </div>
     </template>
   </USlideover>

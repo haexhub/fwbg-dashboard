@@ -25,6 +25,8 @@
     "vue-router": "5.0.2"
   },
   "devDependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@iconify-json/lucide": "^1.2.91",
     "@nuxt/test-utils": "^3.23.0",
     "@playwright/test": "^1.58.0",
     "@types/node": "^25.0.10",
