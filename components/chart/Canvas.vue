@@ -250,11 +250,13 @@ onMounted(() => {
         );
         params.callback(data, false);
 
-        // Restore scroll position after timeframe/source change
+        // Restore scroll position after timeframe/source change.
+        // Use setTimeout because KLineChart needs a frame to process
+        // the new data before scrollToTimestamp can find the target bar.
         if (_restoreTimestamp && chart) {
           const ts = _restoreTimestamp;
           _restoreTimestamp = null;
-          nextTick(() => chart?.scrollToTimestamp(ts, 0));
+          setTimeout(() => chart?.scrollToTimestamp(ts, 0), 50);
         }
 
         // Start streaming after initial data is loaded
