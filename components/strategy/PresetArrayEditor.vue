@@ -42,7 +42,7 @@ function addItem() {
         <UButton
           icon="i-heroicons-trash"
           variant="ghost"
-          size="2xs"
+          size="xs"
           color="error"
           @click="removeItem(index)"
         />

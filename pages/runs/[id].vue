@@ -19,7 +19,7 @@ onMounted(() => {
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
         <NuxtLink to="/runs">
-          <UButton icon="i-heroicons-arrow-left" variant="ghost" size="sm" />
+          <UButton icon="i-heroicons-arrow-left" variant="ghost" />
         </NuxtLink>
         <h2 class="text-xl font-semibold text-white font-mono">
           {{ runId }}

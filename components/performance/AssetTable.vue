@@ -41,7 +41,7 @@ const columns: TableColumn<AssetPerformance>[] = [
           >
             <UButton
               icon="i-heroicons-chart-bar-square"
-              size="2xs"
+              size="xs"
               variant="ghost"
               color="neutral"
             />

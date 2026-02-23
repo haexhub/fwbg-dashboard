@@ -15,7 +15,7 @@ const SECTIONS = [
 
 const activeSection = ref(SECTIONS[0]!.key);
 
-const { presets, status, refresh, createPreset, updatePreset, deletePreset } = usePresets(
+const { presets, status, refresh, createPreset, savePreset, deletePreset } = usePresets(
   computed(() => activeSection.value).value,
 );
 
@@ -50,7 +50,7 @@ function startCreate() {
 function startEdit(preset: PresetItem) {
   selected.value = preset;
   editMode.value = "edit";
-  editName.value = preset.name;
+  editName.value = preset.meta.name;
   editJson.value = JSON.stringify(preset.content, null, 2);
   editError.value = "";
 }
@@ -68,10 +68,10 @@ async function saveEdit() {
   saving.value = true;
   try {
     if (editMode.value === "create") {
-      await createPreset(editName.value.trim(), parsed);
-      selected.value = presets.value.find(p => p.name === editName.value.trim()) ?? null;
-    } else {
-      await updatePreset(editName.value, parsed);
+      const item = await createPreset(editName.value.trim(), "", parsed);
+      selected.value = presets.value.find(p => p.id === item.id) ?? null;
+    } else if (selected.value) {
+      await savePreset(selected.value.id, parsed);
     }
     editMode.value = "none";
   } catch (e: unknown) {
@@ -82,8 +82,8 @@ async function saveEdit() {
 }
 
 async function removePreset(preset: PresetItem) {
-  await deletePreset(preset.name);
-  if (selected.value?.name === preset.name) {
+  await deletePreset(preset.id, "one");
+  if (selected.value?.id === preset.id) {
     selected.value = presets.value[0] ?? null;
   }
 }
@@ -120,17 +120,17 @@ const previewJson = computed(() =>
         <div v-if="status === 'pending'" class="text-sm text-gray-500 p-2">Laden…</div>
         <button
           v-for="preset in presets"
-          :key="preset.name"
+          :key="preset.id"
           class="flex items-center justify-between px-3 py-2 rounded text-sm text-left transition-colors"
-          :class="selected?.name === preset.name && editMode === 'none'
+          :class="selected?.id === preset.id && editMode === 'none'
             ? 'bg-primary-600 text-white'
             : 'text-gray-300 hover:bg-gray-800'"
           @click="selectPreset(preset)"
         >
-          <span class="truncate font-mono">{{ preset.name }}</span>
+          <span class="truncate font-mono">{{ preset.meta.name }}</span>
           <div class="flex gap-1 shrink-0 ml-2">
-            <UButton icon="i-heroicons-pencil-square" variant="ghost" size="2xs" color="neutral" @click.stop="startEdit(preset)" />
-            <UButton icon="i-heroicons-trash" variant="ghost" size="2xs" color="error" @click.stop="removePreset(preset)" />
+            <UButton icon="i-heroicons-pencil-square" variant="ghost" color="neutral" @click.stop="startEdit(preset)" />
+            <UButton icon="i-heroicons-trash" variant="ghost" color="error" @click.stop="removePreset(preset)" />
           </div>
         </button>
 
@@ -174,7 +174,7 @@ const previewJson = computed(() =>
           <UCard v-if="selected">
             <template #header>
               <div class="flex items-center justify-between">
-                <h3 class="text-base font-medium text-white font-mono">{{ selected.name }}</h3>
+                <h3 class="text-base font-medium text-white font-mono">{{ selected.meta.name }}</h3>
                 <UButton variant="soft" icon="i-heroicons-pencil-square" @click="startEdit(selected)">
                   Bearbeiten
                 </UButton>

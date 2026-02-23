@@ -45,7 +45,7 @@ type GridEntry = {
 
 const currentGrid = computed<GridEntry | null>(() => {
   if (!config.value?.grids || !selectedClass.value) return null;
-  return config.value.grids[selectedClass.value] ?? null;
+  return (config.value.grids[selectedClass.value] as GridEntry) ?? null;
 });
 
 // ── Number list editing ──
@@ -303,7 +303,7 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                         class="w-36"
             @keydown.enter="addClass"
           />
-          <UButton size="sm" variant="soft" :disabled="!newClassName.trim()" @click="addClass">
+          <UButton variant="soft" :disabled="!newClassName.trim()" @click="addClass">
             +
           </UButton>
         </div>
@@ -336,13 +336,13 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newTp" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddTp" />
-                <UButton size="sm" variant="ghost" :disabled="!newTp" @click="handleAddTp">+</UButton>
+                <UInput v-model="newTp" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddTp" />
+                <UButton variant="ghost" :disabled="!newTp" @click="handleAddTp">+</UButton>
               </div>
             </div>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addTpSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addTpSection">
           Take Profit hinzufügen
         </UButton>
 
@@ -371,13 +371,13 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newSl" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddSl" />
-                <UButton size="sm" variant="ghost" :disabled="!newSl" @click="handleAddSl">+</UButton>
+                <UInput v-model="newSl" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddSl" />
+                <UButton variant="ghost" :disabled="!newSl" @click="handleAddSl">+</UButton>
               </div>
             </div>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addSlSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addSlSection">
           Stop Loss hinzufügen
         </UButton>
 
@@ -406,13 +406,13 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newCt" type="number" step="0.05" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddCt" />
-                <UButton size="sm" variant="ghost" :disabled="!newCt" @click="handleAddCt">+</UButton>
+                <UInput v-model="newCt" type="number" step="0.05" placeholder="+" class="w-20" @keydown.enter="handleAddCt" />
+                <UButton variant="ghost" :disabled="!newCt" @click="handleAddCt">+</UButton>
               </div>
             </div>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addCtSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addCtSection">
           Confidence Threshold hinzufügen
         </UButton>
 
@@ -441,14 +441,14 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newTimeout" placeholder="+ (oder 'null')" size="sm" class="w-32" @keydown.enter="handleAddTimeout" />
-                <UButton size="sm" variant="ghost" :disabled="!newTimeout && newTimeout !== 'null'" @click="handleAddTimeout">+</UButton>
+                <UInput v-model="newTimeout" placeholder="+ (oder 'null')" class="w-32" @keydown.enter="handleAddTimeout" />
+                <UButton variant="ghost" :disabled="!newTimeout && newTimeout !== 'null'" @click="handleAddTimeout">+</UButton>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">"null" bedeutet kein Timeout.</p>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addTimeoutBarsSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addTimeoutBarsSection">
           Timeout Bars hinzufügen
         </UButton>
 
@@ -468,8 +468,8 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newLongTp" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddLongTp" />
-                <UButton size="sm" variant="ghost" :disabled="!newLongTp" @click="handleAddLongTp">+</UButton>
+                <UInput v-model="newLongTp" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddLongTp" />
+                <UButton variant="ghost" :disabled="!newLongTp" @click="handleAddLongTp">+</UButton>
               </div>
             </div>
           </UCard>
@@ -480,8 +480,8 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newLongSl" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddLongSl" />
-                <UButton size="sm" variant="ghost" :disabled="!newLongSl" @click="handleAddLongSl">+</UButton>
+                <UInput v-model="newLongSl" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddLongSl" />
+                <UButton variant="ghost" :disabled="!newLongSl" @click="handleAddLongSl">+</UButton>
               </div>
             </div>
           </UCard>
@@ -492,13 +492,13 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newLongCt" type="number" step="0.05" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddLongCt" />
-                <UButton size="sm" variant="ghost" :disabled="!newLongCt" @click="handleAddLongCt">+</UButton>
+                <UInput v-model="newLongCt" type="number" step="0.05" placeholder="+" class="w-20" @keydown.enter="handleAddLongCt" />
+                <UButton variant="ghost" :disabled="!newLongCt" @click="handleAddLongCt">+</UButton>
               </div>
             </div>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addLongSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addLongSection">
           Long-Richtung hinzufügen
         </UButton>
 
@@ -518,8 +518,8 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newShortTp" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddShortTp" />
-                <UButton size="sm" variant="ghost" :disabled="!newShortTp" @click="handleAddShortTp">+</UButton>
+                <UInput v-model="newShortTp" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddShortTp" />
+                <UButton variant="ghost" :disabled="!newShortTp" @click="handleAddShortTp">+</UButton>
               </div>
             </div>
           </UCard>
@@ -530,8 +530,8 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newShortSl" type="number" step="0.1" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddShortSl" />
-                <UButton size="sm" variant="ghost" :disabled="!newShortSl" @click="handleAddShortSl">+</UButton>
+                <UInput v-model="newShortSl" type="number" step="0.1" placeholder="+" class="w-20" @keydown.enter="handleAddShortSl" />
+                <UButton variant="ghost" :disabled="!newShortSl" @click="handleAddShortSl">+</UButton>
               </div>
             </div>
           </UCard>
@@ -542,13 +542,13 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                 {{ val }}<UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
               </UBadge>
               <div class="flex gap-1">
-                <UInput v-model="newShortCt" type="number" step="0.05" placeholder="+" size="sm" class="w-20" @keydown.enter="handleAddShortCt" />
-                <UButton size="sm" variant="ghost" :disabled="!newShortCt" @click="handleAddShortCt">+</UButton>
+                <UInput v-model="newShortCt" type="number" step="0.05" placeholder="+" class="w-20" @keydown.enter="handleAddShortCt" />
+                <UButton variant="ghost" :disabled="!newShortCt" @click="handleAddShortCt">+</UButton>
               </div>
             </div>
           </UCard>
         </template>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addShortSection">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addShortSection">
           Short-Richtung hinzufügen
         </UButton>
 
@@ -585,8 +585,8 @@ function removeConditionValue(condIdx: number, valIdx: number) {
               </div>
 
               <div class="flex gap-2">
-                <UInput v-model="cond.column" placeholder="Spalte (z.B. trend_adx_14)" size="sm" class="flex-1" />
-                <USelect v-model="cond.operator" :items="OPERATORS" size="sm" class="w-24" />
+                <UInput v-model="cond.column" placeholder="Spalte (z.B. trend_adx_14)" class="flex-1" />
+                <USelect v-model="cond.operator" :items="OPERATORS" class="w-24" />
               </div>
 
               <div>
@@ -605,28 +605,28 @@ function removeConditionValue(condIdx: number, valIdx: number) {
                     <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
                   </UBadge>
                   <div class="flex gap-1">
-                    <UInput v-model="newConditionValue[ci]" placeholder="+ (oder 'null')" size="sm" class="w-28" @keydown.enter="addConditionValue(ci)" />
-                    <UButton size="sm" variant="ghost" @click="addConditionValue(ci)">+</UButton>
+                    <UInput v-model="newConditionValue[ci]" placeholder="+ (oder 'null')" class="w-28" @keydown.enter="addConditionValue(ci)" />
+                    <UButton variant="ghost" @click="addConditionValue(ci)">+</UButton>
                   </div>
                 </div>
               </div>
 
               <div class="flex gap-3">
                 <UFormField label="Richtungen" class="flex-1">
-                  <UInput v-model.number="cond.directions" type="number" size="sm" class="w-full" />
+                  <UInput v-model.number="cond.directions" type="number" class="w-full" />
                 </UFormField>
                 <UFormField label="Else-Richtungen" class="flex-1">
-                  <UInput v-model.number="cond.else_directions" type="number" size="sm" class="w-full" />
+                  <UInput v-model.number="cond.else_directions" type="number" class="w-full" />
                 </UFormField>
               </div>
             </div>
 
-            <UButton size="sm" variant="soft" icon="i-heroicons-plus" @click="addCondition">
+            <UButton variant="soft" icon="i-heroicons-plus" @click="addCondition">
               Bedingung hinzufügen
             </UButton>
           </div>
         </UCard>
-        <UButton v-else size="sm" variant="soft" icon="i-heroicons-plus" @click="addRegimeFilterGrid">
+        <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addRegimeFilterGrid">
           Regime Filter Grid hinzufügen
         </UButton>
 

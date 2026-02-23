@@ -74,8 +74,8 @@ function formatDate(ts: number): string {
         />
         <template v-else>
           <span class="text-xs text-red-400">Löschen?</span>
-          <UButton size="xs" color="error" @click="emit('delete', source.name)">Ja</UButton>
-          <UButton size="xs" variant="ghost" @click="confirmDelete = false">Nein</UButton>
+          <UButton color="error" @click="emit('delete', source.name)">Ja</UButton>
+          <UButton variant="ghost" @click="confirmDelete = false">Nein</UButton>
         </template>
       </div>
 

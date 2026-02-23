@@ -27,7 +27,7 @@ export function usePresets(section: string) {
   async function savePreset(id: string, content: unknown): Promise<void> {
     await $fetch(`/api/strategy/presets/${section}/${id}`, {
       method: "PUT",
-      body: content,
+      body: content as Record<string, unknown>,
     });
     await refresh();
   }
@@ -36,7 +36,7 @@ export function usePresets(section: string) {
   async function createVersion(id: string, content: unknown): Promise<PresetItem> {
     const item = await $fetch<PresetItem>(
       `/api/strategy/presets/${section}/${id}/version`,
-      { method: "POST", body: content },
+      { method: "POST", body: content as Record<string, unknown> },
     );
     await refresh();
     return item;

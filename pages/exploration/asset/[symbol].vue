@@ -28,7 +28,7 @@ function formatDate(ts?: string): string {
     <!-- Header -->
     <div class="flex items-center gap-4">
       <NuxtLink to="/exploration">
-        <UButton icon="i-heroicons-arrow-left" variant="ghost" size="sm" />
+        <UButton icon="i-heroicons-arrow-left" variant="ghost" />
       </NuxtLink>
       <div>
         <h2 class="text-xl font-semibold text-white">{{ symbol }}</h2>

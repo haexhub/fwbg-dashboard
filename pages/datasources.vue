@@ -8,7 +8,7 @@ const { data: rawSources, refresh } = await useFetch<Record<string, unknown>[]>(
 
 const sources = computed<DataSource[]>(() => {
   if (!rawSources.value) return [];
-  return rawSources.value as DataSource[];
+  return rawSources.value as unknown as DataSource[];
 });
 
 const sourceTypes: SourceType[] = ["csv", "rest", "websocket", "database"];

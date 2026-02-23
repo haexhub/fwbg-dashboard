@@ -161,8 +161,8 @@ registerOverlay({
   name: "rect",
   totalStep: 3,
   needDefaultPointFigure: true,
-  needDefaultXAxisMark: true,
-  needDefaultYAxisMark: true,
+  needDefaultXAxisFigure: true,
+  needDefaultYAxisFigure: true,
   createPointFigures: ({ coordinates }) => {
     if (coordinates.length < 2) return [];
     const [p1, p2] = coordinates;

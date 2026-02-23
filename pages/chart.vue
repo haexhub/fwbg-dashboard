@@ -816,7 +816,7 @@ function handleRemoveIndicator(id: string) {
             <span class="inline-block w-3 h-3 rounded-full bg-green-500 shrink-0 ml-2" /> Win exit
             <span class="inline-block w-3 h-3 rounded-full bg-red-500 shrink-0 ml-2" /> Loss exit
           </div>
-          <UButton size="2xs" variant="ghost" color="neutral" icon="i-heroicons-x-mark" @click="clearRunTradeOverlay" />
+          <UButton variant="ghost" color="neutral" icon="i-heroicons-x-mark" @click="clearRunTradeOverlay" />
         </div>
       </div>
 

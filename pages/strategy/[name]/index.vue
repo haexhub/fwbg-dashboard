@@ -73,7 +73,7 @@ const gridCount = computed(
                                 class="w-48"
                 @keydown.enter="addTag"
               />
-              <UButton size="sm" variant="soft" :disabled="!newTag.trim()" @click="addTag">
+              <UButton variant="soft" :disabled="!newTag.trim()" @click="addTag">
                 Hinzufügen
               </UButton>
             </div>

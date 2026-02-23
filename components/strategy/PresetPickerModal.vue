@@ -10,12 +10,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  apply: [name: string, content: Record<string, unknown>];
+  apply: [id: string, content: Record<string, unknown>];
 }>();
 
-const { presets, status, refresh, createPreset, updatePreset, deletePreset } = usePresets(props.section);
+const { presets, status, refresh, createPreset, savePreset, deletePreset } = usePresets(props.section);
 
-const selectedName = ref<string | null>(null);
+const selectedId = ref<string | undefined>(undefined);
 const editMode = ref<"none" | "create" | "edit">("none");
 const editName = ref("");
 const editJson = ref("");
@@ -23,11 +23,11 @@ const editError = ref("");
 const saving = ref(false);
 
 const selected = computed(() =>
-  presets.value.find((p) => p.name === selectedName.value) ?? null,
+  presets.value.find((p) => p.id === selectedId.value) ?? undefined,
 );
 
 const selectItems = computed(() =>
-  presets.value.map((p) => ({ label: p.name, value: p.name })),
+  presets.value.map((p) => ({ label: p.meta.name, value: p.id })),
 );
 
 // Auto-select current preset on open
@@ -35,13 +35,13 @@ watch(() => props.open, (val) => {
   if (val) {
     refresh();
     editMode.value = "none";
-    selectedName.value = props.currentRef ?? presets.value[0]?.name ?? null;
+    selectedId.value = props.currentRef ?? presets.value[0]?.id ?? undefined;
   }
 });
 
 watch(presets, (list) => {
-  if (!selectedName.value && list.length) {
-    selectedName.value = props.currentRef ?? list[0]?.name ?? null;
+  if (!selectedId.value && list.length) {
+    selectedId.value = props.currentRef ?? list[0]?.id ?? undefined;
   }
 });
 
@@ -55,7 +55,7 @@ function startCreate() {
 function startEdit() {
   if (!selected.value) return;
   editMode.value = "edit";
-  editName.value = selected.value.name;
+  editName.value = selected.value.meta.name;
   editJson.value = JSON.stringify(selected.value.content, null, 2);
   editError.value = "";
 }
@@ -74,10 +74,10 @@ async function saveEdit() {
   try {
     if (editMode.value === "create") {
       const name = editName.value.trim();
-      await createPreset(name, parsed);
-      selectedName.value = name;
-    } else {
-      await updatePreset(editName.value, parsed);
+      const item = await createPreset(name, "", parsed);
+      selectedId.value = item.id;
+    } else if (selected.value) {
+      await savePreset(selected.value.id, parsed);
     }
     editMode.value = "none";
   } catch (e: unknown) {
@@ -89,14 +89,13 @@ async function saveEdit() {
 
 async function removeSelected() {
   if (!selected.value) return;
-  const name = selected.value.name;
-  await deletePreset(name);
-  selectedName.value = presets.value[0]?.name ?? null;
+  await deletePreset(selected.value.id, "one");
+  selectedId.value = presets.value[0]?.id ?? undefined;
 }
 
 function applySelected() {
   if (!selected.value) return;
-  emit("apply", selected.value.name, selected.value.content as Record<string, unknown>);
+  emit("apply", selected.value.id, selected.value.content as Record<string, unknown>);
   emit("update:open", false);
 }
 
@@ -115,7 +114,7 @@ function applySelected() {
       <!-- Selector row -->
       <div class="flex items-center gap-2">
         <USelect
-          v-model="selectedName"
+          v-model="selectedId"
           :items="selectItems"
           value-key="value"
           :loading="status === 'pending'"
@@ -167,8 +166,8 @@ function applySelected() {
         </UFormField>
         <p v-if="editError" class="text-xs text-red-400">{{ editError }}</p>
         <div class="flex gap-2">
-          <UButton size="sm" :loading="saving" @click="saveEdit">Speichern</UButton>
-          <UButton size="sm" variant="ghost" @click="editMode = 'none'">Abbrechen</UButton>
+          <UButton :loading="saving" @click="saveEdit">Speichern</UButton>
+          <UButton variant="ghost" @click="editMode = 'none'">Abbrechen</UButton>
         </div>
       </template>
 

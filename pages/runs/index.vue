@@ -149,7 +149,7 @@ function formatDate(ts?: string): string {
     </UCard>
 
     <!-- Single delete confirmation -->
-    <UModal v-model:open="deleteModalOpen" :ui="{ width: 'sm' }">
+    <UModal v-model:open="deleteModalOpen">
       <template #content>
         <div class="p-6 space-y-4">
           <h3 class="text-base font-semibold text-white">Run löschen?</h3>
@@ -165,7 +165,7 @@ function formatDate(ts?: string): string {
     </UModal>
 
     <!-- Bulk delete confirmation -->
-    <UModal v-model:open="bulkDeleteModalOpen" :ui="{ width: 'sm' }">
+    <UModal v-model:open="bulkDeleteModalOpen">
       <template #content>
         <div class="p-6 space-y-4">
           <h3 class="text-base font-semibold text-white">{{ selected.size }} Runs löschen?</h3>

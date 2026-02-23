@@ -29,7 +29,7 @@ function computeGridOverrides(
  */
 function buildSavePayload(config: StrategyConfig): Record<string, unknown> {
   const refs: StrategyRefs = config._refs ?? {};
-  const { _refs: _unusedRefs, ...base } = config as Record<string, unknown>;
+  const { _refs: _unusedRefs, ...base } = config as unknown as Record<string, unknown>;
   void _unusedRefs;
   const payload = { ...base } as Record<string, unknown>;
 

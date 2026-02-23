@@ -136,7 +136,7 @@ function submit() {
     <!-- Step 2: Fill in form -->
     <template v-else-if="step === 2 && selectedType">
       <div class="flex items-center gap-2">
-        <UButton icon="i-heroicons-arrow-left" variant="ghost" size="xs" @click="back" />
+        <UButton icon="i-heroicons-arrow-left" variant="ghost" @click="back" />
         <UIcon :name="SOURCE_TYPE_ICONS[selectedType]" class="text-gray-400" />
         <span class="text-sm font-medium text-gray-300">{{ SOURCE_TYPE_LABELS[selectedType] }}</span>
       </div>

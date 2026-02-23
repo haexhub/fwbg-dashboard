@@ -27,7 +27,7 @@ const { isDragOver } = makeDroppable(
       },
     },
   },
-  () => [datasource.value],
+  (() => [datasource.value]) as any,
 );
 </script>
 

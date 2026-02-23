@@ -128,7 +128,7 @@ const columns: { key: SortKey; label: string; align?: string }[] = [
       v-if="captureMatrix.length > 50"
       class="mt-3 text-center"
     >
-      <UButton size="xs" variant="ghost" @click="showAll = !showAll">
+      <UButton variant="ghost" @click="showAll = !showAll">
         {{ showAll ? "Weniger anzeigen" : `Alle ${captureMatrix.length} anzeigen` }}
       </UButton>
     </div>
