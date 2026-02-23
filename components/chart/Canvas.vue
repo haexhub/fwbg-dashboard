@@ -40,6 +40,9 @@ const emit = defineEmits<{
 const chartContainer = ref<HTMLDivElement | null>(null);
 let chart: Chart | null = null;
 
+// Timestamp to restore after a timeframe/source change reloads data
+let _restoreTimestamp: number | null = null;
+
 // ── Live price streaming for broker sources ──
 const {
   isConnected: streamConnected,
@@ -247,6 +250,13 @@ onMounted(() => {
         );
         params.callback(data, false);
 
+        // Restore scroll position after timeframe/source change
+        if (_restoreTimestamp && chart) {
+          const ts = _restoreTimestamp;
+          _restoreTimestamp = null;
+          nextTick(() => chart?.scrollToTimestamp(ts, 0));
+        }
+
         // Start streaming after initial data is loaded
         nextTick(updateStreamConnection);
         emit("data-loaded", data.length);
@@ -329,11 +339,19 @@ watch(
   }
 );
 
-// Watch timeframe changes → update chart period
+// Watch timeframe changes → update chart period, preserving scroll position
 watch(
   () => props.timeframe,
   (newTf) => {
     if (!chart) return;
+    // Capture the center of the visible range so we can restore it after reload
+    const dataList = chart.getDataList();
+    const range = chart.getVisibleRange();
+    if (dataList.length > 0 && range) {
+      const centerIdx = Math.round((range.from + range.to) / 2);
+      const clampedIdx = Math.max(0, Math.min(centerIdx, dataList.length - 1));
+      _restoreTimestamp = dataList[clampedIdx]?.timestamp ?? null;
+    }
     const period = PERIOD_MAP[newTf] ?? { type: "hour", span: 1 };
     chart.setPeriod(period as any);
     // Stream resubscribe happens after data reload in getBars callback
@@ -358,6 +376,14 @@ watch(
   () => props.source,
   () => {
     if (!chart) return;
+    // Capture position before reload
+    const dataList = chart.getDataList();
+    const range = chart.getVisibleRange();
+    if (dataList.length > 0 && range) {
+      const centerIdx = Math.round((range.from + range.to) / 2);
+      const clampedIdx = Math.max(0, Math.min(centerIdx, dataList.length - 1));
+      _restoreTimestamp = dataList[clampedIdx]?.timestamp ?? null;
+    }
     // Disconnect stream first — will reconnect after data reload
     streamDisconnect();
     // Re-set symbol to trigger DataLoader reload
