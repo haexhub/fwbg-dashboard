@@ -251,12 +251,21 @@ onMounted(() => {
         params.callback(data, false);
 
         // Restore scroll position after timeframe/source change.
-        // Wait one animation frame so KLineChart has processed the data
-        // before we try to scroll to the target timestamp.
-        if (_restoreTimestamp && chart) {
+        // Find the closest bar index manually and scroll to it,
+        // since scrollToTimestamp can be unreliable after data reload.
+        if (_restoreTimestamp && chart && data.length > 0) {
           const ts = _restoreTimestamp;
           _restoreTimestamp = null;
-          requestAnimationFrame(() => chart?.scrollToTimestamp(ts, 0));
+          let closestIdx = 0;
+          let closestDist = Math.abs(data[0]!.timestamp - ts);
+          for (let i = 1; i < data.length; i++) {
+            const dist = Math.abs(data[i]!.timestamp - ts);
+            if (dist < closestDist) {
+              closestIdx = i;
+              closestDist = dist;
+            }
+          }
+          requestAnimationFrame(() => chart?.scrollToDataIndex(closestIdx, 0));
         }
 
         // Start streaming after initial data is loaded
