@@ -1,17 +1,54 @@
 <script setup lang="ts">
 import { DnDProvider } from "@vue-dnd-kit/core";
 import type { PluginInfo, PipelinePhase } from "~/types/strategy";
+import type { DataSourceBase } from "~/types/datasource";
 
 const { plugins } = usePlugins();
-const { config } = useStrategyConfig();
+const store = useStrategyConfigStore();
+const { config, isRestoring } = storeToRefs(store);
+
+// ── Datasource & Assets ──
+const { data: datasources } = useFetch<DataSourceBase[]>("/api/datasources", {
+  default: () => [],
+});
+
+const assetClasses = computed(() => Object.keys(config.value?.grids ?? {}));
+const datasourceConfigOpen = ref(false);
+
+const assetFilter = computed({
+  get: () => config.value?.assets?.filter ?? [],
+  set: (val: string[]) => {
+    if (!config.value) return;
+    if (!config.value.assets) config.value.assets = {};
+    config.value.assets.filter = val.length > 0 ? val : undefined;
+  },
+});
+
+const assetExclude = computed({
+  get: () => config.value?.assets?.exclude ?? [],
+  set: (val: string[]) => {
+    if (!config.value) return;
+    if (!config.value.assets) config.value.assets = {};
+    config.value.assets.exclude = val.length > 0 ? val : undefined;
+  },
+});
+const pipelineRef = computed(() => config.value?._refs?.pipeline);
+
+const pipelineModelValue = computed(() => {
+  if (!config.value) return undefined;
+  return {
+    pipeline: config.value.pipeline,
+    exit_strategy: config.value.exit_strategy,
+    exit_params: config.value.exit_params,
+  } as Record<string, unknown>;
+});
 
 const {
   lanes,
-  isDirty: kanbanDirty,
-  canUndo,
   selectedPlugin,
   configPanelOpen,
-  loadFromJson,
+  syncFromConfig,
+  _syncingFromConfig,
   toJson,
   addPlugin,
   removePlugin,
@@ -19,39 +56,46 @@ const {
   updatePluginParams,
   openConfig,
   closeConfig,
-  undo,
-  resetToSaved: resetKanban,
 } = useStrategy();
 
-// Load kanban from shared config when plugins are available
+// Sync lanes FROM config on load and on external changes (undo/redo)
 watch(
-  [() => config.value, plugins] as const,
-  ([cfg, pluginList]) => {
-    if (cfg && pluginList?.length) {
-      loadFromJson(cfg, pluginList);
-    }
+  [
+    () => config.value?.pipeline,
+    () => config.value?.exit_strategy,
+    () => config.value?.exit_params,
+    plugins,
+  ],
+  () => {
+    if (!config.value || !plugins.value?.length || _syncingFromConfig.value)
+      return;
+    syncFromConfig(plugins.value);
   },
-  { immediate: true }
+  { immediate: true, deep: true },
 );
 
-// Auto-sync kanban changes back to shared config
+// Sync lanes back TO config (write-back direction)
 watch(
-  [lanes, kanbanDirty] as const,
+  lanes,
   () => {
-    if (!config.value || !kanbanDirty.value) return;
+    if (!config.value || _syncingFromConfig.value || isRestoring.value) return;
     try {
       const json = toJson();
       config.value.pipeline = json.pipeline;
       config.value.exit_strategy = json.exit_strategy;
       config.value.exit_params = json.exit_params;
     } catch {
-      // toJson() throws if no strategy loaded — ignore during init
+      /* ignore during init */
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
-function handleAddPlugin(phase: PipelinePhase, plugin: PluginInfo, index?: number) {
+function handleAddPlugin(
+  phase: PipelinePhase,
+  plugin: PluginInfo,
+  index?: number,
+) {
   addPlugin(phase, plugin, index);
 }
 
@@ -64,7 +108,7 @@ function handleConfigSave(params: Record<string, unknown>) {
   updatePluginParams(
     selectedPlugin.value.phase,
     selectedPlugin.value.id,
-    params
+    params,
   );
 }
 
@@ -85,29 +129,15 @@ function handleSelectPlugin(plugin: PluginInfo) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Kanban toolbar -->
-    <div class="flex items-center gap-2 pb-3 shrink-0">
-      <UButton
-        v-if="canUndo"
-        icon="i-heroicons-arrow-uturn-left"
-        variant="ghost"
-        size="sm"
-        @click="undo"
-      >
-        Undo
-      </UButton>
-      <UButton
-        v-if="kanbanDirty"
-        icon="i-heroicons-x-mark"
-        variant="ghost"
-        size="sm"
-        color="warning"
-        @click="resetKanban"
-      >
-        Reset Pipeline
-      </UButton>
-    </div>
+  <div class="flex flex-col h-full p-1">
+    <StrategyPresetSelectorBar
+      section="pipelines"
+      label="Pipeline"
+      :current-ref="pipelineRef"
+      :model-value="pipelineModelValue"
+      @apply="(name, content) => store.applyPreset('pipeline', name, content)"
+      @detach="store.detachPreset('pipeline')"
+    />
 
     <!-- Strategy Builder -->
     <ClientOnly>
@@ -119,8 +149,12 @@ function handleSelectPlugin(plugin: PluginInfo) {
           >
             <StrategyPluginPalette
               :plugins="plugins ?? []"
+              :datasources="datasources"
+              :current-datasource="config?.datasource"
               @select-plugin="handleSelectPlugin"
+              @add-plugin="(plugin) => handleAddPlugin(plugin.phase, plugin, undefined)"
               @remove-lane-plugin="removePlugin"
+              @select-datasource="(name) => { if (config) config.datasource = name }"
             />
           </div>
 
@@ -129,10 +163,16 @@ function handleSelectPlugin(plugin: PluginInfo) {
             <StrategyKanbanBoard
               :lanes="lanes"
               :plugins="plugins ?? []"
+              :datasource="config?.datasource"
+              :asset-filter="assetFilter"
+              :asset-exclude="assetExclude"
+              :asset-classes="assetClasses"
               @add-plugin="handleAddPlugin"
               @move-plugin="movePlugin"
               @remove-plugin="handleRemovePlugin"
               @configure-plugin="openConfig"
+              @update:datasource="(v) => { if (config) config.datasource = v }"
+              @configure-datasource="datasourceConfigOpen = true"
             />
           </div>
         </div>
@@ -153,6 +193,17 @@ function handleSelectPlugin(plugin: PluginInfo) {
       :open="configPanelOpen"
       @update:open="configPanelOpen = $event"
       @save="handleConfigSave"
+    />
+
+    <!-- Datasource Config Panel -->
+    <StrategyDatasourceConfigPanel
+      v-if="config?.datasource"
+      :open="datasourceConfigOpen"
+      :datasource="config.datasource"
+      :asset-classes="assetClasses"
+      v-model:asset-filter="assetFilter"
+      v-model:asset-exclude="assetExclude"
+      @update:open="datasourceConfigOpen = $event"
     />
   </div>
 </template>

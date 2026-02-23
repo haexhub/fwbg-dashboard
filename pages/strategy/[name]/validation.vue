@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { config } = useStrategyConfig();
+const store = useStrategyConfigStore();
+const { config } = storeToRefs(store);
+const validationRef = computed(() => config.value?._refs?.validation);
 
 const validationMethods = [
   { label: "Walk Forward", value: "walk_forward" },
@@ -40,6 +42,14 @@ function setPruningVal(key: string, value: unknown) {
 <template>
   <div v-if="v" class="overflow-y-auto h-full p-1">
     <div class="space-y-6">
+      <StrategyPresetSelectorBar
+        section="validations"
+        label="Validation"
+        :current-ref="validationRef"
+        :model-value="v"
+        @apply="(name, content) => store.applyPreset('validation', name, content)"
+        @detach="store.detachPreset('validation')"
+      />
       <UCard>
         <template #header>
           <h3 class="text-lg font-medium text-white">Validation</h3>

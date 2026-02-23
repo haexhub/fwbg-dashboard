@@ -43,7 +43,9 @@ export interface SuggestedExitGrid {
 }
 
 export interface ExitOptimizationRequest {
-  asset: string;
+  source: string;
+  symbol: string;
+  timeframe: string;
   exit_strategy?: string;
   exit_params?: Record<string, unknown>;
   max_bars?: number;

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { config } = useStrategyConfig();
+const store = useStrategyConfigStore();
+const { config } = storeToRefs(store);
+const modelRef = computed(() => config.value?._refs?.model);
 
 const architectures = [
   { label: "Unified", value: "unified" },
@@ -50,6 +52,14 @@ function toggleDirection(dir: string) {
 <template>
   <div v-if="config?.model" class="overflow-y-auto h-full p-1">
     <div class="space-y-6">
+      <StrategyPresetSelectorBar
+        section="models"
+        label="Model"
+        :current-ref="modelRef"
+        :model-value="config.model as Record<string, unknown>"
+        @apply="(name, content) => store.applyPreset('model', name, content)"
+        @detach="store.detachPreset('model')"
+      />
       <UCard>
         <template #header>
           <h3 class="text-lg font-medium text-white">Model-Konfiguration</h3>
@@ -75,8 +85,7 @@ function toggleDirection(dir: string) {
                 v-for="opt in directionOptions"
                 :key="opt.value"
                 :variant="config.model.trade_directions.includes(opt.value) ? 'solid' : 'outline'"
-                size="sm"
-                @click="toggleDirection(opt.value)"
+                                @click="toggleDirection(opt.value)"
               >
                 {{ opt.label }}
               </UButton>
@@ -100,14 +109,12 @@ function toggleDirection(dir: string) {
             <UInput
               :model-value="String(value)"
               class="flex-1"
-              size="sm"
-              @update:model-value="updateHyperparameterValue(String(key), $event)"
+                            @update:model-value="updateHyperparameterValue(String(key), $event)"
             />
             <UButton
               icon="i-heroicons-trash"
               variant="ghost"
-              size="xs"
-              color="error"
+                            color="error"
               @click="removeHyperparameter(String(key))"
             />
           </div>
@@ -120,20 +127,17 @@ function toggleDirection(dir: string) {
             <UInput
               v-model="newParamKey"
               placeholder="Key"
-              size="sm"
-              class="w-44"
+                            class="w-44"
               @keydown.enter="addHyperparameter"
             />
             <UInput
               v-model="newParamValue"
               placeholder="Value"
-              size="sm"
-              class="flex-1"
+                            class="flex-1"
               @keydown.enter="addHyperparameter"
             />
             <UButton
-              size="sm"
-              variant="soft"
+                            variant="soft"
               :disabled="!newParamKey.trim()"
               @click="addHyperparameter"
             >

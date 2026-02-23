@@ -16,6 +16,8 @@ const navItems = [
   { label: "Runs", to: "/runs", icon: "i-heroicons-play-circle" },
   { label: "Exploration", to: "/exploration", icon: "i-heroicons-magnifying-glass-circle" },
   { label: "Plugins", to: "/plugins", icon: "i-heroicons-cube" },
+  { label: "Datenquellen", to: "/datasources", icon: "i-heroicons-circle-stack" },
+  { label: "Presets", to: "/presets", icon: "i-heroicons-bookmark-square" },
 ];
 
 function isActive(to: string): boolean {
@@ -63,7 +65,6 @@ async function syncAccounts() {
           <UButton
             :icon="item.icon"
             :variant="isActive(item.to) ? 'soft' : 'ghost'"
-            size="sm"
           >
             {{ item.label }}
           </UButton>

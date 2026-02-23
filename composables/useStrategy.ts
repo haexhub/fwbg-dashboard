@@ -5,15 +5,16 @@ import type {
   PipelinePhase,
   PipelineEntry,
 } from "~/types/strategy";
-import { PIPELINE_PHASES } from "~/types/strategy";
 
 /**
  * Composable for managing a strategy's pipeline state in the kanban board.
  * Converts between the internal PluginInstance format and the fwbg JSON format.
+ *
+ * Undo/redo is handled by the strategy config store — this composable calls
+ * store.commitSnapshot() before discrete mutations (add/remove/move).
  */
 export function useStrategy() {
-  const strategy = ref<StrategyConfig | null>(null);
-  const isDirty = ref(false);
+  const store = useStrategyConfigStore();
 
   // Plugin instances per phase (kanban internal state)
   const lanes = ref<Record<PipelinePhase, PluginInstance[]>>({
@@ -29,62 +30,19 @@ export function useStrategy() {
   const selectedPlugin = ref<PluginInstance | null>(null);
   const configPanelOpen = ref(false);
 
-  // ── Undo / Reset ──
-  type LanesSnapshot = Record<PipelinePhase, PluginInstance[]>;
-  const undoStack = ref<LanesSnapshot[]>([]);
-  const canUndo = computed(() => undoStack.value.length > 0);
-  let _savedSnapshot: LanesSnapshot | null = null;
-
-  function _cloneLanes(): LanesSnapshot {
-    const snap = {} as LanesSnapshot;
-    for (const phase of PIPELINE_PHASES) {
-      snap[phase] = lanes.value[phase].map((p) => ({
-        ...p,
-        params: { ...p.params },
-      }));
-    }
-    return snap;
-  }
-
-  function _pushUndo() {
-    undoStack.value.push(_cloneLanes());
-    // Keep max 50 entries
-    if (undoStack.value.length > 50) undoStack.value.shift();
-  }
-
-  function _restoreLanes(snapshot: LanesSnapshot) {
-    for (const phase of PIPELINE_PHASES) {
-      lanes.value[phase] = snapshot[phase].map((p) => ({
-        ...p,
-        params: { ...p.params },
-      }));
-    }
-  }
-
-  function undo() {
-    const prev = undoStack.value.pop();
-    if (!prev) return;
-    _restoreLanes(prev);
-    isDirty.value = undoStack.value.length > 0 || _savedSnapshot !== null;
-  }
-
-  function resetToSaved() {
-    if (!_savedSnapshot) return;
-    _restoreLanes(_savedSnapshot);
-    undoStack.value = [];
-    isDirty.value = false;
-  }
+  // Flag to prevent write-back loop during config → lanes sync
+  const _syncingFromConfig = ref(false);
 
   /**
-   * Load a strategy JSON into the kanban state.
+   * Rebuild lanes from the shared config (called on load and on undo/redo).
    */
-  function loadFromJson(config: StrategyConfig, plugins: PluginInfo[]) {
-    strategy.value = config;
+  function syncFromConfig(plugins: PluginInfo[]) {
+    if (!store.config) return;
+    _syncingFromConfig.value = true;
 
-    // Helper to convert pipeline entries to PluginInstances
     const toInstances = (
       entries: PipelineEntry[] | undefined,
-      phase: PipelinePhase
+      phase: PipelinePhase,
     ): PluginInstance[] => {
       return (entries ?? []).map((entry) => ({
         id: crypto.randomUUID(),
@@ -96,54 +54,56 @@ export function useStrategy() {
     };
 
     lanes.value.data_loading = toInstances(
-      config.pipeline.data_loading,
-      "data_loading"
+      store.config.pipeline.data_loading,
+      "data_loading",
     );
     lanes.value.preprocessing = toInstances(
-      config.pipeline.preprocessing,
-      "preprocessing"
+      store.config.pipeline.preprocessing,
+      "preprocessing",
     );
     lanes.value.indicators = toInstances(
-      config.pipeline.indicators,
-      "indicators"
+      store.config.pipeline.indicators,
+      "indicators",
     );
     lanes.value.feature_selection = toInstances(
-      config.pipeline.feature_selection,
-      "feature_selection"
+      store.config.pipeline.feature_selection,
+      "feature_selection",
     );
 
-    // Exit strategy is a single item
-    if (config.exit_strategy) {
+    if (store.config.exit_strategy) {
       lanes.value.exit_strategies = [
         {
           id: crypto.randomUUID(),
           fqn: resolvePluginFqn(
-            config.exit_strategy,
+            store.config.exit_strategy,
             "exit_strategies",
-            plugins
+            plugins,
           ),
-          name: config.exit_strategy,
+          name: store.config.exit_strategy,
           phase: "exit_strategies",
-          params: { ...(config.exit_params ?? {}) },
+          params: { ...(store.config.exit_params ?? {}) },
         },
       ];
     } else {
       lanes.value.exit_strategies = [];
     }
 
-    // Risk management not in current strategy JSON but we support it
     lanes.value.risk_management = [];
 
-    _savedSnapshot = _cloneLanes();
-    undoStack.value = [];
-    isDirty.value = false;
+    // Close config panel — lane IDs are regenerated
+    selectedPlugin.value = null;
+    configPanelOpen.value = false;
+
+    nextTick(() => {
+      _syncingFromConfig.value = false;
+    });
   }
 
   /**
    * Convert kanban state back to fwbg strategy JSON format.
    */
   function toJson(): StrategyConfig {
-    if (!strategy.value) throw new Error("No strategy loaded");
+    if (!store.config) throw new Error("No strategy loaded");
 
     const toEntries = (instances: PluginInstance[]): PipelineEntry[] =>
       instances.map((inst) => ({
@@ -154,23 +114,27 @@ export function useStrategy() {
     const exitInstance = lanes.value.exit_strategies[0];
 
     return {
-      ...strategy.value,
+      ...store.config,
       pipeline: {
         data_loading: toEntries(lanes.value.data_loading),
         preprocessing: toEntries(lanes.value.preprocessing),
         indicators: toEntries(lanes.value.indicators),
         feature_selection: toEntries(lanes.value.feature_selection),
       },
-      exit_strategy: exitInstance?.name ?? strategy.value.exit_strategy,
-      exit_params: exitInstance?.params ?? strategy.value.exit_params,
+      exit_strategy: exitInstance?.name ?? store.config.exit_strategy,
+      exit_params: exitInstance?.params ?? store.config.exit_params,
     };
   }
 
   /**
    * Add a plugin from the palette to a lane.
    */
-  function addPlugin(phase: PipelinePhase, plugin: PluginInfo, index?: number) {
-    _pushUndo();
+  function addPlugin(
+    phase: PipelinePhase,
+    plugin: PluginInfo,
+    index?: number,
+  ) {
+    store.commitSnapshot();
     const instance: PluginInstance = {
       id: crypto.randomUUID(),
       fqn: plugin.fqn,
@@ -179,16 +143,18 @@ export function useStrategy() {
       params: { ...plugin.defaults },
     };
 
-    // Exit strategies lane allows only one plugin
     if (phase === "exit_strategies") {
       lanes.value[phase] = [instance];
-    } else if (index != null && index >= 0 && index < lanes.value[phase].length) {
+    } else if (
+      index != null &&
+      index >= 0 &&
+      index < lanes.value[phase].length
+    ) {
       lanes.value[phase].splice(index, 0, instance);
     } else {
       lanes.value[phase].push(instance);
     }
 
-    isDirty.value = true;
     return instance;
   }
 
@@ -196,11 +162,10 @@ export function useStrategy() {
    * Remove a plugin from its lane.
    */
   function removePlugin(phase: PipelinePhase, instanceId: string) {
-    _pushUndo();
+    store.commitSnapshot();
     lanes.value[phase] = lanes.value[phase].filter(
-      (p) => p.id !== instanceId
+      (p) => p.id !== instanceId,
     );
-    isDirty.value = true;
 
     if (selectedPlugin.value?.id === instanceId) {
       selectedPlugin.value = null;
@@ -214,13 +179,12 @@ export function useStrategy() {
   function updatePluginParams(
     phase: PipelinePhase,
     instanceId: string,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
   ) {
     const instance = lanes.value[phase].find((p) => p.id === instanceId);
     if (instance) {
-      _pushUndo();
+      store.commitSnapshot();
       instance.params = { ...params };
-      isDirty.value = true;
     }
   }
 
@@ -245,37 +209,25 @@ export function useStrategy() {
   function movePlugin(
     phase: PipelinePhase,
     instanceId: string,
-    newIndex: number
+    newIndex: number,
   ) {
     const items = lanes.value[phase];
     const currentIndex = items.findIndex((p) => p.id === instanceId);
     if (currentIndex === -1 || currentIndex === newIndex) return;
 
-    _pushUndo();
+    store.commitSnapshot();
     const [item] = items.splice(currentIndex, 1);
     const adjustedIndex =
       newIndex > currentIndex ? newIndex - 1 : newIndex;
     items.splice(adjustedIndex, 0, item!);
-    isDirty.value = true;
-  }
-
-  /**
-   * Update strategy metadata.
-   */
-  function updateMetadata(updates: Partial<StrategyConfig>) {
-    if (!strategy.value) return;
-    Object.assign(strategy.value, updates);
-    isDirty.value = true;
   }
 
   return {
-    strategy: readonly(strategy),
     lanes,
-    isDirty: readonly(isDirty),
-    canUndo,
     selectedPlugin: readonly(selectedPlugin),
     configPanelOpen,
-    loadFromJson,
+    syncFromConfig,
+    _syncingFromConfig: readonly(_syncingFromConfig),
     toJson,
     addPlugin,
     removePlugin,
@@ -283,9 +235,6 @@ export function useStrategy() {
     updatePluginParams,
     openConfig,
     closeConfig,
-    updateMetadata,
-    undo,
-    resetToSaved,
   };
 }
 
@@ -295,18 +244,15 @@ export function useStrategy() {
 function resolvePluginFqn(
   name: string,
   phase: PipelinePhase,
-  plugins: PluginInfo[]
+  plugins: PluginInfo[],
 ): string {
-  // Already FQN
   if (name.includes(":")) return name;
 
-  // Find by name and phase
   const match = plugins.find(
-    (p) => p.name === name && p.phase === phase
+    (p) => p.name === name && p.phase === phase,
   );
   if (match) return match.fqn;
 
-  // Find by name only
   const anyMatch = plugins.find((p) => p.name === name);
   if (anyMatch) return anyMatch.fqn;
 

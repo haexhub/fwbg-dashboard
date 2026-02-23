@@ -89,11 +89,13 @@ const maxBars = ref(48);
 const error = ref("");
 
 async function submit() {
-  if (!assetFilename.value) return;
+  if (!selectedSymbol.value || !selectedTimeframe.value) return;
   error.value = "";
   try {
     const result = await runExitOptimization({
-      asset: assetFilename.value,
+      source: selectedSource.value,
+      symbol: selectedSymbol.value,
+      timeframe: selectedTimeframe.value,
       exit_strategy: exitStrategy.value,
       max_bars: maxBars.value,
     });
@@ -199,7 +201,7 @@ function formatDate(ts?: string): string {
             <UButton
               icon="i-heroicons-play"
               :loading="running"
-              :disabled="!assetFilename"
+              :disabled="!selectedSymbol || !selectedTimeframe"
               class="w-full"
               @click="submit"
             >

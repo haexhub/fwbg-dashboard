@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { config } = useStrategyConfig();
+const store = useStrategyConfigStore();
+const { config } = storeToRefs(store);
+const filtersRef = computed(() => config.value?._refs?.filters);
 
 const f = computed(() => config.value?.filters as Record<string, unknown> | undefined);
 
@@ -16,6 +18,14 @@ function setVal(key: string, value: unknown) {
 <template>
   <div v-if="f" class="overflow-y-auto h-full p-1">
     <div class="space-y-6">
+      <StrategyPresetSelectorBar
+        section="filters"
+        label="Filter"
+        :current-ref="filtersRef"
+        :model-value="f"
+        @apply="(name, content) => store.applyPreset('filters', name, content)"
+        @detach="store.detachPreset('filters')"
+      />
       <UCard>
         <template #header>
           <h3 class="text-lg font-medium text-white">Performance-Filter</h3>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { init, dispose } from "klinecharts";
+import { init, dispose, registerOverlay } from "klinecharts";
 import type {
   Chart,
   KLineData,
@@ -34,6 +34,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "crosshair-change": [data: CrosshairData | null];
   "drawing-cancelled": [];
+  "data-loaded": [count: number];
 }>();
 
 const chartContainer = ref<HTMLDivElement | null>(null);
@@ -89,10 +90,12 @@ function formatDate(params: {
   const dd = String(d.getDate()).padStart(2, "0");
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
+  const weekdays = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const wd = weekdays[d.getDay()];
 
-  // Crosshair/tooltip — always show full date+time
+  // Crosshair/tooltip — always show full date+time with weekday
   if (params.type === "crosshair" || params.type === "tooltip") {
-    return `${dd}.${mo}.${yyyy} ${hh}:${mm}`;
+    return `${wd} ${dd}.${mo}.${yyyy} ${hh}:${mm}`;
   }
 
   const tf = props.timeframe;
@@ -152,6 +155,35 @@ function updateStreamConnection() {
     streamDisconnect();
   }
 }
+
+// Register custom rectangle overlay (not built-in in KLineChart)
+registerOverlay({
+  name: "rect",
+  totalStep: 3,
+  needDefaultPointFigure: true,
+  needDefaultXAxisMark: true,
+  needDefaultYAxisMark: true,
+  createPointFigures: ({ coordinates }) => {
+    if (coordinates.length < 2) return [];
+    const [p1, p2] = coordinates;
+    const x = Math.min(p1!.x, p2!.x);
+    const y = Math.min(p1!.y, p2!.y);
+    const w = Math.abs(p2!.x - p1!.x);
+    const h = Math.abs(p2!.y - p1!.y);
+    return [
+      {
+        type: "rect",
+        attrs: { x, y, width: w, height: h },
+        styles: {
+          style: "stroke_fill",
+          color: "rgba(59, 130, 246, 0.12)",
+          borderColor: "rgba(59, 130, 246, 0.5)",
+          borderSize: 1,
+        },
+      },
+    ];
+  },
+});
 
 onMounted(() => {
   if (!chartContainer.value) return;
@@ -217,6 +249,7 @@ onMounted(() => {
 
         // Start streaming after initial data is loaded
         nextTick(updateStreamConnection);
+        emit("data-loaded", data.length);
       } catch (e) {
         console.error("Failed to load chart data:", e);
         params.callback([], false);

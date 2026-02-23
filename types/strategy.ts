@@ -114,11 +114,13 @@ export interface PipelineEntry {
 }
 
 export interface StrategyConfig {
+  _refs?: import("~/types/preset").StrategyRefs;
   name: string;
   description?: string;
   tags?: string[];
   hypothesis?: string;
   expected_outcome?: string;
+  datasource?: string;
   pipeline: {
     indicators?: PipelineEntry[];
     preprocessing?: PipelineEntry[];
@@ -127,6 +129,8 @@ export interface StrategyConfig {
   };
   exit_strategy: string;
   exit_params: Record<string, unknown>;
+  risk_management?: string;
+  risk_params?: Record<string, unknown>;
   model: {
     type: string;
     architecture: string;
@@ -140,9 +144,15 @@ export interface StrategyConfig {
       sl: number[];
       ct: number[];
       timeout_bars?: (number | null)[];
+      long_ct?: number[];
+      short_ct?: number[];
       regime_filter_grid?: unknown;
     }
   >;
+  assets?: {
+    filter?: string[];
+    exclude?: string[];
+  };
   validation: Record<string, unknown>;
   filters: Record<string, unknown>;
   resources: Record<string, unknown>;

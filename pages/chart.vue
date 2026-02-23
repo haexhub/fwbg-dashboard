@@ -10,6 +10,16 @@ import {
   updateSignalMarkerData,
   SIGNAL_MARKER_NAME,
   LINE_COLORS,
+  ensureTradeMarkerRegistered,
+  updateTradeMarkerData,
+  clearTradeMarkerData,
+  TRADE_MARKER_NAME,
+  type RunTradeMarker,
+  ensureRangeRectRegistered,
+  updateRangeMode,
+  updateRangeTimeFilter,
+  updateRangeWeekdays,
+  RANGE_RECT_NAME,
 } from "~/composables/useChartIndicators";
 
 definePageMeta({ layout: "builder" });
@@ -43,6 +53,53 @@ const indicatorPlugins = computed(
 );
 
 const indicatorPanelOpen = ref(false);
+const rangeInterval = ref("");
+const rangeStartTime = ref("00:00");
+const rangeEndTime = ref("00:00");
+const rangeWeekdays = ref([1, 2, 3, 4, 5]); // Mon-Fri
+
+function parseTimeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+function forceRangeRedraw() {
+  const chart = chartCanvas.value?.getChart();
+  if (chart && rangeInterval.value) {
+    chart.removeIndicator({ name: RANGE_RECT_NAME });
+    chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+  }
+}
+
+function handleRangeTimeChange() {
+  updateRangeTimeFilter(
+    parseTimeToMinutes(rangeStartTime.value),
+    parseTimeToMinutes(rangeEndTime.value),
+  );
+  forceRangeRedraw();
+}
+
+function handleRangeWeekdaysChange(days: number[]) {
+  rangeWeekdays.value = days;
+  updateRangeWeekdays(days);
+  forceRangeRedraw();
+}
+
+function handleRangeIntervalChange(value: string) {
+  rangeInterval.value = value;
+  updateRangeMode(value);
+
+  const chart = chartCanvas.value?.getChart();
+  if (!chart) return;
+
+  if (value) {
+    ensureRangeRectRegistered();
+    chart.removeIndicator({ name: RANGE_RECT_NAME });
+    chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+  } else {
+    chart.removeIndicator({ name: RANGE_RECT_NAME });
+  }
+}
 
 const chartCanvas = ref<{
   getChart: () => import("klinecharts").Chart | null;
@@ -293,7 +350,7 @@ function updateSignalMarkers() {
     chart.removeIndicator({ name: SIGNAL_MARKER_NAME });
     chart.createIndicator(
       { name: SIGNAL_MARKER_NAME },
-      false,
+      true,
       { id: "candle_pane" }
     );
   } else if (signalMarkerActive.value) {
@@ -303,6 +360,194 @@ function updateSignalMarkers() {
 }
 
 watch(signalTimestampsKey, () => nextTick(updateSignalMarkers));
+
+// ── Run Trade Overlay ──
+const route = useRoute();
+const runOverlayId  = computed(() => route.query.run    as string | undefined);
+const runOverlaySym = computed(() => route.query.symbol as string | undefined);
+const tradeOverlayActive = ref(false);
+const tradeOverlayCount  = ref(0);
+
+interface RunTradesResponse {
+  symbol: string;
+  run_id: string;
+  trades: Array<{
+    entry_time?: string;
+    exit_time?: string;
+    entry_price?: number;
+    exit_price?: number;
+    direction?: string;
+    result?: number;
+    pnl_raw?: number;
+    tp_level?: number;
+    sl_level?: number;
+    fold_id?: number;
+  }>;
+}
+
+const runIndicatorsLoaded = ref(false);
+
+async function loadRunIndicators(runId: string) {
+  if (runIndicatorsLoaded.value) return;
+  if (indicatorPlugins.value.length === 0) return;
+
+  try {
+    type RunWithStrategy = { strategy?: { pipeline?: { indicators?: Array<{ name: string; params: Record<string, unknown> }> } } };
+    const runDetail = await $fetch<RunWithStrategy>(`/api/runs/${runId}`);
+    const indicatorEntries = runDetail.strategy?.pipeline?.indicators ?? [];
+    if (indicatorEntries.length === 0) return;
+
+    runIndicatorsLoaded.value = true;
+
+    for (const entry of indicatorEntries) {
+      const plugin = indicatorPlugins.value.find((p) => p.name === entry.name);
+      if (!plugin) continue;
+      if (activeIndicators.value.some((a) => a.fqn === plugin.fqn)) continue;
+
+      try {
+        const response = await $fetch<IndicatorResponse>("/api/chart/indicator", {
+          method: "POST",
+          body: {
+            symbol: symbol.value,
+            timeframe: timeframe.value,
+            source: source.value,
+            fqn: plugin.fqn,
+            params: { ...plugin.defaults, ...entry.params },
+            limit: INDICATOR_LIMIT,
+          },
+        });
+
+        const plotCols = response.plot_columns ?? [];
+        const sigCols = response.signal_columns ?? [];
+
+        if (plotCols.length > 0) {
+          const instanceId = `fwbg_${plugin.name}_${Date.now()}`;
+          const colors: Record<string, string> = {};
+          plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
+          registerFwbgIndicator(instanceId, response, plotCols, colors);
+          const chart = chartCanvas.value?.getChart();
+          const paneId = chart?.createIndicator({ name: instanceId }, false, { height: 120 }) ?? "";
+          addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: entry.params ?? plugin.defaults, columns: plotCols, paneId });
+        }
+
+        if (sigCols.length > 0) {
+          const sigId = `fwbg_sig_${plugin.name}_${Date.now()}`;
+          const sigColors: Record<string, string> = {};
+          sigCols.forEach((col, i) => { sigColors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
+          registerFwbgSignalIndicator(sigId, response, sigCols, sigColors);
+          const chart = chartCanvas.value?.getChart();
+          const paneId = chart?.createIndicator({ name: sigId }, false, { height: 80 }) ?? "";
+          const sigTransitions = extractSignalTransitions(response, sigCols);
+          addIndicator({ id: sigId, fqn: plugin.fqn, name: `${plugin.name} (signal)`, params: entry.params ?? plugin.defaults, columns: sigCols, paneId, isSignal: true, signalTimestamps: sigTransitions.timestamps, signalValueMap: sigTransitions.valueMap });
+        }
+      } catch (e) {
+        console.warn(`[run indicators] Skipping ${plugin.fqn}:`, e);
+      }
+    }
+    nextTick(adjustLayout);
+  } catch (e) {
+    console.warn("Failed to load run indicators:", e);
+  }
+}
+
+// Reactively load run indicators once plugins become available
+watch(indicatorPlugins, (list) => {
+  if (list.length > 0 && runOverlayId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
+    loadRunIndicators(runOverlayId.value);
+  }
+});
+
+async function loadRunTradeOverlay(runId: string, sym: string) {
+  try {
+    const [resp] = await Promise.all([
+      $fetch<RunTradesResponse>(`/api/runs/${runId}/trades/${sym}`),
+      loadRunIndicators(runId),
+    ]);
+    const markers: RunTradeMarker[] = resp.trades
+      .filter((t) => t.entry_time && t.exit_time && t.entry_price != null && t.exit_price != null)
+      .map((t) => ({
+        entryTime:  new Date(t.entry_time!).getTime(),
+        exitTime:   new Date(t.exit_time!).getTime(),
+        entryPrice: t.entry_price!,
+        exitPrice:  t.exit_price!,
+        direction:  (t.direction ?? "LONG") as "LONG" | "SHORT",
+        result:     t.result ?? 0,
+        pnlRaw:     t.pnl_raw ?? 0,
+        tpLevel:    t.tp_level,
+        slLevel:    t.sl_level,
+        foldId:     t.fold_id,
+      }));
+
+    updateTradeMarkerData(markers);
+    tradeOverlayCount.value = markers.length;
+
+    const chart = chartCanvas.value?.getChart();
+    if (chart) {
+      ensureTradeMarkerRegistered();
+      chart.removeIndicator({ name: TRADE_MARKER_NAME });
+      chart.createIndicator({ name: TRADE_MARKER_NAME }, true, { id: "candle_pane" });
+      tradeOverlayActive.value = true;
+
+      // Scroll to the first trade entry
+      const first = markers.reduce<RunTradeMarker | null>(
+        (min, m) => (!min || m.entryTime < min.entryTime ? m : min),
+        null,
+      );
+      if (first) {
+        nextTick(() => chartCanvas.value?.scrollToTimestamp(first.entryTime));
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load run trade overlay:", e);
+  }
+}
+
+function clearRunTradeOverlay() {
+  const chart = chartCanvas.value?.getChart();
+  if (chart) chart.removeIndicator({ name: TRADE_MARKER_NAME });
+  clearTradeMarkerData();
+  tradeOverlayActive.value = false;
+  tradeOverlayCount.value  = 0;
+}
+
+// ── Apply query-param symbol+source after sources load ──
+// useChart's internal watcher auto-selects the first symbol; we override it here.
+watch(sources, async (list) => {
+  if (!list?.length || !runOverlaySym.value) return;
+  await nextTick(); // let useChart's own watcher run first
+
+  const targetSym = runOverlaySym.value;
+
+  // If the target symbol isn't available in the current source, search other sources
+  const inCurrentSource = availableSymbols.value.some((s) => s.symbol === targetSym);
+  if (!inCurrentSource) {
+    const matchingSrc = list.find((src) =>
+      src.symbols?.some((s: { symbol: string }) => s.symbol === targetSym)
+    );
+    if (matchingSrc) {
+      setSource(matchingSrc.name);
+      // setSource sets symbol to first of that source; override immediately below
+    }
+  }
+
+  setSymbol(targetSym);
+}, { immediate: true });
+
+// ── Trade overlay: triggered by Canvas data-loaded event (not by setTimeout) ──
+let _overlayLoaded = false;
+
+function handleDataLoaded(count: number) {
+  if (count === 0 || _overlayLoaded) return;
+  if (!runOverlayId.value || !runOverlaySym.value) return;
+  _overlayLoaded = true;
+  loadRunTradeOverlay(runOverlayId.value, runOverlaySym.value);
+}
+
+// Reset flags when run/symbol changes (user navigates to a different asset or run)
+watch(() => [runOverlayId.value, runOverlaySym.value], () => {
+  _overlayLoaded = false;
+  runIndicatorsLoaded.value = false;
+});
 
 // Screenshot
 function handleScreenshot() {
@@ -529,12 +774,20 @@ function handleRemoveIndicator(id: string) {
         :available-timeframes="availableTimeframes"
         :active-indicators="activeIndicators"
         :active-drawing-tool="activeDrawingTool"
+        :range-interval="rangeInterval"
+        :range-start-time="rangeStartTime"
+        :range-end-time="rangeEndTime"
+        :range-weekdays="rangeWeekdays"
         :is-fullscreen="isFullscreen"
         @update:source="setSource"
         @update:symbol="setSymbol"
         @update:timeframe="setTimeframe"
         @update:chart-type="setChartType"
         @update:drawing-tool="setDrawingTool"
+        @update:range-interval="handleRangeIntervalChange"
+        @update:range-start-time="(v: string) => { rangeStartTime = v; handleRangeTimeChange(); }"
+        @update:range-end-time="(v: string) => { rangeEndTime = v; handleRangeTimeChange(); }"
+        @update:range-weekdays="handleRangeWeekdaysChange"
         @open-indicators="indicatorPanelOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
@@ -542,6 +795,30 @@ function handleRemoveIndicator(id: string) {
         @zoom-out="chartCanvas?.zoomOut()"
         @zoom-reset="chartCanvas?.resetZoom()"
       />
+
+      <!-- Run Trade Overlay Bar -->
+      <div
+        v-if="tradeOverlayActive || (runOverlayId && runOverlaySym)"
+        class="flex items-center gap-3 px-3 py-1 bg-indigo-950/60 border-b border-indigo-800/40 text-xs text-indigo-300"
+      >
+        <span class="i-heroicons-chart-bar-square text-indigo-400 shrink-0" />
+        <span>
+          Run <span class="font-mono font-semibold text-white">{{ runOverlayId }}</span>
+          — <span class="font-mono text-indigo-200">{{ runOverlaySym }}</span>
+          <template v-if="tradeOverlayCount > 0">
+            · <span class="text-white">{{ tradeOverlayCount }} Trades</span>
+          </template>
+        </span>
+        <div class="flex items-center gap-2 ml-auto">
+          <div class="flex items-center gap-1 text-xs text-gray-400">
+            <span class="inline-block w-3 h-3 rounded-full bg-teal-500 shrink-0" /> LONG entry
+            <span class="inline-block w-3 h-3 rounded-full bg-orange-500 shrink-0 ml-2" /> SHORT entry
+            <span class="inline-block w-3 h-3 rounded-full bg-green-500 shrink-0 ml-2" /> Win exit
+            <span class="inline-block w-3 h-3 rounded-full bg-red-500 shrink-0 ml-2" /> Loss exit
+          </div>
+          <UButton size="2xs" variant="ghost" color="neutral" icon="i-heroicons-x-mark" @click="clearRunTradeOverlay" />
+        </div>
+      </div>
 
       <!-- Active Indicators Strip -->
       <ChartIndicatorStrip
@@ -575,6 +852,7 @@ function handleRemoveIndicator(id: string) {
           :active-drawing-tool="activeDrawingTool"
           @crosshair-change="crosshairData = $event"
           @drawing-cancelled="setDrawingTool(null)"
+          @data-loaded="handleDataLoaded"
         />
       </div>
 

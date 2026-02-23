@@ -104,7 +104,6 @@ const phaseOptions = computed(() => [
             <UButton
               icon="i-heroicons-arrow-right"
               variant="ghost"
-              size="xs"
             />
           </NuxtLink>
         </div>

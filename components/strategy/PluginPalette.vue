@@ -6,14 +6,19 @@ import {
   PHASE_ICONS,
 } from "~/types/strategy";
 import type { PluginInfo, PipelinePhase } from "~/types/strategy";
+import type { DataSourceBase } from "~/types/datasource";
 
 const props = defineProps<{
   plugins: PluginInfo[];
+  datasources?: DataSourceBase[];
+  currentDatasource?: string;
 }>();
 
 const emit = defineEmits<{
   selectPlugin: [plugin: PluginInfo];
+  addPlugin: [plugin: PluginInfo];
   removeLanePlugin: [phase: PipelinePhase, instanceId: string];
+  selectDatasource: [name: string];
 }>();
 
 const paletteRef = ref<HTMLElement | null>(null);
@@ -88,7 +93,6 @@ const phaseOptions = PIPELINE_PHASES.map((phase) => ({
         v-model="searchQuery"
         icon="i-heroicons-magnifying-glass"
         placeholder="Search plugins..."
-        size="sm"
         class="w-full"
       />
       <USelectMenu
@@ -97,12 +101,29 @@ const phaseOptions = PIPELINE_PHASES.map((phase) => ({
         value-key="value"
         multiple
         placeholder="All phases"
-        size="sm"
         class="w-full"
       />
     </div>
 
     <div class="flex-1 overflow-y-auto p-2">
+      <!-- Datasource section (always shown, not filtered by search) -->
+      <div v-if="datasources?.length" class="mb-3">
+        <div class="flex items-center gap-1.5 px-1 py-1.5">
+          <UIcon name="i-heroicons-circle-stack" class="text-gray-500 text-xs" />
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Datasource</span>
+          <span class="text-xs text-gray-600">({{ datasources.length }})</span>
+        </div>
+        <div class="space-y-0.5">
+          <StrategyPaletteDatasourceItem
+            v-for="ds in datasources"
+            :key="ds.name"
+            :datasource="ds"
+            :is-selected="currentDatasource === ds.name"
+            @select="emit('selectDatasource', ds.name)"
+          />
+        </div>
+      </div>
+
       <div v-if="!groupedPlugins.length" class="text-center text-gray-500 text-sm py-4">
         No plugins found
       </div>
@@ -121,6 +142,7 @@ const phaseOptions = PIPELINE_PHASES.map((phase) => ({
             :key="plugin.fqn"
             :plugin="plugin"
             @click="emit('selectPlugin', plugin)"
+            @add="emit('addPlugin', plugin)"
           />
         </div>
       </div>

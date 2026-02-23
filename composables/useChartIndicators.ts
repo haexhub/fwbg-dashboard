@@ -324,6 +324,334 @@ export function ensureSignalMarkerRegistered() {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Trade Overlay — draws run backtest trades on the candle pane
+// Each trade: entry triangle + exit circle + TP/SL dashed lines + connector
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const TRADE_MARKER_NAME = "fwbg_trade_markers";
+
+export interface RunTradeMarker {
+  entryTime: number;        // ms timestamp
+  exitTime: number;         // ms timestamp
+  entryPrice: number;
+  exitPrice: number;
+  direction: "LONG" | "SHORT";
+  result: number;           // 1 = win, -1 = loss
+  pnlRaw: number;
+  tpLevel?: number;
+  slLevel?: number;
+  foldId?: number;
+}
+
+const _tradeMarkers: RunTradeMarker[] = [];
+let _tradeMarkerRegistered = false;
+
+export function updateTradeMarkerData(trades: RunTradeMarker[]) {
+  _tradeMarkers.length = 0;
+  _tradeMarkers.push(...trades);
+}
+
+export function clearTradeMarkerData() {
+  _tradeMarkers.length = 0;
+}
+
+export function ensureTradeMarkerRegistered() {
+  if (_tradeMarkerRegistered) return;
+  _tradeMarkerRegistered = true;
+
+  registerIndicator({
+    name: TRADE_MARKER_NAME,
+    shortName: "",
+    calcParams: [],
+    figures: [],
+    calc: (klineDataList) => klineDataList.map(() => ({})),
+    draw: ({ ctx, chart, xAxis, yAxis }) => {
+      if (_tradeMarkers.length === 0) return true;
+
+      const data = chart.getDataList();
+      const range = chart.getVisibleRange();
+
+      // Build full timestamp → bar-index map (all bars, not just visible)
+      const tsToIdx = new Map<number, number>();
+      for (let i = 0; i < data.length; i++) {
+        tsToIdx.set(data[i]!.timestamp, i);
+      }
+
+      // Binary search: find bar index with largest timestamp <= target
+      // Needed when trade timestamps don't align exactly with bar timestamps
+      function snapToBar(targetTs: number): number | undefined {
+        let lo = 0, hi = data.length - 1, result = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (data[mid]!.timestamp <= targetTs) { result = mid; lo = mid + 1; }
+          else { hi = mid - 1; }
+        }
+        return result >= 0 ? result : undefined;
+      }
+
+      ctx.save();
+      ctx.setLineDash([]);
+
+      for (const trade of _tradeMarkers) {
+        const entryIdx = tsToIdx.get(trade.entryTime) ?? snapToBar(trade.entryTime);
+        const exitIdx  = tsToIdx.get(trade.exitTime) ?? snapToBar(trade.exitTime);
+
+        // Skip trades with no bar alignment (different timeframe, outside loaded range)
+        if (entryIdx === undefined && exitIdx === undefined) continue;
+
+        const isLong = trade.direction === "LONG";
+        const isWin  = trade.result > 0;
+
+        // Colors: LONG entry = teal, SHORT entry = orange, win exit = green, loss exit = red
+        const entryColor = isLong ? "#14b8a6" : "#f97316";
+        const exitColor  = isWin  ? "#22c55e" : "#ef4444";
+        const lineColor  = isWin  ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.5)";
+
+        const entryX = entryIdx !== undefined ? xAxis.convertToPixel(entryIdx) : null;
+        const exitX  = exitIdx  !== undefined ? xAxis.convertToPixel(exitIdx)  : null;
+        const entryY = yAxis.convertToPixel(trade.entryPrice);
+        const exitY  = yAxis.convertToPixel(trade.exitPrice);
+
+        // Only draw if at least one endpoint is in the visible bar range
+        const entryVisible = entryIdx !== undefined && entryIdx >= range.from - 5 && entryIdx <= range.to + 5;
+        const exitVisible  = exitIdx  !== undefined && exitIdx  >= range.from - 5 && exitIdx  <= range.to + 5;
+        if (!entryVisible && !exitVisible) continue;
+
+        // ── TP / SL dashed horizontal lines (entry → exit) ──
+        if (entryX !== null && exitX !== null) {
+          if (trade.tpLevel != null) {
+            const tpY = yAxis.convertToPixel(trade.tpLevel);
+            ctx.strokeStyle = "rgba(34,197,94,0.35)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 4]);
+            ctx.beginPath();
+            ctx.moveTo(entryX, tpY);
+            ctx.lineTo(exitX, tpY);
+            ctx.stroke();
+          }
+          if (trade.slLevel != null) {
+            const slY = yAxis.convertToPixel(trade.slLevel);
+            ctx.strokeStyle = "rgba(239,68,68,0.35)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 4]);
+            ctx.beginPath();
+            ctx.moveTo(entryX, slY);
+            ctx.lineTo(exitX, slY);
+            ctx.stroke();
+          }
+        }
+
+        // ── Connector line (entry price → exit price) ──
+        ctx.setLineDash([]);
+        if (entryX !== null && exitX !== null) {
+          ctx.strokeStyle = lineColor;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(entryX, entryY);
+          ctx.lineTo(exitX, exitY);
+          ctx.stroke();
+        }
+
+        // ── Entry triangle (▲ LONG below price, ▼ SHORT above price) ──
+        if (entryX !== null) {
+          const s = 10; // half-width — bigger for visibility
+          const h = 14; // height
+          ctx.fillStyle = entryColor;
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          if (isLong) {
+            // Triangle pointing up, placed below the entry price level
+            const ty = entryY + 20;
+            ctx.moveTo(entryX,      ty - h);
+            ctx.lineTo(entryX - s,  ty);
+            ctx.lineTo(entryX + s,  ty);
+          } else {
+            // Triangle pointing down, placed above the entry price level
+            const ty = entryY - 20;
+            ctx.moveTo(entryX,      ty + h);
+            ctx.lineTo(entryX - s,  ty);
+            ctx.lineTo(entryX + s,  ty);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        // ── Exit circle ──
+        if (exitX !== null) {
+          ctx.fillStyle = exitColor;
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(exitX, exitY, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+      return true;
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Range Rectangles — groups bars into calendar-based time windows and draws
+// alternating rects spanning each window's high/low price range
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const RANGE_RECT_NAME = "fwbg_range_rects";
+
+let _rangeMode = "";  // "", "1h", "4h", "8h", "1d", "1w", "1m"
+let _rangeStartMinutes = 0;  // minutes from midnight UTC (0+0 = no filter)
+let _rangeEndMinutes = 0;
+let _rangeWeekdays = new Set([1, 2, 3, 4, 5]); // 0=Sun .. 6=Sat, default Mon-Fri
+let _rangeRectRegistered = false;
+
+const RANGE_COLORS = [
+  "rgba(59, 130, 246, 0.10)",   // blue
+  "rgba(139, 92, 246, 0.10)",   // purple
+];
+const RANGE_BORDERS = [
+  "rgba(59, 130, 246, 0.30)",
+  "rgba(139, 92, 246, 0.30)",
+];
+
+export function updateRangeMode(mode: string) {
+  _rangeMode = mode;
+}
+
+export function updateRangeTimeFilter(startMinutes: number, endMinutes: number) {
+  _rangeStartMinutes = startMinutes;
+  _rangeEndMinutes = endMinutes;
+}
+
+export function updateRangeWeekdays(days: number[]) {
+  _rangeWeekdays = new Set(days);
+}
+
+/** Check if bar falls within the time-of-day filter */
+function _isInTimeRange(timestamp: number): boolean {
+  if (_rangeStartMinutes === 0 && _rangeEndMinutes === 0) return true;
+  const d = new Date(timestamp);
+  const m = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if (_rangeStartMinutes <= _rangeEndMinutes) {
+    return m >= _rangeStartMinutes && m < _rangeEndMinutes;
+  }
+  // Overnight range (e.g. 22:00–06:00)
+  return m >= _rangeStartMinutes || m < _rangeEndMinutes;
+}
+
+/** Check if bar falls on an allowed weekday (for 1w mode) */
+function _isAllowedWeekday(timestamp: number): boolean {
+  return _rangeWeekdays.has(new Date(timestamp).getUTCDay());
+}
+
+/** Calendar-based window ID computation */
+function _getWindowId(timestamp: number): number {
+  const d = new Date(timestamp);
+  switch (_rangeMode) {
+    case "1h": return Math.floor(timestamp / 3_600_000);
+    case "4h": return Math.floor(timestamp / 14_400_000);
+    case "8h": return Math.floor(timestamp / 28_800_000);
+    case "1d":
+      return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+    case "1w": {
+      // ISO week: align to Monday
+      const day = d.getUTCDay(); // 0=Sun
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+      const monday = new Date(timestamp + mondayOffset * 86_400_000);
+      return monday.getUTCFullYear() * 100 +
+        Math.ceil(((monday.getTime() - Date.UTC(monday.getUTCFullYear(), 0, 1)) / 86_400_000 + 1) / 7);
+    }
+    case "1m":
+      return d.getUTCFullYear() * 100 + d.getUTCMonth();
+    default: return 0;
+  }
+}
+
+export function ensureRangeRectRegistered() {
+  if (_rangeRectRegistered) return;
+  _rangeRectRegistered = true;
+
+  registerIndicator({
+    name: RANGE_RECT_NAME,
+    shortName: "",
+    calcParams: [],
+    figures: [],
+    calc: (klineDataList) => klineDataList.map(() => ({})),
+    draw: ({ ctx, chart, xAxis, yAxis }) => {
+      if (!_rangeMode) return true;
+
+      const data = chart.getDataList();
+      if (data.length === 0) return true;
+
+      const range = chart.getVisibleRange();
+
+      const hasTimeFilter = _rangeStartMinutes !== 0 || _rangeEndMinutes !== 0;
+      const hasWeekdayFilter = _rangeMode === "1w";
+
+      // Group ALL bars into time windows (not just visible ones) so that
+      // rectangles always show the full high/low of the entire window,
+      // even when parts are scrolled out of view
+      interface Window { fromIdx: number; toIdx: number; high: number; low: number; windowId: number; }
+      const windowMap = new Map<number, Window>();
+
+      for (let i = 0; i < data.length; i++) {
+        const bar = data[i]!;
+
+        // Skip bars outside filters
+        if (hasTimeFilter && !_isInTimeRange(bar.timestamp)) continue;
+        if (hasWeekdayFilter && !_isAllowedWeekday(bar.timestamp)) continue;
+
+        const windowId = _getWindowId(bar.timestamp);
+        const win = windowMap.get(windowId);
+        if (win) {
+          win.toIdx = i;
+          win.high = Math.max(win.high, bar.high);
+          win.low = Math.min(win.low, bar.low);
+        } else {
+          windowMap.set(windowId, { fromIdx: i, toIdx: i, high: bar.high, low: bar.low, windowId });
+        }
+      }
+
+      // Only draw windows that overlap with the visible range
+      const windows = [...windowMap.values()].filter(
+        (w) => w.toIdx >= range.from && w.fromIdx <= range.to
+      );
+
+      ctx.save();
+      for (let w = 0; w < windows.length; w++) {
+        const win = windows[w]!;
+        const colorIdx = win.windowId % 2 === 0 ? 0 : 1;
+
+        const x1 = xAxis.convertToPixel(win.fromIdx);
+        const x2 = xAxis.convertToPixel(win.toIdx);
+        const yTop = yAxis.convertToPixel(win.high);
+        const yBot = yAxis.convertToPixel(win.low);
+
+        // Half-bar padding on each side
+        const halfBar = Math.max(4, (x2 - x1) / ((win.toIdx - win.fromIdx) || 1) * 0.5);
+        const rx = x1 - halfBar;
+        const rw = (x2 - x1) + halfBar * 2;
+        const ry = yTop;
+        const rh = yBot - yTop;
+
+        ctx.fillStyle = RANGE_COLORS[colorIdx]!;
+        ctx.fillRect(rx, ry, rw, rh);
+
+        ctx.strokeStyle = RANGE_BORDERS[colorIdx]!;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx, ry, rw, rh);
+      }
+      ctx.restore();
+      return true;
+    },
+  });
+}
+
 /**
  * Adjust a hex color's opacity by mixing with black.
  */

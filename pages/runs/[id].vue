@@ -1,30 +1,15 @@
 <script setup lang="ts">
-import { statusColor, formatWinRate, formatPnl } from "~/types/strategy";
-import type { RunDetail } from "~/types/strategy";
+import { statusColor } from "~/types/strategy";
 
 const route = useRoute();
 const runId = computed(() => route.params.id as string);
 
-const { getRunDetail, cancelRun } = useRuns();
+const { detail, performance, loading, error, load } = useRunPerformance(
+  runId.value,
+);
 
-const detail = ref<RunDetail | null>(null);
-const loading = ref(true);
-
-onMounted(async () => {
-  try {
-    detail.value = await getRunDetail(runId.value);
-  } catch {
-    // Run not found
-  } finally {
-    loading.value = false;
-  }
-});
-
-const assetList = computed(() => {
-  if (!detail.value?.assets) return [];
-  return Object.values(detail.value.assets).sort((a, b) =>
-    a.symbol.localeCompare(b.symbol)
-  );
+onMounted(() => {
+  load();
 });
 </script>
 
@@ -49,67 +34,84 @@ const assetList = computed(() => {
       </div>
     </div>
 
+    <!-- Strategy Info -->
+    <div
+      v-if="detail?.strategy"
+      class="flex items-center gap-3 text-sm text-gray-400"
+    >
+      <span class="font-medium text-white">{{
+        detail.strategy.name
+      }}</span>
+      <span v-if="detail.strategy.description">
+        — {{ detail.strategy.description }}
+      </span>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="py-16 text-center text-gray-400">
-      Loading run...
+      Lade Run-Daten...
     </div>
 
-    <!-- Not found -->
-    <div v-else-if="!detail" class="py-16 text-center text-gray-400">
-      Run "{{ runId }}" not found.
+    <!-- Error -->
+    <div v-else-if="error" class="py-16 text-center text-red-400">
+      {{ error }}
     </div>
 
+    <!-- No data -->
+    <div
+      v-else-if="!performance"
+      class="py-16 text-center text-gray-400"
+    >
+      Keine Performance-Daten verfügbar.
+    </div>
+
+    <!-- Dashboard -->
     <template v-else>
-      <!-- Strategy Info -->
-      <UCard v-if="detail.strategy">
-        <template #header>
-          <h3 class="text-sm font-medium text-gray-400">Strategy</h3>
-        </template>
-        <div class="space-y-1">
-          <p class="text-white font-medium">{{ detail.strategy.name }}</p>
-          <p v-if="detail.strategy.description" class="text-sm text-gray-400">
-            {{ detail.strategy.description }}
-          </p>
-        </div>
-      </UCard>
+      <!-- TradeZella-style Summary Widgets -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <PerformanceCumulativePnl
+          :net-pnl="performance.netPnl"
+          :total-trades="performance.totalTrades"
+          :equity-curve="performance.equityCurve"
+        />
+        <PerformanceProfitFactorGauge
+          :profit-factor="performance.profitFactor"
+        />
+        <PerformanceWinRateRing
+          :win-rate="performance.winRate"
+          :total-trades="performance.totalTrades"
+        />
+        <PerformanceMaxDrawdownGauge
+          :max-drawdown="performance.maxDrawdown"
+          :max-drawdown-pct="performance.maxDrawdownPct"
+        />
+        <PerformanceAvgWinLoss
+          :avg-win="performance.avgWin"
+          :avg-loss="performance.avgLoss"
+        />
+      </div>
 
-      <!-- Asset Results -->
-      <UCard v-if="assetList.length">
-        <template #header>
-          <h3 class="text-sm font-medium text-gray-400">
-            Assets ({{ assetList.length }})
-          </h3>
-        </template>
-        <div class="divide-y divide-gray-800">
-          <div
-            v-for="asset in assetList"
-            :key="asset.symbol"
-            class="flex items-center justify-between py-2 px-1"
-          >
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-white text-sm">{{ asset.symbol }}</span>
-              <UBadge
-                :color="asset.status === 'ok' ? 'success' : asset.status === 'error' ? 'error' : 'warning'"
-                variant="subtle"
-                size="xs"
-              >
-                {{ asset.status }}
-              </UBadge>
-            </div>
-            <div class="flex gap-6 text-sm text-gray-400">
-              <span v-if="asset.walk_forward.total_trades">
-                {{ asset.walk_forward.total_trades }} trades
-              </span>
-              <span v-if="asset.walk_forward.mean_win_rate">
-                WR: {{ formatWinRate(asset.walk_forward.mean_win_rate) }}
-              </span>
-              <span v-if="asset.walk_forward.mean_pnl != null">
-                PnL: {{ formatPnl(asset.walk_forward.mean_pnl) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </UCard>
+      <!-- Secondary KPI Cards -->
+      <PerformanceStatCards :data="performance" />
+
+      <!-- Equity · Drawdown · Profit per Trade (shared X axis) -->
+      <PerformanceEquityPanel
+        :simulation="performance.equitySimulation"
+        :profit-per-trade="performance.profitPerTrade"
+      />
+
+      <!-- Score Radar + P&L Bar + Trade Distribution -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <PerformanceScoreRadar :data="performance" />
+        <PerformancePnlBarChart :assets="performance.assetBreakdown" />
+        <PerformanceTradeDistribution :data="performance" />
+      </div>
+
+      <!-- Trade Log -->
+      <PerformanceTradeTable :trades="performance.trades" />
+
+      <!-- Asset Table -->
+      <PerformanceAssetTable :assets="performance.assetBreakdown" :run-id="runId" />
     </template>
   </div>
 </template>

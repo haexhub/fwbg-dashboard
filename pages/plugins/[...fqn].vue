@@ -35,6 +35,12 @@ const paramEntries = computed(() => {
   if (!plugin.value) return [];
   return Object.entries(plugin.value.param_schema);
 });
+
+// ── Plugin docs (README) ──
+const { data: docs } = useFetch<{ has_docs: boolean; readme: string | null }>(
+  () => `/api/strategy/plugins/${encodeURIComponent(fqn.value)}/docs`,
+  { watch: [fqn] }
+);
 </script>
 
 <template>
@@ -43,7 +49,7 @@ const paramEntries = computed(() => {
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
         <NuxtLink to="/plugins">
-          <UButton icon="i-heroicons-arrow-left" variant="ghost" size="sm" />
+          <UButton icon="i-heroicons-arrow-left" variant="ghost" />
         </NuxtLink>
         <h2 class="text-xl font-semibold text-white">
           {{ plugin?.name ?? fqn }}
@@ -135,6 +141,27 @@ const paramEntries = computed(() => {
             </div>
           </div>
         </div>
+      </UCard>
+
+      <!-- README -->
+      <UCard v-if="docs?.readme">
+        <template #header>
+          <h3 class="text-sm font-medium text-gray-400">README</h3>
+        </template>
+        <MDC
+          :value="docs.readme"
+          class="prose prose-invert prose-sm max-w-none
+            prose-headings:text-white prose-headings:font-semibold
+            prose-p:text-gray-300 prose-p:leading-relaxed
+            prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+            prose-code:text-emerald-400 prose-code:bg-gray-900 prose-code:px-1 prose-code:rounded
+            prose-pre:bg-gray-950 prose-pre:border prose-pre:border-gray-800
+            prose-strong:text-white
+            prose-ul:text-gray-300 prose-ol:text-gray-300
+            prose-li:marker:text-gray-500
+            prose-hr:border-gray-800
+            prose-blockquote:border-blue-500 prose-blockquote:text-gray-400"
+        />
       </UCard>
 
       <!-- Test Results -->

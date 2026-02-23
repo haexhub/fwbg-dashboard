@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { config } = useStrategyConfig();
+const { config } = storeToRefs(useStrategyConfigStore());
 
 // Tag management
 const newTag = ref("");
@@ -70,8 +70,7 @@ const gridCount = computed(
               <UInput
                 v-model="newTag"
                 placeholder="Neuer Tag..."
-                size="sm"
-                class="w-48"
+                                class="w-48"
                 @keydown.enter="addTag"
               />
               <UButton size="sm" variant="soft" :disabled="!newTag.trim()" @click="addTag">
@@ -130,24 +129,6 @@ const gridCount = computed(
         </UCard>
       </div>
 
-      <!-- Exit Info -->
-      <UCard>
-        <template #header>
-          <h3 class="text-lg font-medium text-white">Exit-Strategie</h3>
-        </template>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <span class="text-sm text-gray-400">Typ</span>
-            <p class="text-white font-mono">{{ config.exit_strategy }}</p>
-          </div>
-          <div>
-            <span class="text-sm text-gray-400">Parameter</span>
-            <p class="text-white font-mono text-sm">
-              {{ JSON.stringify(config.exit_params) }}
-            </p>
-          </div>
-        </div>
-      </UCard>
     </div>
   </div>
 </template>

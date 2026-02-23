@@ -8,7 +8,7 @@ test.describe("Settings API", () => {
 
   test.beforeAll(async ({ playwright }) => {
     request = await playwright.request.newContext({
-      baseURL: "http://localhost:3000",
+      baseURL: "http://localhost:3100",
     });
   });
 

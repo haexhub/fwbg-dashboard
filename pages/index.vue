@@ -3,8 +3,6 @@ import type {
   Account,
   AccountStatus,
   SlippageWarning,
-  Trade,
-  Performance,
   Position,
   AccountData,
   StatusSummary,
@@ -66,8 +64,7 @@ const syncTrades = async () => {
       selectedAccountId.value !== "all" ? selectedAccountId.value : undefined;
     const url = accountId ? `/api/sync?accountId=${accountId}` : "/api/sync";
     await fetch(url, { method: "POST" });
-    await refreshTrades();
-    await refreshPerformance();
+    refreshPerformance();
   } catch (error) {
     console.error("Failed to sync trades:", error);
   } finally {
@@ -137,23 +134,9 @@ const slippageWarnings = computed(() => {
   );
 });
 
-const { data: performance, refresh: refreshPerformance } =
-  await useFetch<Performance>("/api/performance", {
-    query: statusQuery,
-    watch: [selectedAccountId],
-  });
-
-const { data: trades, refresh: refreshTrades } = await useFetch<{
-  trades: Trade[];
-}>("/api/trades", {
-  query: computed(() => ({
-    limit: 20,
-    ...(selectedAccountId.value && selectedAccountId.value !== "all"
-      ? { accountId: selectedAccountId.value }
-      : {}),
-  })),
-  watch: [selectedAccountId],
-});
+// Unified performance data (shared components)
+const { performance: livePerformance, refresh: refreshPerformance } =
+  useLivePerformance(selectedAccountId);
 
 const { data: logs, refresh: refreshLogs } = await useFetch<LogsData>(
   "/api/logs",
@@ -172,7 +155,6 @@ const { data: logs, refresh: refreshLogs } = await useFetch<LogsData>(
 const refreshAll = () => {
   refreshStatus();
   refreshPerformance();
-  refreshTrades();
   refreshLogs();
 };
 
@@ -277,8 +259,22 @@ const selectedAccount = computed(() =>
       :show-all-accounts="selectedAccountId === 'all'"
     />
 
-    <!-- Performance Cards -->
-    <DashboardPerformanceCards :performance="performance ?? null" />
+    <!-- Performance Cards (shared) -->
+    <PerformanceStatCards v-if="livePerformance" :data="livePerformance" />
+
+    <!-- Equity · Drawdown · Profit per Trade -->
+    <PerformanceEquityPanel
+      v-if="livePerformance?.equitySimulation.length"
+      :simulation="livePerformance.equitySimulation"
+      :profit-per-trade="livePerformance.profitPerTrade"
+      :log-scale="false"
+    />
+
+    <!-- Fallback: simple equity curve when no simulation data -->
+    <PerformanceEquityCurve
+      v-else-if="livePerformance?.equityCurve.length"
+      :points="livePerformance.equityCurve"
+    />
 
     <!-- Open Positions Table -->
     <DashboardOpenPositionsTable
@@ -286,10 +282,10 @@ const selectedAccount = computed(() =>
       :ws-connected="wsConnected"
     />
 
-    <!-- Trade History -->
-    <DashboardTradeHistoryTable
-      :trades="trades?.trades || []"
-      :show-account-column="selectedAccountId === 'all'"
+    <!-- Trade History (shared) -->
+    <PerformanceTradeTable
+      v-if="livePerformance"
+      :trades="livePerformance.trades"
     />
 
     <!-- Bot Logs -->

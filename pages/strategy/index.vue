@@ -110,14 +110,12 @@ const columns = [
               <UButton
                 icon="i-heroicons-pencil-square"
                 variant="ghost"
-                size="xs"
               />
             </NuxtLink>
             <UButton
               icon="i-heroicons-trash"
               variant="ghost"
               color="error"
-              size="xs"
               @click="handleDelete(s.filename)"
             />
           </div>

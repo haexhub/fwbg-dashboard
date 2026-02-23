@@ -1,7 +1,11 @@
 import pkg from "./package.json";
 
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui"],
+  devServer: {
+    port: 3100,
+  },
+
+  modules: ["@nuxt/ui", "@pinia/nuxt", "@nuxtjs/mdc"],
 
   css: ["~/assets/css/main.css"],
 

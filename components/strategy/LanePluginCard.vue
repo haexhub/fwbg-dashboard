@@ -64,16 +64,12 @@ const paramPreview = computed(() => {
         <UButton
           icon="i-heroicons-cog-6-tooth"
           variant="ghost"
-          size="xs"
-          class="p-0.5!"
           @click="emit('configure')"
         />
         <UButton
           icon="i-heroicons-x-mark"
           variant="ghost"
           color="error"
-          size="xs"
-          class="p-0.5!"
           @click="emit('remove')"
         />
       </div>
