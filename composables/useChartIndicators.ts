@@ -603,6 +603,14 @@ function _isAllowedWeekday(timestamp: number): boolean {
 function _getWindowId(timestamp: number): number {
   const d = new Date(timestamp);
   switch (_rangeMode) {
+    case "15m": {
+      const block = d.getHours() * 4 + Math.floor(d.getMinutes() / 15);
+      return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + block;
+    }
+    case "30m": {
+      const block = d.getHours() * 2 + Math.floor(d.getMinutes() / 30);
+      return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + block;
+    }
     case "1h": {
       // Local-time-aware hourly windows
       return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + d.getHours();

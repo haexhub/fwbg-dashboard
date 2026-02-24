@@ -100,9 +100,6 @@ const drawingTools = [
 // Range rectangle interval options
 const rangeIntervalOptions = [
   { label: "Off", value: "" },
-  { label: "1h", value: "1h" },
-  { label: "4h", value: "4h" },
-  { label: "8h", value: "8h" },
   { label: "1D", value: "1d" },
   { label: "1W", value: "1w" },
   { label: "1M", value: "1m" },

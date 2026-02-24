@@ -414,9 +414,16 @@ watch(
       const clampedIdx = Math.max(0, Math.min(centerIdx, dataList.length - 1));
       _restoreTimestamp = dataList[clampedIdx]?.timestamp ?? null;
     }
+    // Disconnect stream first — will reconnect after data reload
+    streamDisconnect();
     const period = PERIOD_MAP[newTf] ?? { type: "hour", span: 1 };
     chart.setPeriod(period as any);
-    // Stream resubscribe happens after data reload in getBars callback
+    // Re-set symbol to trigger DataLoader reload with new timeframe
+    chart.setSymbol({
+      ticker: props.symbol,
+      pricePrecision: props.pricePrecision,
+      volumePrecision: 0,
+    });
   }
 );
 
