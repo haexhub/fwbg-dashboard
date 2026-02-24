@@ -346,10 +346,13 @@ export interface RunTradeMarker {
 
 const _tradeMarkers: RunTradeMarker[] = [];
 let _tradeMarkerRegistered = false;
+let _tradeDrawDebugDone = false;
+let _tradeDrawDebugCount = 0;
 
 export function updateTradeMarkerData(trades: RunTradeMarker[]) {
   _tradeMarkers.length = 0;
   _tradeMarkers.push(...trades);
+  _tradeDrawDebugDone = false;
 }
 
 export function clearTradeMarkerData() {
@@ -371,6 +374,7 @@ export function ensureTradeMarkerRegistered() {
 
       const data = chart.getDataList();
       const range = chart.getVisibleRange();
+      if (data.length === 0) return true;
 
       // Build full timestamp → bar-index map (all bars, not just visible)
       const tsToIdx = new Map<number, number>();
@@ -378,27 +382,65 @@ export function ensureTradeMarkerRegistered() {
         tsToIdx.set(data[i]!.timestamp, i);
       }
 
-      // Binary search: find bar index with largest timestamp <= target
-      // Needed when trade timestamps don't align exactly with bar timestamps
-      function snapToBar(targetTs: number): number | undefined {
-        let lo = 0, hi = data.length - 1, result = -1;
+      // Find bar index for a timestamp: exact match, snap to nearest loaded bar,
+      // or interpolate fractional index for timestamps outside loaded range
+      function findBarIndex(targetTs: number): number {
+        // Exact match
+        const exact = tsToIdx.get(targetTs);
+        if (exact !== undefined) return exact;
+
+        // Binary search: find bar with largest timestamp <= target
+        let lo = 0, hi = data.length - 1, snapIdx = -1;
         while (lo <= hi) {
           const mid = (lo + hi) >> 1;
-          if (data[mid]!.timestamp <= targetTs) { result = mid; lo = mid + 1; }
+          if (data[mid]!.timestamp <= targetTs) { snapIdx = mid; lo = mid + 1; }
           else { hi = mid - 1; }
         }
-        return result >= 0 ? result : undefined;
+
+        if (snapIdx >= 0 && snapIdx < data.length - 1) {
+          // Interpolate between two bars for sub-bar precision
+          const t0 = data[snapIdx]!.timestamp;
+          const t1 = data[snapIdx + 1]!.timestamp;
+          const frac = (targetTs - t0) / (t1 - t0);
+          return snapIdx + Math.min(frac, 1);
+        }
+        if (snapIdx >= 0) return snapIdx;
+
+        // Target is before all loaded bars — extrapolate using avg bar spacing
+        if (data.length >= 2) {
+          const avgSpacing = (data[data.length - 1]!.timestamp - data[0]!.timestamp) / (data.length - 1);
+          if (avgSpacing > 0) {
+            return (targetTs - data[0]!.timestamp) / avgSpacing; // negative index = before loaded data
+          }
+        }
+        return 0;
+      }
+
+      // Debug: log once per data change how many trades are drawn vs skipped
+      if (!_tradeDrawDebugDone || _tradeDrawDebugCount !== _tradeMarkers.length) {
+        _tradeDrawDebugCount = _tradeMarkers.length;
+        _tradeDrawDebugDone = true;
+        let drawn = 0, skipped = 0, beforeRange = 0, afterRange = 0;
+        for (const t of _tradeMarkers) {
+          const eIdx = findBarIndex(t.entryTime);
+          const xIdx = findBarIndex(t.exitTime);
+          const eVis = eIdx >= range.from - 5 && eIdx <= range.to + 5;
+          const xVis = xIdx >= range.from - 5 && xIdx <= range.to + 5;
+          if (eVis || xVis) { drawn++; } else {
+            skipped++;
+            if (eIdx < range.from) beforeRange++;
+            else afterRange++;
+          }
+        }
+        console.log(`[trade draw] total=${_tradeMarkers.length}, drawn=${drawn}, skipped=${skipped} (before=${beforeRange}, after=${afterRange}), bars=${data.length}, visible=${range.from}-${range.to}`);
       }
 
       ctx.save();
       ctx.setLineDash([]);
 
       for (const trade of _tradeMarkers) {
-        const entryIdx = tsToIdx.get(trade.entryTime) ?? snapToBar(trade.entryTime);
-        const exitIdx  = tsToIdx.get(trade.exitTime) ?? snapToBar(trade.exitTime);
-
-        // Skip trades with no bar alignment (different timeframe, outside loaded range)
-        if (entryIdx === undefined && exitIdx === undefined) continue;
+        const entryIdx = findBarIndex(trade.entryTime);
+        const exitIdx  = findBarIndex(trade.exitTime);
 
         const isLong = trade.direction === "LONG";
         const isWin  = trade.result > 0;
@@ -408,67 +450,61 @@ export function ensureTradeMarkerRegistered() {
         const exitColor  = isWin  ? "#22c55e" : "#ef4444";
         const lineColor  = isWin  ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.5)";
 
-        const entryX = entryIdx !== undefined ? xAxis.convertToPixel(entryIdx) : null;
-        const exitX  = exitIdx  !== undefined ? xAxis.convertToPixel(exitIdx)  : null;
+        const entryX = xAxis.convertToPixel(entryIdx);
+        const exitX  = xAxis.convertToPixel(exitIdx);
         const entryY = yAxis.convertToPixel(trade.entryPrice);
         const exitY  = yAxis.convertToPixel(trade.exitPrice);
 
-        // Only draw if at least one endpoint is in the visible bar range
-        const entryVisible = entryIdx !== undefined && entryIdx >= range.from - 5 && entryIdx <= range.to + 5;
-        const exitVisible  = exitIdx  !== undefined && exitIdx  >= range.from - 5 && exitIdx  <= range.to + 5;
+        // Only draw if at least one endpoint is near the visible bar range
+        const entryVisible = entryIdx >= range.from - 5 && entryIdx <= range.to + 5;
+        const exitVisible  = exitIdx  >= range.from - 5 && exitIdx  <= range.to + 5;
         if (!entryVisible && !exitVisible) continue;
 
         // ── TP / SL dashed horizontal lines (entry → exit) ──
-        if (entryX !== null && exitX !== null) {
-          if (trade.tpLevel != null) {
-            const tpY = yAxis.convertToPixel(trade.tpLevel);
-            ctx.strokeStyle = "rgba(34,197,94,0.35)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3, 4]);
-            ctx.beginPath();
-            ctx.moveTo(entryX, tpY);
-            ctx.lineTo(exitX, tpY);
-            ctx.stroke();
-          }
-          if (trade.slLevel != null) {
-            const slY = yAxis.convertToPixel(trade.slLevel);
-            ctx.strokeStyle = "rgba(239,68,68,0.35)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3, 4]);
-            ctx.beginPath();
-            ctx.moveTo(entryX, slY);
-            ctx.lineTo(exitX, slY);
-            ctx.stroke();
-          }
+        if (trade.tpLevel != null) {
+          const tpY = yAxis.convertToPixel(trade.tpLevel);
+          ctx.strokeStyle = "rgba(34,197,94,0.35)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(entryX, tpY);
+          ctx.lineTo(exitX, tpY);
+          ctx.stroke();
+        }
+        if (trade.slLevel != null) {
+          const slY = yAxis.convertToPixel(trade.slLevel);
+          ctx.strokeStyle = "rgba(239,68,68,0.35)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(entryX, slY);
+          ctx.lineTo(exitX, slY);
+          ctx.stroke();
         }
 
         // ── Connector line (entry price → exit price) ──
         ctx.setLineDash([]);
-        if (entryX !== null && exitX !== null) {
-          ctx.strokeStyle = lineColor;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(entryX, entryY);
-          ctx.lineTo(exitX, exitY);
-          ctx.stroke();
-        }
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(entryX, entryY);
+        ctx.lineTo(exitX, exitY);
+        ctx.stroke();
 
         // ── Entry triangle (▲ LONG below price, ▼ SHORT above price) ──
-        if (entryX !== null) {
-          const s = 10; // half-width — bigger for visibility
-          const h = 14; // height
+        if (entryVisible) {
+          const s = 10;
+          const h = 14;
           ctx.fillStyle = entryColor;
           ctx.strokeStyle = "rgba(0,0,0,0.6)";
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           if (isLong) {
-            // Triangle pointing up, placed below the entry price level
             const ty = entryY + 20;
             ctx.moveTo(entryX,      ty - h);
             ctx.lineTo(entryX - s,  ty);
             ctx.lineTo(entryX + s,  ty);
           } else {
-            // Triangle pointing down, placed above the entry price level
             const ty = entryY - 20;
             ctx.moveTo(entryX,      ty + h);
             ctx.lineTo(entryX - s,  ty);
@@ -480,7 +516,7 @@ export function ensureTradeMarkerRegistered() {
         }
 
         // ── Exit circle ──
-        if (exitX !== null) {
+        if (exitVisible) {
           ctx.fillStyle = exitColor;
           ctx.strokeStyle = "rgba(0,0,0,0.6)";
           ctx.lineWidth = 1.5;
@@ -505,9 +541,11 @@ export function ensureTradeMarkerRegistered() {
 export const RANGE_RECT_NAME = "fwbg_range_rects";
 
 let _rangeMode = "";  // "", "1h", "4h", "8h", "1d", "1w", "1m"
-let _rangeStartMinutes = 0;  // minutes from midnight UTC (0+0 = no filter)
+let _rangeStartMinutes = 0;  // minutes from midnight (0+0 = no filter)
 let _rangeEndMinutes = 0;
 let _rangeWeekdays = new Set([1, 2, 3, 4, 5]); // 0=Sun .. 6=Sat, default Mon-Fri
+let _rangeChartTimeframe = "HOUR"; // chart timeframe — time filter only applies to intraday
+let _rangeUseOpenClose = false; // true = use open/close instead of high/low for rect bounds
 let _rangeRectRegistered = false;
 
 const RANGE_COLORS = [
@@ -532,11 +570,23 @@ export function updateRangeWeekdays(days: number[]) {
   _rangeWeekdays = new Set(days);
 }
 
-/** Check if bar falls within the time-of-day filter */
+export function updateRangeChartTimeframe(tf: string) {
+  _rangeChartTimeframe = tf;
+}
+
+export function updateRangeUseOpenClose(value: boolean) {
+  _rangeUseOpenClose = value;
+}
+
+const INTRADAY_TIMEFRAMES = new Set(["MINUTE_1", "MINUTE_5", "MINUTE_15", "MINUTE_30", "HOUR", "HOUR_4"]);
+
+/** Check if bar falls within the time-of-day filter (local time, matching x-axis) */
 function _isInTimeRange(timestamp: number): boolean {
   if (_rangeStartMinutes === 0 && _rangeEndMinutes === 0) return true;
+  // Time filter only makes sense for intraday chart timeframes
+  if (!INTRADAY_TIMEFRAMES.has(_rangeChartTimeframe)) return true;
   const d = new Date(timestamp);
-  const m = d.getUTCHours() * 60 + d.getUTCMinutes();
+  const m = d.getHours() * 60 + d.getMinutes();
   if (_rangeStartMinutes <= _rangeEndMinutes) {
     return m >= _rangeStartMinutes && m < _rangeEndMinutes;
   }
@@ -546,28 +596,37 @@ function _isInTimeRange(timestamp: number): boolean {
 
 /** Check if bar falls on an allowed weekday (for 1w mode) */
 function _isAllowedWeekday(timestamp: number): boolean {
-  return _rangeWeekdays.has(new Date(timestamp).getUTCDay());
+  return _rangeWeekdays.has(new Date(timestamp).getDay());
 }
 
-/** Calendar-based window ID computation */
+/** Calendar-based window ID computation (local time, matching x-axis) */
 function _getWindowId(timestamp: number): number {
   const d = new Date(timestamp);
   switch (_rangeMode) {
-    case "1h": return Math.floor(timestamp / 3_600_000);
-    case "4h": return Math.floor(timestamp / 14_400_000);
-    case "8h": return Math.floor(timestamp / 28_800_000);
+    case "1h": {
+      // Local-time-aware hourly windows
+      return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + d.getHours();
+    }
+    case "4h": {
+      const block = Math.floor(d.getHours() / 4);
+      return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + block;
+    }
+    case "8h": {
+      const block = Math.floor(d.getHours() / 8);
+      return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + block;
+    }
     case "1d":
-      return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+      return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
     case "1w": {
-      // ISO week: align to Monday
-      const day = d.getUTCDay(); // 0=Sun
+      // ISO week: align to Monday (local time)
+      const day = d.getDay(); // 0=Sun
       const mondayOffset = day === 0 ? -6 : 1 - day;
       const monday = new Date(timestamp + mondayOffset * 86_400_000);
-      return monday.getUTCFullYear() * 100 +
-        Math.ceil(((monday.getTime() - Date.UTC(monday.getUTCFullYear(), 0, 1)) / 86_400_000 + 1) / 7);
+      return monday.getFullYear() * 100 +
+        Math.ceil(((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / 86_400_000 + 1) / 7);
     }
     case "1m":
-      return d.getUTCFullYear() * 100 + d.getUTCMonth();
+      return d.getFullYear() * 100 + d.getMonth();
     default: return 0;
   }
 }
@@ -607,13 +666,15 @@ export function ensureRangeRectRegistered() {
         if (hasWeekdayFilter && !_isAllowedWeekday(bar.timestamp)) continue;
 
         const windowId = _getWindowId(bar.timestamp);
+        const bHigh = _rangeUseOpenClose ? Math.max(bar.open, bar.close) : bar.high;
+        const bLow = _rangeUseOpenClose ? Math.min(bar.open, bar.close) : bar.low;
         const win = windowMap.get(windowId);
         if (win) {
           win.toIdx = i;
-          win.high = Math.max(win.high, bar.high);
-          win.low = Math.min(win.low, bar.low);
+          win.high = Math.max(win.high, bHigh);
+          win.low = Math.min(win.low, bLow);
         } else {
-          windowMap.set(windowId, { fromIdx: i, toIdx: i, high: bar.high, low: bar.low, windowId });
+          windowMap.set(windowId, { fromIdx: i, toIdx: i, high: bHigh, low: bLow, windowId });
         }
       }
 
@@ -632,8 +693,10 @@ export function ensureRangeRectRegistered() {
         const yTop = yAxis.convertToPixel(win.high);
         const yBot = yAxis.convertToPixel(win.low);
 
-        // Half-bar padding on each side
-        const halfBar = Math.max(4, (x2 - x1) / ((win.toIdx - win.fromIdx) || 1) * 0.5);
+        // Half-bar padding: use the pixel distance of one bar step, clamped
+        const barCount = win.toIdx - win.fromIdx;
+        const oneBarPx = barCount > 0 ? (x2 - x1) / barCount : 0;
+        const halfBar = Math.max(2, Math.min(oneBarPx * 0.5, 8));
         const rx = x1 - halfBar;
         const rw = (x2 - x1) + halfBar * 2;
         const ry = yTop;

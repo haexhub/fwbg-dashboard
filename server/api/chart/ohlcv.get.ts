@@ -1,7 +1,8 @@
 /**
- * GET /api/chart/ohlcv?symbol=EURUSD&timeframe=HOUR&source=forexsb&limit=5000&offset=0
+ * GET /api/chart/ohlcv?symbol=EURUSD&timeframe=HOUR&source=forexsb&limit=5000&before=1700000000000
  * Proxy to fwbg API: load OHLCV data from CSV data source.
- * Cache-first: returns cached bars when available.
+ * Fetches all data from fwbg on first request, caches it, then serves
+ * paginated slices via `before` (timestamp) and `limit` query params.
  */
 import type { OhlcvBar } from "~/server/utils/ohlcv-cache";
 import { getCachedOhlcv, setCachedOhlcv } from "~/server/utils/ohlcv-cache";
@@ -14,41 +15,63 @@ interface FwbgOhlcvResponse {
   data: OhlcvBar[];
 }
 
+function sliceBars(bars: OhlcvBar[], before: number | null, limit: number | null) {
+  let result = bars;
+  if (before) {
+    result = result.filter((b) => b.timestamp < before);
+  }
+  if (limit && result.length > limit) {
+    result = result.slice(-limit);
+  }
+  return result;
+}
+
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const source = String(query.source || "");
   const symbol = String(query.symbol || "");
   const timeframe = String(query.timeframe || "");
+  const before = query.before ? Number(query.before) : null;
+  const limit = query.limit ? Number(query.limit) : null;
 
   // ── Cache check ──
   if (source && symbol && timeframe) {
     const cached = getCachedOhlcv(source, symbol, timeframe);
     if (cached) {
+      const sliced = sliceBars(cached, before, limit);
       return {
         symbol,
         timeframe,
         total: cached.length,
-        count: cached.length,
-        data: cached,
+        count: sliced.length,
+        data: sliced,
         cached: true,
       };
     }
   }
 
-  // ── Cache miss → fetch from fwbg ──
+  // ── Cache miss → fetch ALL from fwbg ──
   const params = new URLSearchParams();
   if (query.symbol) params.set("symbol", String(query.symbol));
   if (query.timeframe) params.set("timeframe", String(query.timeframe));
   if (query.source) params.set("source", String(query.source));
-  if (query.limit) params.set("limit", String(query.limit));
-  if (query.offset) params.set("offset", String(query.offset));
+  params.set("limit", "50000");
 
   const result = await fwbgFetch<FwbgOhlcvResponse>(`/api/chart/ohlcv?${params.toString()}`);
 
-  // Store in cache
+  // Store full dataset in cache
   if (source && symbol && timeframe && result.data?.length > 0) {
     setCachedOhlcv(source, symbol, timeframe, result.data);
   }
 
-  return result;
+  // Return paginated slice
+  const allBars = result.data ?? [];
+  const sliced = sliceBars(allBars, before, limit);
+  return {
+    symbol,
+    timeframe,
+    total: allBars.length,
+    count: sliced.length,
+    data: sliced,
+  };
 });

@@ -3,7 +3,7 @@
  * Load OHLCV data from a broker source.
  *
  * Strategy:
- * 1. Return from cache if available
+ * 1. Return from cache if available (paginated via before/limit)
  * 2. Try direct IG REST API fetch
  * 3. On failure (e.g. historical data allowance exhausted), fall back
  *    to fwbg backend (which has a yfinance fallback)
@@ -24,6 +24,17 @@ interface FwbgOhlcvResponse {
   data: OhlcvBar[];
 }
 
+function sliceBars(bars: OhlcvBar[], before: number | null, limit: number | null) {
+  let result = bars;
+  if (before) {
+    result = result.filter((b) => b.timestamp < before);
+  }
+  if (limit && result.length > limit) {
+    result = result.slice(-limit);
+  }
+  return result;
+}
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
@@ -34,17 +45,19 @@ export default defineEventHandler(async (event) => {
 
   const symbol = body.symbol as string;
   const timeframe = body.timeframe as string;
-  const limit = Math.min(body.limit || 500, 1000);
+  const before = body.before ? Number(body.before) : null;
+  const limit = body.limit ? Number(body.limit) : null;
 
   // ── 1. Cache check ──
   const cached = getCachedOhlcv(source, symbol, timeframe);
   if (cached) {
+    const sliced = sliceBars(cached, before, limit);
     return {
       symbol,
       timeframe,
       total: cached.length,
-      count: cached.length,
-      data: cached,
+      count: sliced.length,
+      data: sliced,
       cached: true,
     };
   }
@@ -53,20 +66,22 @@ export default defineEventHandler(async (event) => {
   const accountId = source.replace("broker:", "");
   const epic = SYMBOL_TO_EPIC[symbol];
   const resolution = epic ? TIMEFRAME_TO_IG_RESOLUTION[timeframe] : undefined;
+  const fetchLimit = 1000; // Max from broker API
 
   if (epic && resolution) {
     try {
       const client = await createIGClient(accountId);
-      const bars = await client.fetchLatestPrices(epic, resolution, limit);
+      const bars = await client.fetchLatestPrices(epic, resolution, fetchLimit);
 
       setCachedOhlcv(source, symbol, timeframe, bars);
 
+      const sliced = sliceBars(bars, before, limit);
       return {
         symbol,
         timeframe,
         total: bars.length,
-        count: bars.length,
-        data: bars,
+        count: sliced.length,
+        data: sliced,
       };
     } catch (error: any) {
       console.warn(`[ohlcv] Direct IG fetch failed (${error.message}), falling back to fwbg`);
@@ -86,7 +101,7 @@ export default defineEventHandler(async (event) => {
       body: JSON.stringify({
         symbol,
         timeframe,
-        limit,
+        limit: fetchLimit,
         broker_type: "ig",
         credentials: {
           api_key: account.credentials.api_key,
@@ -101,7 +116,15 @@ export default defineEventHandler(async (event) => {
       setCachedOhlcv(source, symbol, timeframe, result.data);
     }
 
-    return result;
+    const allBars = result.data ?? [];
+    const sliced = sliceBars(allBars, before, limit);
+    return {
+      symbol,
+      timeframe,
+      total: allBars.length,
+      count: sliced.length,
+      data: sliced,
+    };
   } catch (error: any) {
     throw createError({
       statusCode: 502,

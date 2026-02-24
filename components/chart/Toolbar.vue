@@ -16,6 +16,7 @@ const props = defineProps<{
   rangeStartTime: string;
   rangeEndTime: string;
   rangeWeekdays: number[];
+  rangeUseOpenClose: boolean;
   isFullscreen: boolean;
 }>();
 
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   "update:range-start-time": [value: string];
   "update:range-end-time": [value: string];
   "update:range-weekdays": [value: number[]];
+  "update:range-use-open-close": [value: boolean];
   "open-indicators": [];
   screenshot: [];
   "toggle-fullscreen": [];
@@ -256,7 +258,7 @@ function toggleDrawingTool(tool: string) {
 
           <!-- Time filter -->
           <div v-if="rangeInterval">
-            <div class="text-sm text-gray-400 mb-2">Time Filter (UTC)</div>
+            <div class="text-sm text-gray-400 mb-2">Time Filter</div>
             <div class="flex items-center gap-2">
               <UInput
                 type="time"
@@ -272,6 +274,15 @@ function toggleDrawingTool(tool: string) {
                 @update:model-value="emit('update:range-end-time', $event)"
               />
             </div>
+          </div>
+
+          <!-- Open/Close only toggle -->
+          <div v-if="rangeInterval" class="flex items-center justify-between">
+            <span class="text-sm text-gray-400">Open/Close only</span>
+            <USwitch
+              :model-value="rangeUseOpenClose"
+              @update:model-value="emit('update:range-use-open-close', $event)"
+            />
           </div>
 
           <!-- Weekday selector (1W only) -->

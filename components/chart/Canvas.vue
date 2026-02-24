@@ -29,6 +29,7 @@ const props = defineProps<{
   pricePrecision: number;
   activeDrawingTool: string | null;
   chartType: "candle_solid" | "ohlc" | "area";
+  loadAll?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -116,31 +117,43 @@ function formatDate(params: {
   return `${dd}.${mo}`;
 }
 
+const PAGE_SIZE = 5000;
+
+interface FetchResult {
+  bars: KLineData[];
+  total: number;
+  count: number;
+}
+
 /**
- * Fetch OHLCV data from the API.
- * For broker sources, uses POST (credentials injected server-side).
- * For CSV sources, uses GET.
+ * Fetch OHLCV data from the API with optional pagination.
+ * Returns bars + total count so caller can determine if more data exists.
  */
 async function fetchOhlcvData(
   symbol: string,
   timeframe: string,
   source: string,
-  limit: number = 10000
-): Promise<KLineData[]> {
+  limit: number = PAGE_SIZE,
+  before?: number,
+): Promise<FetchResult> {
   let response: OhlcvResponse;
 
   if (source.startsWith("broker:")) {
     response = await $fetch<OhlcvResponse>("/api/chart/ohlcv", {
       method: "POST",
-      body: { source, symbol, timeframe, limit },
+      body: { source, symbol, timeframe, limit, ...(before ? { before } : {}) },
     });
   } else {
     response = await $fetch<OhlcvResponse>("/api/chart/ohlcv", {
-      params: { symbol, timeframe, source, limit },
+      params: { symbol, timeframe, source, limit, ...(before ? { before } : {}) },
     });
   }
 
-  return response.data as KLineData[];
+  return {
+    bars: response.data as KLineData[],
+    total: response.total,
+    count: response.count,
+  };
 }
 
 /**
@@ -236,41 +249,79 @@ onMounted(() => {
   // Set data loader with subscribeBar for live updates
   chart.setDataLoader({
     getBars: async (params: DataLoaderGetBarsParams) => {
-      // Only load on init; ignore forward/backward for now
+      // ── Forward: user scrolled to oldest bar, load more history ──
+      if (params.type === "forward") {
+        try {
+          const before = params.timestamp ?? chart?.getDataList()[0]?.timestamp;
+          const result = await fetchOhlcvData(
+            params.symbol.ticker,
+            props.timeframe,
+            props.source,
+            PAGE_SIZE,
+            before ?? undefined,
+          );
+          // total = all bars in backend, loaded = what chart already has + this batch
+          const loaded = (chart?.getDataList().length ?? 0) + result.bars.length;
+          const hasMore = loaded < result.total;
+          params.callback(result.bars, { forward: hasMore });
+        } catch (e) {
+          console.error("Failed to load older chart data:", e);
+          params.callback([], false);
+        }
+        return;
+      }
+
+      // ── Backward / other: no newer data to load (live streaming handles this) ──
       if (params.type !== "init") {
         params.callback([], false);
         return;
       }
 
+      // ── Init: load most recent page (or all data if loadAll is set) ──
       try {
-        const data = await fetchOhlcvData(
+        const initLimit = props.loadAll ? 50000 : PAGE_SIZE;
+        const result = await fetchOhlcvData(
           params.symbol.ticker,
           props.timeframe,
-          props.source
+          props.source,
+          initLimit,
         );
-        params.callback(data, false);
+        const hasMore = !props.loadAll && result.count < result.total;
+        params.callback(result.bars, { forward: hasMore, backward: false });
 
         // Restore scroll position after timeframe/source change.
-        // Find the closest bar index manually and scroll to it,
-        // since scrollToTimestamp can be unreliable after data reload.
-        if (_restoreTimestamp && chart && data.length > 0) {
+        // KLineChart auto-scrolls to the latest bar after data load.
+        // We retry scrollToDataIndex until the target is actually visible.
+        if (_restoreTimestamp && chart && result.bars.length > 0) {
           const ts = _restoreTimestamp;
           _restoreTimestamp = null;
           let closestIdx = 0;
-          let closestDist = Math.abs(data[0]!.timestamp - ts);
-          for (let i = 1; i < data.length; i++) {
-            const dist = Math.abs(data[i]!.timestamp - ts);
+          let closestDist = Math.abs(result.bars[0]!.timestamp - ts);
+          for (let i = 1; i < result.bars.length; i++) {
+            const dist = Math.abs(result.bars[i]!.timestamp - ts);
             if (dist < closestDist) {
               closestIdx = i;
               closestDist = dist;
             }
           }
-          requestAnimationFrame(() => chart?.scrollToDataIndex(closestIdx, 0));
+          let attempts = 0;
+          const scrollToTarget = () => {
+            if (!chart || attempts >= 15) return;
+            attempts++;
+            chart.scrollToDataIndex(closestIdx);
+            requestAnimationFrame(() => {
+              const range = chart?.getVisibleRange();
+              if (range && (closestIdx < range.from || closestIdx > range.to)) {
+                requestAnimationFrame(scrollToTarget);
+              }
+            });
+          };
+          requestAnimationFrame(() => requestAnimationFrame(scrollToTarget));
         }
 
         // Start streaming after initial data is loaded
         nextTick(updateStreamConnection);
-        emit("data-loaded", data.length);
+        emit("data-loaded", result.bars.length);
       } catch (e) {
         console.error("Failed to load chart data:", e);
         params.callback([], false);

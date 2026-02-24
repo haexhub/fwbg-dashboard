@@ -19,6 +19,8 @@ import {
   updateRangeMode,
   updateRangeTimeFilter,
   updateRangeWeekdays,
+  updateRangeChartTimeframe,
+  updateRangeUseOpenClose,
   RANGE_RECT_NAME,
 } from "~/composables/useChartIndicators";
 
@@ -57,6 +59,7 @@ const rangeInterval = ref("");
 const rangeStartTime = ref("00:00");
 const rangeEndTime = ref("00:00");
 const rangeWeekdays = ref([1, 2, 3, 4, 5]); // Mon-Fri
+const rangeUseOpenClose = ref(false);
 
 function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -84,6 +87,20 @@ function handleRangeWeekdaysChange(days: number[]) {
   updateRangeWeekdays(days);
   forceRangeRedraw();
 }
+
+function handleRangeUseOpenCloseChange(value: boolean) {
+  rangeUseOpenClose.value = value;
+  updateRangeUseOpenClose(value);
+  forceRangeRedraw();
+}
+
+// Keep range rects aware of the chart timeframe so the time filter
+// is only applied on intraday timeframes (not daily/weekly/monthly)
+updateRangeChartTimeframe(timeframe.value);
+watch(timeframe, (tf) => {
+  updateRangeChartTimeframe(tf);
+  forceRangeRedraw();
+});
 
 function handleRangeIntervalChange(value: string) {
   rangeInterval.value = value;
@@ -464,12 +481,12 @@ async function loadRunTradeOverlay(runId: string, sym: string) {
       loadRunIndicators(runId),
     ]);
     const markers: RunTradeMarker[] = resp.trades
-      .filter((t) => t.entry_time && t.exit_time && t.entry_price != null && t.exit_price != null)
+      .filter((t) => t.entry_time && t.entry_price != null)
       .map((t) => ({
         entryTime:  new Date(t.entry_time!).getTime(),
-        exitTime:   new Date(t.exit_time!).getTime(),
+        exitTime:   t.exit_time ? new Date(t.exit_time).getTime() : new Date(t.entry_time!).getTime(),
         entryPrice: t.entry_price!,
-        exitPrice:  t.exit_price!,
+        exitPrice:  t.exit_price ?? t.entry_price!,
         direction:  (t.direction ?? "LONG") as "LONG" | "SHORT",
         result:     t.result ?? 0,
         pnlRaw:     t.pnl_raw ?? 0,
@@ -778,6 +795,7 @@ function handleRemoveIndicator(id: string) {
         :range-start-time="rangeStartTime"
         :range-end-time="rangeEndTime"
         :range-weekdays="rangeWeekdays"
+        :range-use-open-close="rangeUseOpenClose"
         :is-fullscreen="isFullscreen"
         @update:source="setSource"
         @update:symbol="setSymbol"
@@ -788,6 +806,7 @@ function handleRemoveIndicator(id: string) {
         @update:range-start-time="(v: string) => { rangeStartTime = v; handleRangeTimeChange(); }"
         @update:range-end-time="(v: string) => { rangeEndTime = v; handleRangeTimeChange(); }"
         @update:range-weekdays="handleRangeWeekdaysChange"
+        @update:range-use-open-close="handleRangeUseOpenCloseChange"
         @open-indicators="indicatorPanelOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
@@ -850,6 +869,7 @@ function handleRemoveIndicator(id: string) {
           :chart-type="chartType"
           :price-precision="pricePrecision"
           :active-drawing-tool="activeDrawingTool"
+          :load-all="!!runOverlayId"
           @crosshair-change="crosshairData = $event"
           @drawing-cancelled="setDrawingTool(null)"
           @data-loaded="handleDataLoaded"
