@@ -3,6 +3,14 @@ const store = useStrategyConfigStore();
 const { config } = storeToRefs(store);
 const modelRef = computed(() => config.value?._refs?.model);
 
+const { plugins } = usePlugins();
+const modelPlugins = computed(() =>
+  plugins.value?.filter((p) => p.phase === "model") ?? []
+);
+const modelTypeItems = computed(() =>
+  modelPlugins.value.map((p) => ({ label: p.name, value: p.name, description: p.description }))
+);
+
 const architectures = [
   { label: "Unified", value: "unified" },
   { label: "Long/Short Separate", value: "long_short_separate" },
@@ -67,7 +75,12 @@ function toggleDirection(dir: string) {
         <div class="space-y-4">
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <UFormField label="Typ">
-              <UInput v-model="config.model.type" class="w-full" />
+              <USelect
+                v-model="config.model.type"
+                :items="modelTypeItems"
+                value-key="value"
+                class="w-full"
+              />
             </UFormField>
             <UFormField label="Architektur">
               <USelect

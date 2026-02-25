@@ -33,8 +33,11 @@ export type PipelinePhase =
   | "indicators"
   | "feature_selection"
   | "exit_strategies"
-  | "risk_management";
+  | "risk_management"
+  | "model"
+  | "labeling";
 
+/** Phases shown as kanban lanes in the pipeline editor */
 export const PIPELINE_PHASES: PipelinePhase[] = [
   "data_loading",
   "preprocessing",
@@ -51,6 +54,8 @@ export const PHASE_LABELS: Record<PipelinePhase, string> = {
   feature_selection: "Feature Selection",
   exit_strategies: "Exit Strategies",
   risk_management: "Risk Management",
+  model: "Model",
+  labeling: "Labeling",
 };
 
 export const PHASE_ICONS: Record<PipelinePhase, string> = {
@@ -60,6 +65,8 @@ export const PHASE_ICONS: Record<PipelinePhase, string> = {
   feature_selection: "i-heroicons-adjustments-horizontal",
   exit_strategies: "i-heroicons-arrow-right-on-rectangle",
   risk_management: "i-heroicons-shield-check",
+  model: "i-heroicons-cpu-chip",
+  labeling: "i-heroicons-tag",
 };
 
 export const PHASE_COLORS: Record<PipelinePhase, string> = {
@@ -69,6 +76,8 @@ export const PHASE_COLORS: Record<PipelinePhase, string> = {
   feature_selection: "primary",
   exit_strategies: "error",
   risk_management: "neutral",
+  model: "primary",
+  labeling: "warning",
 };
 
 // ──────────────────────────────────────────────
