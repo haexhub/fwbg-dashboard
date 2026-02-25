@@ -29,14 +29,15 @@ export default defineEventHandler(async (event) => {
   }
 
   // Fallback: use the existing runs/start endpoint
+  // Use `assets` (symbol filter) not `asset_classes` (registry class names)
+  // so that grid keys like "DAX" or "ASX200" match the actual CSV filenames.
   return fwbgFetch<unknown>("/api/runs/start", {
     method: "POST",
     body: JSON.stringify({
       strategy_name: body.strategy_name,
-      asset_classes: [body.asset],
-      description: `preview · ${body.asset} · ${body.days_limit ?? 60}d`,
+      assets: [body.asset],
+      description: `preview · ${body.asset}`,
       preview: true,
-      days_limit: body.days_limit ?? 60,
     }),
   });
 });
