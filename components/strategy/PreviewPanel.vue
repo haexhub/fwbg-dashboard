@@ -137,15 +137,13 @@ async function pollProgress() {
 
 async function loadTrades() {
   if (!runId.value || !effectiveAsset.value) return;
-  try {
-    const res = await $fetch<{ trades: TradeEntry[] }>(
-      `/api/runs/${runId.value}/trades/${effectiveAsset.value}`,
-    );
-    trades.value = (res.trades ?? []).sort((a, b) => {
-      if (!a.entry_time || !b.entry_time) return 0;
-      return parseUTC(a.entry_time) - parseUTC(b.entry_time);
-    });
-  }
+  const res = await $fetch<{ trades: TradeEntry[] }>(
+    `/api/runs/${runId.value}/trades/${effectiveAsset.value}`,
+  );
+  trades.value = (res.trades ?? []).sort((a, b) => {
+    if (!a.entry_time || !b.entry_time) return 0;
+    return parseUTC(a.entry_time) - parseUTC(b.entry_time);
+  });
 }
 
 async function startPreview() {
