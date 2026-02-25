@@ -511,11 +511,17 @@ async function loadRunTradeOverlay(runId: string, sym: string) {
       $fetch<RunTradesResponse>(`/api/runs/${runId}/trades/${sym}`),
       loadRunIndicators(runId),
     ]);
+    // Parse timestamp as UTC (backend sends naive ISO strings without timezone suffix)
+    function parseUTC(s: string): number {
+      if (s.includes("Z") || s.includes("+") || s.match(/-\d{2}:\d{2}$/)) return new Date(s).getTime();
+      return new Date(s + "Z").getTime();
+    }
+
     const markers: RunTradeMarker[] = resp.trades
       .filter((t) => t.entry_time && t.entry_price != null)
       .map((t) => ({
-        entryTime:  new Date(t.entry_time!).getTime(),
-        exitTime:   t.exit_time ? new Date(t.exit_time).getTime() : new Date(t.entry_time!).getTime(),
+        entryTime:  parseUTC(t.entry_time!),
+        exitTime:   t.exit_time ? parseUTC(t.exit_time) : parseUTC(t.entry_time!),
         entryPrice: t.entry_price!,
         exitPrice:  t.exit_price ?? t.entry_price!,
         direction:  (t.direction ?? "LONG") as "LONG" | "SHORT",

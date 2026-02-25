@@ -346,13 +346,10 @@ export interface RunTradeMarker {
 
 const _tradeMarkers: RunTradeMarker[] = [];
 let _tradeMarkerRegistered = false;
-let _tradeDrawDebugDone = false;
-let _tradeDrawDebugCount = 0;
 
 export function updateTradeMarkerData(trades: RunTradeMarker[]) {
   _tradeMarkers.length = 0;
   _tradeMarkers.push(...trades);
-  _tradeDrawDebugDone = false;
 }
 
 export function clearTradeMarkerData() {
@@ -382,57 +379,22 @@ export function ensureTradeMarkerRegistered() {
         tsToIdx.set(data[i]!.timestamp, i);
       }
 
-      // Find bar index for a timestamp: exact match, snap to nearest loaded bar,
-      // or interpolate fractional index for timestamps outside loaded range
+      // Find bar index for a timestamp: exact match or floor-snap
+      // (bar whose timestamp is <= target, i.e. the bar that contains this point in time)
       function findBarIndex(targetTs: number): number {
         // Exact match
         const exact = tsToIdx.get(targetTs);
         if (exact !== undefined) return exact;
 
-        // Binary search: find bar with largest timestamp <= target
-        let lo = 0, hi = data.length - 1, snapIdx = -1;
+        // Binary search: find bar with largest timestamp <= target (floor)
+        let lo = 0, hi = data.length - 1, floorIdx = -1;
         while (lo <= hi) {
           const mid = (lo + hi) >> 1;
-          if (data[mid]!.timestamp <= targetTs) { snapIdx = mid; lo = mid + 1; }
+          if (data[mid]!.timestamp <= targetTs) { floorIdx = mid; lo = mid + 1; }
           else { hi = mid - 1; }
         }
 
-        if (snapIdx >= 0 && snapIdx < data.length - 1) {
-          // Interpolate between two bars for sub-bar precision
-          const t0 = data[snapIdx]!.timestamp;
-          const t1 = data[snapIdx + 1]!.timestamp;
-          const frac = (targetTs - t0) / (t1 - t0);
-          return snapIdx + Math.min(frac, 1);
-        }
-        if (snapIdx >= 0) return snapIdx;
-
-        // Target is before all loaded bars — extrapolate using avg bar spacing
-        if (data.length >= 2) {
-          const avgSpacing = (data[data.length - 1]!.timestamp - data[0]!.timestamp) / (data.length - 1);
-          if (avgSpacing > 0) {
-            return (targetTs - data[0]!.timestamp) / avgSpacing; // negative index = before loaded data
-          }
-        }
-        return 0;
-      }
-
-      // Debug: log once per data change how many trades are drawn vs skipped
-      if (!_tradeDrawDebugDone || _tradeDrawDebugCount !== _tradeMarkers.length) {
-        _tradeDrawDebugCount = _tradeMarkers.length;
-        _tradeDrawDebugDone = true;
-        let drawn = 0, skipped = 0, beforeRange = 0, afterRange = 0;
-        for (const t of _tradeMarkers) {
-          const eIdx = findBarIndex(t.entryTime);
-          const xIdx = findBarIndex(t.exitTime);
-          const eVis = eIdx >= range.from - 5 && eIdx <= range.to + 5;
-          const xVis = xIdx >= range.from - 5 && xIdx <= range.to + 5;
-          if (eVis || xVis) { drawn++; } else {
-            skipped++;
-            if (eIdx < range.from) beforeRange++;
-            else afterRange++;
-          }
-        }
-        console.log(`[trade draw] total=${_tradeMarkers.length}, drawn=${drawn}, skipped=${skipped} (before=${beforeRange}, after=${afterRange}), bars=${data.length}, visible=${range.from}-${range.to}`);
+        return floorIdx >= 0 ? floorIdx : 0;
       }
 
       ctx.save();
@@ -491,37 +453,37 @@ export function ensureTradeMarkerRegistered() {
         ctx.lineTo(exitX, exitY);
         ctx.stroke();
 
-        // ── Entry triangle (▲ LONG below price, ▼ SHORT above price) ──
+        // ── Entry triangle centered on entry price ──
         if (entryVisible) {
-          const s = 10;
-          const h = 14;
+          const s = 6;  // half-width
+          const h = 10; // height
           ctx.fillStyle = entryColor;
           ctx.strokeStyle = "rgba(0,0,0,0.6)";
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 1;
           ctx.beginPath();
           if (isLong) {
-            const ty = entryY + 20;
-            ctx.moveTo(entryX,      ty - h);
-            ctx.lineTo(entryX - s,  ty);
-            ctx.lineTo(entryX + s,  ty);
+            // ▲ pointing up, tip at entry price
+            ctx.moveTo(entryX, entryY);
+            ctx.lineTo(entryX - s, entryY + h);
+            ctx.lineTo(entryX + s, entryY + h);
           } else {
-            const ty = entryY - 20;
-            ctx.moveTo(entryX,      ty + h);
-            ctx.lineTo(entryX - s,  ty);
-            ctx.lineTo(entryX + s,  ty);
+            // ▼ pointing down, tip at entry price
+            ctx.moveTo(entryX, entryY);
+            ctx.lineTo(entryX - s, entryY - h);
+            ctx.lineTo(entryX + s, entryY - h);
           }
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
         }
 
-        // ── Exit circle ──
+        // ── Exit circle centered on exit price ──
         if (exitVisible) {
           ctx.fillStyle = exitColor;
           ctx.strokeStyle = "rgba(0,0,0,0.6)";
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.arc(exitX, exitY, 8, 0, Math.PI * 2);
+          ctx.arc(exitX, exitY, 5, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
         }
