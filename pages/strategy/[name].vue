@@ -182,7 +182,7 @@ onKeyStroke("y", (e) => {
     <StrategyPreviewPanel
       v-if="config"
       v-model:open="previewPanelOpen"
-      :strategy-name="config.name"
+      :strategy-name="strategyName"
       :datasource="config.datasource"
       :available-assets="previewAssetClasses"
     />
