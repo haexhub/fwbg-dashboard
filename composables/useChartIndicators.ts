@@ -585,13 +585,27 @@ function _getWindowId(timestamp: number): number {
       const block = Math.floor(d.getHours() / 8);
       return d.getFullYear() * 1_000_000 + (d.getMonth() + 1) * 10_000 + d.getDate() * 100 + block;
     }
-    case "1d":
-      return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    case "1d": {
+      // For overnight ranges (start > end), early-morning bars belong to the previous day's window
+      let ref = d;
+      if (_rangeStartMinutes > _rangeEndMinutes) {
+        const m = d.getHours() * 60 + d.getMinutes();
+        if (m < _rangeEndMinutes) ref = new Date(timestamp - 86_400_000);
+      }
+      return ref.getFullYear() * 10000 + (ref.getMonth() + 1) * 100 + ref.getDate();
+    }
     case "1w": {
       // ISO week: align to Monday (local time)
-      const day = d.getDay(); // 0=Sun
+      // For overnight ranges (start > end), early-morning bars belong to the previous day's window
+      let ts = timestamp;
+      if (_rangeStartMinutes > _rangeEndMinutes) {
+        const m = d.getHours() * 60 + d.getMinutes();
+        if (m < _rangeEndMinutes) ts = timestamp - 86_400_000;
+      }
+      const wd = new Date(ts);
+      const day = wd.getDay(); // 0=Sun
       const mondayOffset = day === 0 ? -6 : 1 - day;
-      const monday = new Date(timestamp + mondayOffset * 86_400_000);
+      const monday = new Date(ts + mondayOffset * 86_400_000);
       return monday.getFullYear() * 100 +
         Math.ceil(((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / 86_400_000 + 1) / 7);
     }
