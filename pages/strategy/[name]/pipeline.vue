@@ -118,9 +118,6 @@ const selectedPluginInfo = computed(() => {
   return plugins.value?.find((p) => p.fqn === selectedPlugin.value!.fqn);
 });
 
-// Preview panel
-const previewPanelOpen = ref(false);
-
 // Plugin detail panel (palette click)
 const detailPlugin = ref<PluginInfo | null>(null);
 const detailPanelOpen = ref(false);
@@ -133,25 +130,14 @@ function handleSelectPlugin(plugin: PluginInfo) {
 
 <template>
   <div class="flex flex-col h-full p-1">
-    <div class="flex items-center gap-2">
-      <StrategyPresetSelectorBar
-        section="pipelines"
-        label="Pipeline"
-        :current-ref="pipelineRef"
-        :model-value="pipelineModelValue"
-        class="flex-1"
-        @apply="(name, content) => store.applyPreset('pipeline', name, content)"
-        @detach="store.detachPreset('pipeline')"
-      />
-      <UButton
-        icon="i-lucide-eye"
-        variant="ghost"
-        size="sm"
-        @click="previewPanelOpen = true"
-      >
-        Vorschau
-      </UButton>
-    </div>
+    <StrategyPresetSelectorBar
+      section="pipelines"
+      label="Pipeline"
+      :current-ref="pipelineRef"
+      :model-value="pipelineModelValue"
+      @apply="(name, content) => store.applyPreset('pipeline', name, content)"
+      @detach="store.detachPreset('pipeline')"
+    />
 
     <!-- Strategy Builder -->
     <ClientOnly>
@@ -207,15 +193,6 @@ function handleSelectPlugin(plugin: PluginInfo) {
       :open="configPanelOpen"
       @update:open="configPanelOpen = $event"
       @save="handleConfigSave"
-    />
-
-    <!-- Preview Panel -->
-    <StrategyPreviewPanel
-      v-if="config"
-      v-model:open="previewPanelOpen"
-      :strategy-name="config.name"
-      :datasource="config.datasource"
-      :available-assets="assetFilter"
     />
 
     <!-- Datasource Config Panel -->

@@ -34,7 +34,6 @@ interface ProgressResponse {
 type PanelStatus = "idle" | "running" | "done" | "error";
 
 const selectedAsset = ref(props.availableAssets[0] ?? "");
-const customAsset = ref("");
 const panelStatus = ref<PanelStatus>("idle");
 const runId = ref<string | null>(null);
 const progressPct = ref(0);
@@ -59,11 +58,7 @@ onUnmounted(() => stopPolling());
 
 // ── Computed ──
 
-const effectiveAsset = computed(() =>
-  props.availableAssets.length > 0
-    ? selectedAsset.value
-    : customAsset.value.trim().toUpperCase(),
-);
+const effectiveAsset = computed(() => selectedAsset.value);
 
 const assetItems = computed(() =>
   props.availableAssets.map((a) => ({ label: a, value: a })),
@@ -219,13 +214,9 @@ function openInChart() {
             :disabled="panelStatus === 'running'"
             class="w-full"
           />
-          <UInput
-            v-else
-            v-model="customAsset"
-            placeholder="z.B. EURUSD"
-            :disabled="panelStatus === 'running'"
-            class="uppercase"
-          />
+          <p v-else class="text-xs text-gray-500">
+            Keine Assets konfiguriert. Bitte zuerst im Assets-Tab Asset-Klassen anlegen.
+          </p>
         </UFormField>
 
         <!-- Action -->

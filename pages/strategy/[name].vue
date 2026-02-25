@@ -27,6 +27,10 @@ async function handleSave() {
 // Run modal
 const runModalOpen = ref(false);
 
+// Preview panel
+const previewPanelOpen = ref(false);
+const previewAssetClasses = computed(() => Object.keys(config.value?.grids ?? {}));
+
 function handleRunStarted(_jobId: string) {
   navigateTo("/runs");
 }
@@ -124,6 +128,14 @@ onKeyStroke("y", (e) => {
             Save
           </UButton>
           <UButton
+            icon="i-lucide-eye"
+            variant="ghost"
+            :disabled="!config"
+            @click="previewPanelOpen = true"
+          >
+            Vorschau
+          </UButton>
+          <UButton
             icon="i-heroicons-play"
             color="success"
             variant="soft"
@@ -165,6 +177,15 @@ onKeyStroke("y", (e) => {
     <div v-else class="flex-1 min-h-0">
       <NuxtPage />
     </div>
+
+    <!-- Preview Panel -->
+    <StrategyPreviewPanel
+      v-if="config"
+      v-model:open="previewPanelOpen"
+      :strategy-name="config.name"
+      :datasource="config.datasource"
+      :available-assets="previewAssetClasses"
+    />
 
     <!-- Run Start Modal -->
     <RunsRunStartModal
