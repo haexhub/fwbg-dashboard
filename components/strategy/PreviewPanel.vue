@@ -112,8 +112,15 @@ async function pollProgress() {
     const s = res.status ?? "running";
     if (s === "completed") {
       stopPolling();
-      await loadTrades();
-      panelStatus.value = "done";
+      try {
+        await loadTrades();
+        panelStatus.value = "done";
+      } catch (loadErr: unknown) {
+        const e = loadErr as { statusMessage?: string; message?: string };
+        errorMessage.value =
+          e?.statusMessage ?? e?.message ?? "Signale konnten nicht geladen werden";
+        panelStatus.value = "error";
+      }
     } else if (s === "failed" || s === "cancelled") {
       stopPolling();
       errorMessage.value = `Run ${s}`;
@@ -138,8 +145,6 @@ async function loadTrades() {
       if (!a.entry_time || !b.entry_time) return 0;
       return parseUTC(a.entry_time) - parseUTC(b.entry_time);
     });
-  } catch {
-    trades.value = [];
   }
 }
 
@@ -256,12 +261,20 @@ function openInChart() {
         </div>
 
         <!-- Error -->
-        <div
-          v-if="panelStatus === 'error'"
-          class="rounded-md bg-red-900/30 border border-red-700/40 p-3"
-        >
-          <p class="text-sm text-red-300">{{ errorMessage }}</p>
-        </div>
+        <template v-if="panelStatus === 'error'">
+          <div class="rounded-md bg-red-900/30 border border-red-700/40 p-3">
+            <p class="text-sm text-red-300">{{ errorMessage }}</p>
+          </div>
+          <UButton
+            v-if="runId"
+            icon="i-lucide-external-link"
+            variant="outline"
+            class="w-full justify-center"
+            @click="openInChart"
+          >
+            Im Chart anzeigen
+          </UButton>
+        </template>
 
         <!-- Results -->
         <template v-if="panelStatus === 'done'">
