@@ -22,6 +22,10 @@ import {
   updateRangeChartTimeframe,
   updateRangeUseOpenClose,
   RANGE_RECT_NAME,
+  ensureSessionOverlayRegistered,
+  updateSessionEnabledIds,
+  updateSessionChartTimeframe,
+  SESSION_OVERLAY_NAME,
 } from "~/composables/useChartIndicators";
 
 definePageMeta({ layout: "builder" });
@@ -60,6 +64,7 @@ const rangeStartTime = ref("00:00");
 const rangeEndTime = ref("00:00");
 const rangeWeekdays = ref([1, 2, 3, 4, 5]); // Mon-Fri
 const rangeUseOpenClose = ref(false);
+const sessionEnabledIds = ref<string[]>([]);
 
 function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -94,13 +99,39 @@ function handleRangeUseOpenCloseChange(value: boolean) {
   forceRangeRedraw();
 }
 
-// Keep range rects aware of the chart timeframe so the time filter
-// is only applied on intraday timeframes (not daily/weekly/monthly)
+// Keep overlays aware of chart timeframe (intraday gating)
 updateRangeChartTimeframe(timeframe.value);
+updateSessionChartTimeframe(timeframe.value);
 watch(timeframe, (tf) => {
   updateRangeChartTimeframe(tf);
+  updateSessionChartTimeframe(tf);
   forceRangeRedraw();
+  forceSessionRedraw();
 });
+
+function forceSessionRedraw() {
+  const chart = chartCanvas.value?.getChart();
+  if (chart && sessionEnabledIds.value.length > 0) {
+    chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
+    chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+  }
+}
+
+function handleSessionEnabledIdsChange(ids: string[]) {
+  sessionEnabledIds.value = ids;
+  updateSessionEnabledIds(ids);
+
+  const chart = chartCanvas.value?.getChart();
+  if (!chart) return;
+
+  if (ids.length > 0) {
+    ensureSessionOverlayRegistered();
+    chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
+    chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+  } else {
+    chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
+  }
+}
 
 function handleRangeIntervalChange(value: string) {
   rangeInterval.value = value;
@@ -796,6 +827,7 @@ function handleRemoveIndicator(id: string) {
         :range-end-time="rangeEndTime"
         :range-weekdays="rangeWeekdays"
         :range-use-open-close="rangeUseOpenClose"
+        :session-enabled-ids="sessionEnabledIds"
         :is-fullscreen="isFullscreen"
         @update:source="setSource"
         @update:symbol="setSymbol"
@@ -807,6 +839,7 @@ function handleRemoveIndicator(id: string) {
         @update:range-end-time="(v: string) => { rangeEndTime = v; handleRangeTimeChange(); }"
         @update:range-weekdays="handleRangeWeekdaysChange"
         @update:range-use-open-close="handleRangeUseOpenCloseChange"
+        @update:session-enabled-ids="handleSessionEnabledIdsChange"
         @open-indicators="indicatorPanelOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"

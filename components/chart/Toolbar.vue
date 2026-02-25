@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { TIMEFRAME_LABELS } from "~/types/chart";
 import type { ChartSource, ChartSymbol, ActiveIndicator } from "~/types/chart";
+import { TRADING_SESSIONS } from "~/composables/useChartIndicators";
 
 const props = defineProps<{
   source: string;
@@ -17,6 +18,7 @@ const props = defineProps<{
   rangeEndTime: string;
   rangeWeekdays: number[];
   rangeUseOpenClose: boolean;
+  sessionEnabledIds: string[];
   isFullscreen: boolean;
 }>();
 
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   "update:range-end-time": [value: string];
   "update:range-weekdays": [value: number[]];
   "update:range-use-open-close": [value: boolean];
+  "update:session-enabled-ids": [value: string[]];
   "open-indicators": [];
   screenshot: [];
   "toggle-fullscreen": [];
@@ -128,6 +131,16 @@ function toggleWeekday(day: number) {
     current.add(day);
   }
   emit("update:range-weekdays", [...current]);
+}
+
+function toggleSession(id: string) {
+  const current = new Set(props.sessionEnabledIds);
+  if (current.has(id)) {
+    current.delete(id);
+  } else {
+    current.add(id);
+  }
+  emit("update:session-enabled-ids", [...current]);
 }
 
 function toggleDrawingTool(tool: string) {
@@ -295,6 +308,61 @@ function toggleDrawingTool(tool: string) {
                 {{ wd.label }}
               </UButton>
             </div>
+          </div>
+        </div>
+      </template>
+    </UPopover>
+
+    <!-- Trading Sessions -->
+    <UPopover>
+      <UButton
+        icon="i-lucide-clock"
+        :variant="sessionEnabledIds.length > 0 ? 'soft' : 'ghost'"
+      >
+        Sessions
+        <UBadge
+          v-if="sessionEnabledIds.length > 0"
+          :label="String(sessionEnabledIds.length)"
+          color="primary"
+          variant="subtle"
+          class="ml-1"
+        />
+      </UButton>
+
+      <template #content>
+        <div class="p-4 space-y-1 w-72">
+          <div class="text-sm text-gray-400 mb-3">Trading Sessions</div>
+          <div
+            v-for="session in TRADING_SESSIONS"
+            :key="session.id"
+            class="flex items-center gap-2 cursor-pointer hover:bg-gray-800/50 rounded px-2 py-1"
+            @click="toggleSession(session.id)"
+          >
+            <div
+              class="w-3 h-3 rounded-sm shrink-0"
+              :style="{ backgroundColor: session.color.replace(/[\d.]+\)$/, '0.4)') }"
+            />
+            <span
+              class="text-sm flex-1"
+              :class="sessionEnabledIds.includes(session.id) ? 'text-white' : 'text-gray-500'"
+            >
+              {{ session.name }}
+            </span>
+            <USwitch
+              :model-value="sessionEnabledIds.includes(session.id)"
+              size="sm"
+              @click.stop
+              @update:model-value="toggleSession(session.id)"
+            />
+          </div>
+          <USeparator class="my-2" />
+          <div class="flex gap-2">
+            <UButton size="xs" variant="ghost" @click="emit('update:session-enabled-ids', TRADING_SESSIONS.map((s) => s.id))">
+              All
+            </UButton>
+            <UButton size="xs" variant="ghost" @click="emit('update:session-enabled-ids', [])">
+              None
+            </UButton>
           </div>
         </div>
       </template>

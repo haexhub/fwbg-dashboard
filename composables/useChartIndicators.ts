@@ -723,6 +723,138 @@ export function ensureRangeRectRegistered() {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Trading Sessions — full-height colored bands for exchange open hours
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SESSION_OVERLAY_NAME = "fwbg_trading_sessions";
+
+export interface TradingSession {
+  id: string;
+  name: string;
+  openUTC: number;   // minutes from midnight UTC
+  closeUTC: number;  // minutes from midnight UTC
+  color: string;     // rgba fill color (low alpha)
+}
+
+export const TRADING_SESSIONS: TradingSession[] = [
+  { id: "asx",   name: "Sydney",       openUTC: 0,    closeUTC: 360,  color: "rgba(255, 193, 7, 0.06)" },
+  { id: "tse",   name: "Tokyo",        openUTC: 0,    closeUTC: 360,  color: "rgba(244, 67, 54, 0.06)" },
+  { id: "hkex",  name: "Hong Kong",    openUTC: 90,   closeUTC: 480,  color: "rgba(233, 30, 99, 0.06)" },
+  { id: "sse",   name: "Shanghai",     openUTC: 90,   closeUTC: 420,  color: "rgba(156, 39, 176, 0.06)" },
+  { id: "bse",   name: "Mumbai",       openUTC: 225,  closeUTC: 600,  color: "rgba(255, 152, 0, 0.06)" },
+  { id: "xetra", name: "XETRA",        openUTC: 420,  closeUTC: 930,  color: "rgba(33, 150, 243, 0.06)" },
+  { id: "jse",   name: "Johannesburg", openUTC: 420,  closeUTC: 900,  color: "rgba(0, 150, 136, 0.06)" },
+  { id: "lse",   name: "London",       openUTC: 480,  closeUTC: 990,  color: "rgba(63, 81, 181, 0.06)" },
+  { id: "nyse",  name: "NYSE",         openUTC: 810,  closeUTC: 1200, color: "rgba(76, 175, 80, 0.06)" },
+  { id: "tsx",   name: "Toronto",      openUTC: 810,  closeUTC: 1200, color: "rgba(0, 188, 212, 0.06)" },
+  { id: "b3",    name: "B3",           openUTC: 780,  closeUTC: 1200, color: "rgba(121, 85, 72, 0.06)" },
+];
+
+let _sessionEnabledIds = new Set<string>();
+let _sessionChartTimeframe = "HOUR";
+let _sessionRegistered = false;
+
+export function updateSessionEnabledIds(ids: string[]) {
+  _sessionEnabledIds = new Set(ids);
+}
+
+export function updateSessionChartTimeframe(tf: string) {
+  _sessionChartTimeframe = tf;
+}
+
+export function ensureSessionOverlayRegistered() {
+  if (_sessionRegistered) return;
+  _sessionRegistered = true;
+
+  registerIndicator({
+    name: SESSION_OVERLAY_NAME,
+    shortName: "",
+    calcParams: [],
+    figures: [],
+    calc: (klineDataList) => klineDataList.map(() => ({})),
+    draw: ({ ctx, chart, xAxis, yAxis }) => {
+      if (_sessionEnabledIds.size === 0) return true;
+      if (!INTRADAY_TIMEFRAMES.has(_sessionChartTimeframe)) return true;
+
+      const data = chart.getDataList();
+      if (data.length === 0) return true;
+      const range = chart.getVisibleRange();
+
+      // Full-height pixel bounds: use extreme prices so bands cover the entire pane
+      let maxPrice = -Infinity, minPrice = Infinity;
+      for (let i = range.from; i <= range.to; i++) {
+        const bar = data[i];
+        if (!bar) continue;
+        if (bar.high > maxPrice) maxPrice = bar.high;
+        if (bar.low < minPrice) minPrice = bar.low;
+      }
+      const priceRange = maxPrice - minPrice;
+      const paneTop = yAxis.convertToPixel(maxPrice + priceRange * 10);
+      const paneBot = yAxis.convertToPixel(minPrice - priceRange * 10);
+
+      // Convert UTC session times to local minutes-from-midnight
+      const tzOffset = new Date().getTimezoneOffset(); // e.g. -60 for UTC+1
+      const enabledSessions = TRADING_SESSIONS.filter((s) => _sessionEnabledIds.has(s.id));
+      const localSessions = enabledSessions.map((s) => ({
+        ...s,
+        openLocal: (s.openUTC - tzOffset + 1440) % 1440,
+        closeLocal: (s.closeUTC - tzOffset + 1440) % 1440,
+      }));
+
+      ctx.save();
+
+      for (const session of localSessions) {
+        let bandStart = -1;
+        let bandEnd = -1;
+
+        for (let i = range.from; i <= range.to + 1; i++) {
+          const bar = i <= range.to ? data[i] : null;
+          let inSession = false;
+
+          if (bar) {
+            const d = new Date(bar.timestamp);
+            const localMin = d.getHours() * 60 + d.getMinutes();
+
+            if (session.openLocal <= session.closeLocal) {
+              inSession = localMin >= session.openLocal && localMin < session.closeLocal;
+            } else {
+              // Overnight session (crosses midnight in local time)
+              inSession = localMin >= session.openLocal || localMin < session.closeLocal;
+            }
+          }
+
+          if (inSession) {
+            if (bandStart === -1) bandStart = i;
+            bandEnd = i;
+          } else if (bandStart !== -1) {
+            // Draw completed band
+            const x1 = xAxis.convertToPixel(bandStart);
+            const x2 = xAxis.convertToPixel(bandEnd);
+            const barPx = bandEnd > bandStart ? (x2 - x1) / (bandEnd - bandStart) : 12;
+            const halfBar = Math.max(2, Math.min(barPx * 0.5, 8));
+
+            ctx.fillStyle = session.color;
+            ctx.fillRect(x1 - halfBar, paneTop, (x2 - x1) + halfBar * 2, paneBot - paneTop);
+
+            // Session label at top
+            ctx.fillStyle = session.color.replace(/[\d.]+\)$/, "0.5)");
+            ctx.font = "10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(session.name, (x1 + x2) / 2, paneTop + 12);
+
+            bandStart = -1;
+            bandEnd = -1;
+          }
+        }
+      }
+
+      ctx.restore();
+      return true;
+    },
+  });
+}
+
 /**
  * Adjust a hex color's opacity by mixing with black.
  */
