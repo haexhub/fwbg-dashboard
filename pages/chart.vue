@@ -58,13 +58,41 @@ const indicatorPlugins = computed(
   () => plugins.value?.filter((p) => p.phase === "indicators") ?? []
 );
 
+const {
+  querySource,
+  querySymbol,
+  queryTimeframe,
+  queryChartType,
+  queryRangeInterval,
+  queryRangeStartTime,
+  queryRangeEndTime,
+  queryRangeWeekdays,
+  queryRangeUseOpenClose,
+  querySessionIds,
+  queryRunId,
+  queryIndicators,
+  syncToUrl,
+} = useChartQuery();
+
+// Apply timeframe and chart type early (before overlay watchers run)
+if (queryTimeframe.value) setTimeframe(queryTimeframe.value);
+if (queryChartType.value && ["candle_solid", "ohlc", "area"].includes(queryChartType.value)) {
+  setChartType(queryChartType.value as "candle_solid" | "ohlc" | "area");
+}
+
 const indicatorPanelOpen = ref(false);
-const rangeInterval = ref("");
-const rangeStartTime = ref("00:00");
-const rangeEndTime = ref("00:00");
-const rangeWeekdays = ref([1, 2, 3, 4, 5]); // Mon-Fri
-const rangeUseOpenClose = ref(false);
-const sessionEnabledIds = ref<string[]>([]);
+const rangeInterval     = ref(queryRangeInterval.value    ?? "");
+const rangeStartTime    = ref(queryRangeStartTime.value   ?? "00:00");
+const rangeEndTime      = ref(queryRangeEndTime.value     ?? "00:00");
+const rangeWeekdays     = ref<number[]>(
+  queryRangeWeekdays.value
+    ? queryRangeWeekdays.value.split(",").map(Number).filter(n => !isNaN(n))
+    : [1, 2, 3, 4, 5]
+);
+const rangeUseOpenClose = ref(queryRangeUseOpenClose.value === "1");
+const sessionEnabledIds = ref<string[]>(
+  querySessionIds.value ? querySessionIds.value.split(",").filter(Boolean) : []
+);
 
 function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -410,9 +438,7 @@ function updateSignalMarkers() {
 watch(signalTimestampsKey, () => nextTick(updateSignalMarkers));
 
 // ── Run Trade Overlay ──
-const route = useRoute();
-const runOverlayId  = computed(() => route.query.run    as string | undefined);
-const runOverlaySym = computed(() => route.query.symbol as string | undefined);
+// queryRunId and querySymbol are provided by useChartQuery above.
 const tradeOverlayActive = ref(false);
 const tradeOverlayCount  = ref(0);
 
@@ -500,8 +526,12 @@ async function loadRunIndicators(runId: string) {
 
 // Reactively load run indicators once plugins become available
 watch(indicatorPlugins, (list) => {
-  if (list.length > 0 && runOverlayId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
-    loadRunIndicators(runOverlayId.value);
+  if (list.length > 0 && queryRunId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
+    loadRunIndicators(queryRunId.value);
+  }
+  if (list.length > 0 && queryIndicators.value && !_indicatorsRestored && _stateRestored) {
+    _indicatorsRestored = true;
+    void restoreIndicatorsFromUrl(queryIndicators.value);
   }
 });
 
@@ -564,41 +594,135 @@ function clearRunTradeOverlay() {
   tradeOverlayCount.value  = 0;
 }
 
-// ── Apply query-param symbol+source after sources load ──
+async function restoreIndicatorsFromUrl(indJson: string) {
+  try {
+    const entries: Array<{
+      fqn: string;
+      params: Record<string, unknown>;
+      columns: string[];
+      isSignal?: boolean;
+    }> = JSON.parse(indJson);
+
+    for (const entry of entries) {
+      if (activeIndicators.value.some((a) => a.fqn === entry.fqn)) continue;
+      const plugin = indicatorPlugins.value.find((p) => p.fqn === entry.fqn);
+      if (!plugin) continue;
+
+      try {
+        const response = await $fetch<IndicatorResponse>("/api/chart/indicator", {
+          method: "POST",
+          body: {
+            symbol: symbol.value,
+            timeframe: timeframe.value,
+            source: source.value,
+            fqn: entry.fqn,
+            params: entry.params,
+            limit: INDICATOR_LIMIT,
+          },
+        });
+
+        if (entry.isSignal) {
+          const sigId = `fwbg_sig_${plugin.name}_${Date.now()}`;
+          const colors: Record<string, string> = {};
+          entry.columns.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
+          registerFwbgSignalIndicator(sigId, response, entry.columns, colors);
+          const chart = chartCanvas.value?.getChart();
+          const paneId = chart?.createIndicator({ name: sigId }, false, { height: 80 }) ?? "";
+          const transitions = extractSignalTransitions(response, entry.columns);
+          addIndicator({ id: sigId, fqn: entry.fqn, name: `${plugin.name} (signal)`, params: entry.params, columns: entry.columns, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap });
+        } else {
+          const instanceId = `fwbg_${plugin.name}_${Date.now()}`;
+          const colors: Record<string, string> = {};
+          entry.columns.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
+          registerFwbgIndicator(instanceId, response, entry.columns, colors);
+          const chart = chartCanvas.value?.getChart();
+          const paneId = chart?.createIndicator({ name: instanceId }, false, { height: 120 }) ?? "";
+          addIndicator({ id: instanceId, fqn: entry.fqn, name: plugin.name, params: entry.params, columns: entry.columns, paneId });
+        }
+      } catch (e) {
+        console.warn(`[restore] Skipping ${entry.fqn}:`, e);
+      }
+    }
+    nextTick(adjustLayout);
+  } catch (e) {
+    console.warn("[restore] Invalid ind param:", e);
+  }
+}
+
+// ── Apply source/symbol from URL after sources load ──
 // useChart's internal watcher auto-selects the first symbol; we override it here.
+// querySymbol covers both regular chart symbol and trade-overlay asset.
 watch(sources, async (list) => {
-  if (!list?.length || !runOverlaySym.value) return;
+  if (!list?.length) return;
   await nextTick(); // let useChart's own watcher run first
 
-  const targetSym = runOverlaySym.value;
-
-  // If the target symbol isn't available in the current source, search other sources
-  const inCurrentSource = availableSymbols.value.some((s) => s.symbol === targetSym);
-  if (!inCurrentSource) {
-    const matchingSrc = list.find((src) =>
-      src.symbols?.some((s: { symbol: string }) => s.symbol === targetSym)
-    );
-    if (matchingSrc) {
-      setSource(matchingSrc.name);
-      // setSource sets symbol to first of that source; override immediately below
-    }
+  if (querySource.value) {
+    const sourceExists = list.find((src) => src.name === querySource.value);
+    if (sourceExists) setSource(querySource.value);
   }
 
-  setSymbol(targetSym);
+  if (querySymbol.value) {
+    await nextTick();
+    const inCurrentSource = availableSymbols.value.some((s) => s.symbol === querySymbol.value);
+    if (!inCurrentSource) {
+      const matchingSrc = list.find((src) =>
+        src.symbols?.some((s: { symbol: string }) => s.symbol === querySymbol.value)
+      );
+      if (matchingSrc) setSource(matchingSrc.name);
+    }
+    setSymbol(querySymbol.value);
+  }
 }, { immediate: true });
 
 // ── Trade overlay: triggered by Canvas data-loaded event (not by setTimeout) ──
 let _overlayLoaded = false;
+let _stateRestored = false;
+let _indicatorsRestored = false;
 
 function handleDataLoaded(count: number) {
-  if (count === 0 || _overlayLoaded) return;
-  if (!runOverlayId.value || !runOverlaySym.value) return;
+  if (count === 0) return;
+
+  // Restore chart overlays from URL on first data load
+  if (!_stateRestored) {
+    _stateRestored = true;
+    if (rangeInterval.value) {
+      updateRangeMode(rangeInterval.value);
+      updateRangeTimeFilter(
+        parseTimeToMinutes(rangeStartTime.value),
+        parseTimeToMinutes(rangeEndTime.value),
+      );
+      updateRangeWeekdays(rangeWeekdays.value);
+      updateRangeUseOpenClose(rangeUseOpenClose.value);
+      ensureRangeRectRegistered();
+      const chart = chartCanvas.value?.getChart();
+      if (chart) {
+        chart.removeIndicator({ name: RANGE_RECT_NAME });
+        chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+      }
+    }
+    if (sessionEnabledIds.value.length > 0) {
+      updateSessionEnabledIds(sessionEnabledIds.value);
+      ensureSessionOverlayRegistered();
+      const chart = chartCanvas.value?.getChart();
+      if (chart) {
+        chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
+        chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+      }
+    }
+    if (queryIndicators.value && !_indicatorsRestored && indicatorPlugins.value.length > 0) {
+      _indicatorsRestored = true;
+      void restoreIndicatorsFromUrl(queryIndicators.value);
+    }
+  }
+
+  if (_overlayLoaded) return;
+  if (!queryRunId.value || !querySymbol.value) return;
   _overlayLoaded = true;
-  loadRunTradeOverlay(runOverlayId.value, runOverlaySym.value);
+  loadRunTradeOverlay(queryRunId.value, querySymbol.value);
 }
 
-// Reset flags when run/symbol changes (user navigates to a different asset or run)
-watch(() => [runOverlayId.value, runOverlaySym.value], () => {
+// Reset trade-overlay flags when the run id changes
+watch(queryRunId, () => {
   _overlayLoaded = false;
   runIndicatorsLoaded.value = false;
 });
@@ -812,6 +936,30 @@ function handleRemoveIndicator(id: string) {
   removeIndicator(id);
   nextTick(adjustLayout);
 }
+
+// ── Sync chart state to URL via composable ──
+watch(
+  [source, symbol, timeframe, chartType, rangeInterval, rangeStartTime, rangeEndTime, rangeWeekdays, rangeUseOpenClose, sessionEnabledIds, activeIndicators],
+  () => syncToUrl({
+    source: source.value,
+    symbol: symbol.value,
+    timeframe: timeframe.value,
+    chartType: chartType.value,
+    rangeInterval: rangeInterval.value,
+    rangeStartTime: rangeStartTime.value,
+    rangeEndTime: rangeEndTime.value,
+    rangeWeekdays: rangeWeekdays.value,
+    rangeUseOpenClose: rangeUseOpenClose.value,
+    sessionIds: sessionEnabledIds.value,
+    indicators: activeIndicators.value.map((i) => ({
+      fqn: i.fqn,
+      params: i.params,
+      columns: i.columns,
+      isSignal: i.isSignal || false,
+    })),
+  }),
+  { deep: true },
+);
 </script>
 
 <template>
@@ -856,13 +1004,13 @@ function handleRemoveIndicator(id: string) {
 
       <!-- Run Trade Overlay Bar -->
       <div
-        v-if="tradeOverlayActive || (runOverlayId && runOverlaySym)"
+        v-if="tradeOverlayActive || (queryRunId && querySymbol)"
         class="flex items-center gap-3 px-3 py-1 bg-indigo-950/60 border-b border-indigo-800/40 text-xs text-indigo-300"
       >
         <span class="i-heroicons-chart-bar-square text-indigo-400 shrink-0" />
         <span>
-          Run <span class="font-mono font-semibold text-white">{{ runOverlayId }}</span>
-          — <span class="font-mono text-indigo-200">{{ runOverlaySym }}</span>
+          Run <span class="font-mono font-semibold text-white">{{ queryRunId }}</span>
+          — <span class="font-mono text-indigo-200">{{ querySymbol }}</span>
           <template v-if="tradeOverlayCount > 0">
             · <span class="text-white">{{ tradeOverlayCount }} Trades</span>
           </template>
@@ -908,7 +1056,7 @@ function handleRemoveIndicator(id: string) {
           :chart-type="chartType"
           :price-precision="pricePrecision"
           :active-drawing-tool="activeDrawingTool"
-          :load-all="!!runOverlayId"
+          :load-all="!!queryRunId"
           @crosshair-change="crosshairData = $event"
           @drawing-cancelled="setDrawingTool(null)"
           @data-loaded="handleDataLoaded"
