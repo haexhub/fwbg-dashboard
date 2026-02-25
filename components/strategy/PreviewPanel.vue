@@ -34,6 +34,7 @@ interface ProgressResponse {
 type PanelStatus = "idle" | "running" | "done" | "error";
 
 const selectedAsset = ref(props.availableAssets[0] ?? "");
+const daysLimit = ref(60);
 const panelStatus = ref<PanelStatus>("idle");
 const runId = ref<string | null>(null);
 const progressPct = ref(0);
@@ -162,7 +163,7 @@ async function startPreview() {
         body: {
           strategy_name: props.strategyName,
           asset,
-          days_limit: 60,
+          days_limit: daysLimit.value,
         },
       },
     );
@@ -204,20 +205,31 @@ function openInChart() {
     <template #body>
       <div class="space-y-5 p-1">
 
-        <!-- Asset selector -->
-        <UFormField label="Asset">
-          <USelect
-            v-if="availableAssets.length > 0"
-            v-model="selectedAsset"
-            :items="assetItems"
-            value-key="value"
-            :disabled="panelStatus === 'running'"
-            class="w-full"
-          />
-          <p v-else class="text-xs text-gray-500">
-            Keine Assets konfiguriert. Bitte zuerst im Assets-Tab Asset-Klassen anlegen.
-          </p>
-        </UFormField>
+        <!-- Asset + Days -->
+        <div class="flex gap-3">
+          <UFormField label="Asset" class="flex-1">
+            <USelect
+              v-if="availableAssets.length > 0"
+              v-model="selectedAsset"
+              :items="assetItems"
+              value-key="value"
+              :disabled="panelStatus === 'running'"
+              class="w-full"
+            />
+            <p v-else class="text-xs text-gray-500">
+              Keine Assets konfiguriert. Bitte zuerst im Assets-Tab Asset-Klassen anlegen.
+            </p>
+          </UFormField>
+          <UFormField label="Tage" class="w-24">
+            <UInput
+              v-model.number="daysLimit"
+              type="number"
+              :min="1"
+              :disabled="panelStatus === 'running'"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
 
         <!-- Action -->
         <UButton
