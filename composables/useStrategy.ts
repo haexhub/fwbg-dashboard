@@ -24,6 +24,8 @@ export function useStrategy() {
     feature_selection: [],
     exit_strategies: [],
     risk_management: [],
+    model: [],
+    labeling: [],
   });
 
   // Currently selected plugin for config panel
