@@ -91,12 +91,10 @@ const timeframeItems = computed(() =>
 // Drawing tools — icons matching KLineChart demo style
 const drawingTools = [
   { name: "segment", icon: "i-lucide-minus", label: "Segment" },
-  { name: "horizontalStraightLine", icon: "i-lucide-grip-horizontal", label: "Horizontal" },
   { name: "rayLine", icon: "i-lucide-move-diagonal-2", label: "Ray" },
   { name: "fibonacciLine", icon: "i-lucide-align-justify", label: "Fibonacci" },
-  { name: "parallelStraightLine", icon: "i-lucide-equal", label: "Channel" },
+  { name: "filledChannel", icon: "i-lucide-equal", label: "Channel" },
   { name: "priceLine", icon: "i-lucide-dollar-sign", label: "Price Line" },
-  { name: "simpleTag", icon: "i-lucide-tag", label: "Tag" },
   { name: "rect", icon: "i-lucide-square", label: "Rectangle" },
 ];
 
@@ -150,6 +148,24 @@ function toggleDrawingTool(tool: string) {
     emit("update:drawing-tool", tool);
   }
 }
+
+// Horizontal / Vertical line dropdown
+const lineTools = [
+  { label: "Horizontale Linie", name: "horizontalStraightLine", icon: "i-lucide-minus" },
+  { label: "Vertikale Linie", name: "verticalStraightLine", icon: "i-lucide-separator-vertical" },
+];
+
+const isLineToolActive = computed(() =>
+  lineTools.some((t) => t.name === props.activeDrawingTool),
+);
+
+const lineToolItems = computed(() =>
+  lineTools.map((t) => [{
+    label: t.label,
+    icon: t.icon,
+    onSelect: () => toggleDrawingTool(t.name),
+  }]),
+);
 </script>
 
 <template>
@@ -213,6 +229,14 @@ function toggleDrawingTool(tool: string) {
           @click="toggleDrawingTool(tool.name)"
         />
       </UTooltip>
+
+      <!-- Horizontal / Vertical line dropdown -->
+      <UDropdownMenu :items="lineToolItems">
+        <UButton
+          icon="i-lucide-ruler"
+          :variant="isLineToolActive ? 'soft' : 'ghost'"
+        />
+      </UDropdownMenu>
     </div>
 
     <USeparator orientation="vertical" class="h-6" />

@@ -4,6 +4,8 @@ import type {
   Chart,
   KLineData,
   Crosshair,
+  Bounding,
+  Coordinate,
   DataLoaderGetBarsParams,
   DataLoaderSubscribeBarParams,
   DataLoaderUnsubscribeBarParams,
@@ -198,6 +200,87 @@ registerOverlay({
         },
       },
     ];
+  },
+});
+
+// Register filled channel overlay (parallel lines + shaded area between them)
+registerOverlay({
+  name: "filledChannel",
+  totalStep: 4,
+  needDefaultPointFigure: true,
+  needDefaultXAxisFigure: true,
+  needDefaultYAxisFigure: true,
+  createPointFigures: ({ coordinates, bounding }: { coordinates: Coordinate[]; bounding: Bounding }) => {
+    if (coordinates.length < 2) return [];
+
+    const [p1, p2] = coordinates;
+    const figures: Array<{ type: string; attrs: unknown; styles?: unknown }> = [];
+
+    // First line — extend to screen bounds
+    if (p1!.x === p2!.x) {
+      // Vertical
+      figures.push({
+        type: "line",
+        attrs: { coordinates: [{ x: p1!.x, y: 0 }, { x: p1!.x, y: bounding.height }] },
+      });
+    } else {
+      const k = (p1!.y - p2!.y) / (p1!.x - p2!.x);
+      const b = p1!.y - k * p1!.x;
+      figures.push({
+        type: "line",
+        attrs: { coordinates: [{ x: 0, y: b }, { x: bounding.width, y: k * bounding.width + b }] },
+      });
+    }
+
+    if (coordinates.length < 3) return figures;
+
+    const p3 = coordinates[2]!;
+
+    if (p1!.x === p2!.x) {
+      // Vertical channel
+      figures.push({
+        type: "line",
+        attrs: { coordinates: [{ x: p3.x, y: 0 }, { x: p3.x, y: bounding.height }] },
+      });
+      figures.push({
+        type: "polygon",
+        attrs: {
+          coordinates: [
+            { x: p1!.x, y: 0 },
+            { x: p1!.x, y: bounding.height },
+            { x: p3.x, y: bounding.height },
+            { x: p3.x, y: 0 },
+          ],
+        },
+        styles: { style: "fill", color: "rgba(59, 130, 246, 0.08)" },
+      });
+    } else {
+      const k = (p1!.y - p2!.y) / (p1!.x - p2!.x);
+      const b1 = p1!.y - k * p1!.x;
+      const b2 = p3.y - k * p3.x;
+
+      // Second line
+      figures.push({
+        type: "line",
+        attrs: { coordinates: [{ x: 0, y: b2 }, { x: bounding.width, y: k * bounding.width + b2 }] },
+      });
+
+      // Filled polygon between the two lines
+      figures.push({
+        type: "polygon",
+        attrs: {
+          coordinates: [
+            { x: 0, y: b1 },
+            { x: bounding.width, y: k * bounding.width + b1 },
+            { x: bounding.width, y: k * bounding.width + b2 },
+            { x: 0, y: b2 },
+          ],
+        },
+        styles: { style: "fill", color: "rgba(59, 130, 246, 0.08)" },
+      });
+    }
+
+    return figures;
   },
 });
 
