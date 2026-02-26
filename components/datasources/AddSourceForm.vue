@@ -143,17 +143,17 @@ function submit() {
 
       <div class="space-y-3">
         <!-- Common fields -->
-        <UFormField label="Name">
-          <UInput v-model="common.name" placeholder="meine_quelle" class="font-mono" />
+        <UFormField label="Name" class="w-full">
+          <UInput v-model="common.name" placeholder="meine_quelle" class="font-mono w-full" />
         </UFormField>
-        <UFormField label="Beschreibung">
-          <UInput v-model="common.description" placeholder="Optional" />
+        <UFormField label="Beschreibung" class="w-full">
+          <UTextarea v-model="common.description" placeholder="Optional" :rows="3" class="w-full" />
         </UFormField>
 
         <!-- CSV fields -->
         <template v-if="selectedType === 'csv'">
-          <UFormField label="Dateiname-Muster">
-            <UInput v-model="csvForm.file_pattern" placeholder="{symbol}_{timeframe}.csv" class="font-mono" />
+          <UFormField label="Dateiname-Muster" class="w-full">
+            <UInput v-model="csvForm.file_pattern" placeholder="{symbol}_{timeframe}.csv" class="font-mono w-full" />
           </UFormField>
           <p class="text-xs text-gray-500">
             Ordner wird automatisch unter <span class="font-mono">data/{{ common.name || '…' }}/</span> angelegt.

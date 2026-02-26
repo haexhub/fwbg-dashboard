@@ -155,6 +155,7 @@ async function handleETLDone() {
           @delete-raw="handleDeleteRaw"
           @delete-datasource="handleDeleteDatasource"
           @etl="openETL"
+          @updated="refresh"
         />
       </template>
       <p v-else class="pl-6 text-xs text-gray-600">

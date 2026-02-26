@@ -21,6 +21,18 @@ export interface CSVSource extends DataSourceBase {
   files?: FileInfo[];
   raw_file_count?: number;
   raw_files?: FileInfo[];
+  // ETL / transform fields
+  raw_path?: string;
+  raw_pattern?: string;
+  timestamp_unit?: string;
+  symbol_map?: Record<string, string>;
+  timezone?: string;
+  date_col?: string;
+  open_col?: string;
+  high_col?: string;
+  low_col?: string;
+  close_col?: string;
+  volume_col?: string;
 }
 
 export interface RESTSource extends DataSourceBase {

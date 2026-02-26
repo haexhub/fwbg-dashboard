@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DataSource } from "~/types/datasource";
+import type { DataSource, CSVSource } from "~/types/datasource";
 import { SOURCE_TYPE_ICONS } from "~/types/datasource";
 
 const props = defineProps<{
@@ -12,11 +12,14 @@ const emit = defineEmits<{
   deleteRaw: [sourceName: string, filename: string];
   deleteDatasource: [sourceName: string, filename: string];
   etl: [sourceName: string, filename: string];
+  updated: [];
 }>();
 
 const expanded = ref(false);
 const confirmDelete = ref(false);
 const fileTab = ref("raw");
+
+const csv = computed(() => (props.source.type === "csv" ? props.source as CSVSource : null));
 
 function formatSize(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -45,19 +48,19 @@ function formatDate(ts: number): string {
       </div>
 
       <!-- File counts for CSV -->
-      <template v-if="source.type === 'csv'">
+      <template v-if="csv">
         <span class="shrink-0 text-xs text-gray-500">
-          {{ (source as any).file_count ?? 0 }} Dateien
+          {{ csv.file_count ?? 0 }} Dateien
         </span>
-        <span v-if="(source as any).raw_file_count" class="shrink-0 text-xs text-gray-600">
-          · {{ (source as any).raw_file_count }} roh
+        <span v-if="csv.raw_file_count" class="shrink-0 text-xs text-gray-600">
+          · {{ csv.raw_file_count }} roh
         </span>
       </template>
 
       <!-- Actions -->
       <div class="flex shrink-0 items-center gap-1" @click.stop>
         <UButton
-          v-if="source.type === 'csv'"
+          v-if="csv"
           icon="i-heroicons-arrow-up-tray"
           size="xs"
           variant="ghost"
@@ -89,11 +92,11 @@ function formatDate(ts: number): string {
     <div v-if="expanded" class="border-t border-gray-800 px-4 py-3 space-y-4">
       <!-- Config fields -->
       <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
-        <template v-if="source.type === 'csv'">
+        <template v-if="csv">
           <div class="text-gray-500">Pfad</div>
-          <div class="col-span-1 font-mono text-gray-300 sm:col-span-2">{{ (source as any).path }}</div>
+          <div class="col-span-1 font-mono text-gray-300 sm:col-span-2">{{ csv.path }}</div>
           <div class="text-gray-500">Dateinamen</div>
-          <div class="col-span-1 font-mono text-gray-300 sm:col-span-2">{{ (source as any).file_pattern }}</div>
+          <div class="col-span-1 font-mono text-gray-300 sm:col-span-2">{{ csv.file_pattern }}</div>
         </template>
         <template v-else-if="source.type === 'rest'">
           <div class="text-gray-500">URL</div>
@@ -126,12 +129,13 @@ function formatDate(ts: number): string {
       </div>
 
       <!-- CSV file tabs -->
-      <template v-if="source.type === 'csv'">
+      <template v-if="csv">
         <UTabs
           v-model="fileTab"
           :items="[
-            { label: `Rohdaten (${(source as any).raw_files?.length ?? 0})`, value: 'raw' },
-            { label: `Verarbeitete Daten (${(source as any).files?.length ?? 0})`, value: 'processed' },
+            { label: `Rohdaten (${csv.raw_files?.length ?? 0})`, value: 'raw' },
+            { label: `Verarbeitete Daten (${csv.files?.length ?? 0})`, value: 'processed' },
+            { label: 'Transform', value: 'transform' },
           ]"
           :content="false"
         />
@@ -149,9 +153,9 @@ function formatDate(ts: number): string {
               Hochladen
             </UButton>
           </div>
-          <div v-if="(source as any).raw_files?.length" class="max-h-64 overflow-y-auto space-y-1">
+          <div v-if="csv.raw_files?.length" class="max-h-64 overflow-y-auto space-y-1">
             <div
-              v-for="file in (source as any).raw_files"
+              v-for="file in csv.raw_files"
               :key="file.name"
               class="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-800"
             >
@@ -180,9 +184,9 @@ function formatDate(ts: number): string {
 
         <!-- Processed files -->
         <div v-if="fileTab === 'processed'" class="space-y-1">
-          <div v-if="(source as any).files?.length" class="max-h-64 overflow-y-auto space-y-1">
+          <div v-if="csv.files?.length" class="max-h-64 overflow-y-auto space-y-1">
             <div
-              v-for="file in (source as any).files"
+              v-for="file in csv.files"
               :key="file.name"
               class="flex items-center gap-2 rounded px-2 py-1 hover:bg-gray-800"
             >
@@ -200,6 +204,14 @@ function formatDate(ts: number): string {
             </div>
           </div>
           <p v-else class="pl-2 text-xs text-gray-600">Noch keine Dateien verarbeitet.</p>
+        </div>
+
+        <!-- Transform config -->
+        <div v-if="fileTab === 'transform'">
+          <DatasourcesTransformConfig
+            :source="csv"
+            @updated="emit('updated')"
+          />
         </div>
       </template>
     </div>
