@@ -1,43 +1,23 @@
 /**
  * POST /api/strategy/preview
- * Start a lightweight preview run for a single asset class (first N days).
+ * Synchronous signal preview for a single symbol — no optimization, no polling.
  *
- * Body: { strategy_name: string, asset: string, days_limit?: number }
- * Returns: { job_id: string, status: string }
- *
- * Tries fwbg /api/preview first; if not available falls back to
- * /api/runs/start with asset_classes + preview hints so the feature
- * works without a dedicated backend endpoint.
+ * Body: { strategy_name: string, asset: string, last_n_bars?: number }
+ * Returns: { symbol, timeframe, total_bars, trades: TradeEntry[] }
  */
 export default defineEventHandler(async (event) => {
   const body = await readBody<{
     strategy_name: string;
     asset: string;
-    days_limit?: number;
+    last_n_bars?: number;
   }>(event);
 
-  // Try dedicated preview endpoint first
-  try {
-    return await fwbgFetch<unknown>("/api/preview", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-  } catch (err: unknown) {
-    const status = (err as { statusCode?: number })?.statusCode;
-    // Fall back to regular run start if endpoint doesn't exist yet
-    if (status !== 404 && status !== 405) throw err;
-  }
-
-  // Fallback: use the existing runs/start endpoint
-  // Use `assets` (symbol filter) not `asset_classes` (registry class names)
-  // so that grid keys like "DAX" or "ASX200" match the actual CSV filenames.
-  return fwbgFetch<unknown>("/api/runs/start", {
+  return fwbgFetch<unknown>("/api/runs/preview", {
     method: "POST",
     body: JSON.stringify({
       strategy_name: body.strategy_name,
-      assets: [body.asset],
-      description: `preview · ${body.asset}`,
-      preview: true,
+      symbol: body.asset,
+      last_n_bars: body.last_n_bars,
     }),
   });
 });

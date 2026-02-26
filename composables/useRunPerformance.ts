@@ -143,7 +143,7 @@ interface PreparedFold {
   testSize: number; // number of bars in test period
 }
 
-function aggregatePerformance(details: GridDetail[]): PerformanceData {
+export function aggregatePerformance(details: GridDetail[]): PerformanceData {
   const assetBreakdown: AssetPerformance[] = [];
   let totalTrades = 0;
   let totalWins = 0;

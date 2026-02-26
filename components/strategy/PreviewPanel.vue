@@ -18,15 +18,18 @@ interface TradeEntry {
   entry_price?: number;
   exit_price?: number;
   direction?: "LONG" | "SHORT";
-  result?: number;
+  result?: string;
   pnl_raw?: number;
+  signal?: string;
 }
 
-interface ProgressResponse {
-  status?: string;
-  progress?: number; // 0–1
-  message?: string;
-  current_asset?: string;
+interface PreviewResponse {
+  symbol: string;
+  timeframe: string;
+  total_bars: number;
+  trades: TradeEntry[];
+  tp_used?: number;
+  sl_used?: number;
 }
 
 // ── State ──
@@ -34,14 +37,11 @@ interface ProgressResponse {
 type PanelStatus = "idle" | "running" | "done" | "error";
 
 const selectedAsset = ref(props.availableAssets[0] ?? "");
+const lastNBars = ref(10000);
 const panelStatus = ref<PanelStatus>("idle");
-const runId = ref<string | null>(null);
-const progressPct = ref(0);
-const progressMessage = ref("");
 const trades = ref<TradeEntry[]>([]);
 const errorMessage = ref("");
-
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+const previewMeta = ref<{ timeframe?: string; totalBars?: number; tp?: number; sl?: number }>({});
 
 // Keep selectedAsset in sync when the available list changes
 watch(
@@ -53,8 +53,6 @@ watch(
   },
   { immediate: true },
 );
-
-onUnmounted(() => stopPolling());
 
 // ── Computed ──
 
@@ -91,104 +89,49 @@ function formatTime(ts?: string): string {
   });
 }
 
-function stopPolling() {
-  if (pollTimer != null) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-}
-
 // ── Preview logic ──
-
-async function pollProgress() {
-  if (!runId.value) return;
-  try {
-    const res = await $fetch<ProgressResponse>(
-      `/api/runs/${runId.value}/progress`,
-    );
-    progressPct.value = Math.round((res.progress ?? 0) * 100);
-    progressMessage.value = res.message ?? res.current_asset ?? "";
-    const s = res.status ?? "running";
-    if (s === "completed") {
-      stopPolling();
-      try {
-        await loadTrades();
-        panelStatus.value = "done";
-      } catch (loadErr: unknown) {
-        const e = loadErr as { statusMessage?: string; message?: string };
-        errorMessage.value =
-          e?.statusMessage ?? e?.message ?? "Signale konnten nicht geladen werden";
-        panelStatus.value = "error";
-      }
-    } else if (s === "failed" || s === "cancelled") {
-      stopPolling();
-      errorMessage.value = `Run ${s}`;
-      panelStatus.value = "error";
-    }
-  } catch (e: unknown) {
-    stopPolling();
-    const err = e as { statusMessage?: string; message?: string };
-    errorMessage.value =
-      err?.statusMessage ?? err?.message ?? "Fortschritt konnte nicht abgerufen werden";
-    panelStatus.value = "error";
-  }
-}
-
-async function loadTrades() {
-  if (!runId.value || !effectiveAsset.value) return;
-  const res = await $fetch<{ trades: TradeEntry[] }>(
-    `/api/runs/${runId.value}/trades/${effectiveAsset.value}`,
-  );
-  trades.value = (res.trades ?? []).sort((a, b) => {
-    if (!a.entry_time || !b.entry_time) return 0;
-    return parseUTC(a.entry_time) - parseUTC(b.entry_time);
-  });
-}
 
 async function startPreview() {
   const asset = effectiveAsset.value;
   if (!asset) return;
 
-  stopPolling();
   panelStatus.value = "running";
-  runId.value = null;
   trades.value = [];
   errorMessage.value = "";
-  progressPct.value = 0;
-  progressMessage.value = "";
+  previewMeta.value = {};
 
   try {
-    const res = await $fetch<{ run_id?: string; job_id?: string }>(
+    const res = await $fetch<PreviewResponse>(
       "/api/strategy/preview",
       {
         method: "POST",
         body: {
           strategy_name: props.strategyName,
           asset,
+          last_n_bars: lastNBars.value || undefined,
         },
       },
     );
-    runId.value = res.run_id ?? res.job_id ?? null;
-    if (!runId.value) throw new Error("Keine Run-ID vom Backend erhalten");
 
-    // Immediate check + recurring poll
-    await pollProgress();
-    if (panelStatus.value === "running") {
-      pollTimer = setInterval(pollProgress, 2000);
-    }
+    trades.value = (res.trades ?? []).sort((a, b) => {
+      if (!a.entry_time || !b.entry_time) return 0;
+      return parseUTC(a.entry_time) - parseUTC(b.entry_time);
+    });
+
+    previewMeta.value = {
+      timeframe: res.timeframe,
+      totalBars: res.total_bars,
+      tp: res.tp_used,
+      sl: res.sl_used,
+    };
+
+    panelStatus.value = "done";
   } catch (e: unknown) {
     panelStatus.value = "error";
-    const err = e as { statusMessage?: string; message?: string };
+    const err = e as { statusMessage?: string; message?: string; data?: { detail?: string } };
     errorMessage.value =
-      err?.statusMessage ?? err?.message ?? "Vorschau konnte nicht gestartet werden";
+      err?.data?.detail ?? err?.statusMessage ?? err?.message ?? "Vorschau konnte nicht gestartet werden";
   }
-}
-
-function openInChart() {
-  if (!runId.value || !effectiveAsset.value) return;
-  const params = new URLSearchParams({ run: runId.value, symbol: effectiveAsset.value });
-  if (props.datasource) params.set("source", props.datasource);
-  window.open(`/chart?${params}`, "_blank");
 }
 </script>
 
@@ -219,6 +162,18 @@ function openInChart() {
           </p>
         </UFormField>
 
+        <!-- Bars limit -->
+        <UFormField label="Letzte N Bars">
+          <UInput
+            v-model.number="lastNBars"
+            type="number"
+            :min="1000"
+            :step="1000"
+            :disabled="panelStatus === 'running'"
+            class="w-full"
+          />
+        </UFormField>
+
         <!-- Action -->
         <UButton
           :loading="panelStatus === 'running'"
@@ -229,17 +184,16 @@ function openInChart() {
           Vorschau starten
         </UButton>
 
-        <!-- Progress bar -->
+        <!-- Progress -->
         <div v-if="panelStatus === 'running'" class="space-y-1.5">
           <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              class="h-full bg-blue-500 rounded-full transition-all duration-300"
-              :style="{ width: progressPct > 0 ? `${progressPct}%` : '100%' }"
-              :class="progressPct === 0 ? 'animate-pulse' : ''"
+              class="h-full bg-blue-500 rounded-full animate-pulse"
+              style="width: 100%"
             />
           </div>
           <p class="text-xs text-gray-400">
-            {{ progressMessage || "Signale werden berechnet…" }}
+            Signale werden berechnet…
           </p>
         </div>
 
@@ -248,19 +202,16 @@ function openInChart() {
           <div class="rounded-md bg-red-900/30 border border-red-700/40 p-3">
             <p class="text-sm text-red-300">{{ errorMessage }}</p>
           </div>
-          <UButton
-            v-if="runId"
-            icon="i-lucide-external-link"
-            variant="outline"
-            class="w-full justify-center"
-            @click="openInChart"
-          >
-            Im Chart anzeigen
-          </UButton>
         </template>
 
         <!-- Results -->
         <template v-if="panelStatus === 'done'">
+          <!-- Meta info -->
+          <div v-if="previewMeta.timeframe" class="text-xs text-gray-500">
+            {{ previewMeta.totalBars?.toLocaleString() }} Bars
+            <span v-if="previewMeta.tp"> · TP {{ previewMeta.tp }} / SL {{ previewMeta.sl }}</span>
+          </div>
+
           <!-- Stats row -->
           <div class="flex gap-3 text-sm">
             <div class="bg-gray-800/60 rounded px-3 py-2 min-w-[4rem] text-center">
@@ -283,7 +234,7 @@ function openInChart() {
 
           <!-- No signals -->
           <p v-if="trades.length === 0" class="text-sm text-gray-400">
-            Keine Einstiegssignale in den ersten 60 Tagen gefunden.
+            Keine Einstiegssignale gefunden.
           </p>
 
           <!-- Entry signals table -->
@@ -324,16 +275,6 @@ function openInChart() {
               </tbody>
             </table>
           </div>
-
-          <!-- Open in chart -->
-          <UButton
-            icon="i-lucide-external-link"
-            variant="outline"
-            class="w-full justify-center"
-            @click="openInChart"
-          >
-            Im Chart anzeigen
-          </UButton>
         </template>
 
       </div>

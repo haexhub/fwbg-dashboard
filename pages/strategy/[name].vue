@@ -29,7 +29,11 @@ const runModalOpen = ref(false);
 
 // Preview panel
 const previewPanelOpen = ref(false);
-const previewAssetClasses = computed(() => Object.keys(config.value?.grids ?? {}));
+const ASSET_CLASSES = new Set(["FOREX", "INDEX", "COMMODITY", "CRYPTO"]);
+const previewAssetClasses = computed(() =>
+  Object.keys(config.value?.grids ?? {}).filter((k) => !ASSET_CLASSES.has(k)),
+);
+const isSignalModel = computed(() => config.value?.model?.type === "signal");
 
 function handleRunStarted(_jobId: string) {
   navigateTo("/runs");
@@ -127,15 +131,44 @@ onKeyStroke("y", (e) => {
           >
             Save
           </UButton>
-          <UButton
-            icon="i-lucide-eye"
-            variant="ghost"
-            :disabled="!config"
-            @click="previewPanelOpen = true"
+          <template v-if="isSignalModel">
+            <UTooltip
+              v-if="isDirty"
+              text="Bitte zuerst alle Änderungen speichern"
+            >
+              <UButton
+                icon="i-lucide-eye"
+                variant="ghost"
+                disabled
+              >
+                Vorschau
+              </UButton>
+            </UTooltip>
+            <UButton
+              v-else
+              icon="i-lucide-eye"
+              variant="ghost"
+              :disabled="!config"
+              @click="previewPanelOpen = true"
+            >
+              Vorschau
+            </UButton>
+          </template>
+          <UTooltip
+            v-if="isDirty"
+            text="Bitte zuerst alle Änderungen speichern"
           >
-            Vorschau
-          </UButton>
+            <UButton
+              icon="i-heroicons-play"
+              color="success"
+              variant="soft"
+              disabled
+            >
+              Run
+            </UButton>
+          </UTooltip>
           <UButton
+            v-else
             icon="i-heroicons-play"
             color="success"
             variant="soft"
