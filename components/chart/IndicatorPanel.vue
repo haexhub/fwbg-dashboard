@@ -30,54 +30,21 @@ function getPluginType(plugin: PluginInfo): "indicator" | "signal" | "both" {
 // ── Type filter ──
 const typeFilter = ref<"" | "indicator" | "signal">("");
 
-// ── Browse entries: split grouped plugins into virtual sub-indicator entries ──
+// ── Browse entries: one entry per plugin ──
 interface BrowseEntry {
   id: string;
   label: string;
   plugin: PluginInfo;
-  parentLabel?: string;
-  preSelectGroup?: string;
   pluginType: "indicator" | "signal" | "both";
 }
 
-function groupFeatureColumns(cols: string[]): Map<string, string[]> {
-  const prefixLen = findCommonPrefixLen(cols);
-  const groups = new Map<string, string[]>();
-  for (const col of cols) {
-    const stripped = stripPrefix(col, prefixLen);
-    const firstToken = stripped.split("_")[0]!;
-    if (!groups.has(firstToken)) groups.set(firstToken, []);
-    groups.get(firstToken)!.push(col);
-  }
-  return groups;
-}
-
 const browseEntries = computed<BrowseEntry[]>(() => {
-  const entries: BrowseEntry[] = [];
-  for (const plugin of props.plugins) {
-    const pType = getPluginType(plugin);
-    const cols = plugin.feature_columns;
-    if (!cols || cols.length === 0) {
-      entries.push({ id: plugin.fqn, label: plugin.name, plugin, pluginType: pType });
-      continue;
-    }
-    const groups = groupFeatureColumns(cols);
-    if (groups.size <= 1) {
-      entries.push({ id: plugin.fqn, label: plugin.name, plugin, pluginType: pType });
-    } else {
-      for (const [key] of groups) {
-        entries.push({
-          id: `${plugin.fqn}:${key}`,
-          label: key.toUpperCase(),
-          plugin,
-          parentLabel: plugin.name,
-          preSelectGroup: key,
-          pluginType: pType,
-        });
-      }
-    }
-  }
-  return entries;
+  return props.plugins.map((plugin) => ({
+    id: plugin.fqn,
+    label: plugin.name,
+    plugin,
+    pluginType: getPluginType(plugin),
+  }));
 });
 
 // Sort entries alphabetically by label
@@ -173,13 +140,10 @@ const configTabs = computed(() => [
   },
 ]);
 
-const preSelectGroupKey = ref<string | null>(null);
-
 function startConfig(entry: BrowseEntry) {
   configPlugin.value = entry.plugin;
   configParams.value = { ...entry.plugin.defaults };
-  preSelectGroupKey.value = entry.preSelectGroup ?? null;
-  configTab.value = entry.preSelectGroup ? "plot" : "parameters";
+  configTab.value = "plot";
   availableColumns.value = [];
   selectedColumns.value = [];
   signalColumns.value = [];
@@ -213,16 +177,8 @@ async function fetchColumns() {
     );
     availableColumns.value = response.plot_columns ?? [];
     signalColumns.value = response.signal_columns ?? [];
-    // Pre-select only matching group or all columns
-    if (preSelectGroupKey.value) {
-      const prefixLen = findCommonPrefixLen(availableColumns.value);
-      selectedColumns.value = availableColumns.value.filter((col) => {
-        const stripped = stripPrefix(col, prefixLen);
-        return stripped.split("_")[0] === preSelectGroupKey.value;
-      });
-    } else {
-      selectedColumns.value = [...availableColumns.value];
-    }
+    // Pre-select all columns
+    selectedColumns.value = [...availableColumns.value];
     // Pre-select all signal columns
     selectedSignals.value = [...signalColumns.value];
     // Assign default colors from palette
