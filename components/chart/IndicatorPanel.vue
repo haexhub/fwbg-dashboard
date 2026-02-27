@@ -131,13 +131,13 @@ const configSchema = computed<Record<string, ParamSchema>>(() => {
 const configParamNames = computed(() => Object.keys(configSchema.value));
 
 const configTabs = computed(() => [
-  { label: "Parameters", value: "parameters", icon: "i-heroicons-adjustments-horizontal" },
   {
-    label: "Plot",
+    label: "Columns",
     value: "plot",
     icon: "i-heroicons-chart-bar",
     badge: columnsLoaded.value ? `${totalSelected.value}/${availableColumns.value.length + signalColumns.value.length}` : undefined,
   },
+  { label: "Parameters", value: "parameters", icon: "i-heroicons-adjustments-horizontal" },
 ]);
 
 function startConfig(entry: BrowseEntry) {
@@ -263,6 +263,15 @@ const columnGroups = computed<ColumnGroup[]>(() => {
     label: key.toUpperCase(),
     columns,
   }));
+});
+
+const groupLabels = computed<Record<string, string>>(() => {
+  const labels = configPlugin.value?.column_group_labels ?? {};
+  const result: Record<string, string> = {};
+  for (const group of columnGroups.value) {
+    result[group.key] = labels[group.key] ?? group.label;
+  }
+  return result;
 });
 
 // Column display labels (stripped of common prefix)
@@ -463,7 +472,7 @@ async function confirmAdd() {
                     @update:model-value="toggleGroup(group)"
                   />
                   <span class="text-xs font-semibold text-gray-400 tracking-wider flex-1">
-                    {{ group.label }}
+                    {{ groupLabels[group.key] }}
                   </span>
                   <span class="text-xs text-gray-600">
                     {{ group.columns.filter(c => selectedColumns.includes(c)).length }}/{{ group.columns.length }}
