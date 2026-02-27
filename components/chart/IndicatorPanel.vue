@@ -371,8 +371,7 @@ async function confirmAdd() {
             @click="cancelConfig"
           />
           <h4 class="font-medium text-white">
-            {{ preSelectGroupKey ? preSelectGroupKey.toUpperCase() : configPlugin.name }}
-            <span v-if="preSelectGroupKey" class="text-gray-500 font-normal text-sm ml-1">{{ configPlugin.name }}</span>
+            {{ configPlugin.name }}
           </h4>
         </div>
 
@@ -636,16 +635,21 @@ async function confirmAdd() {
                 class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-800/50 cursor-pointer transition-colors"
                 @click="startConfig(entry)"
               >
-                <span class="text-sm text-white flex-1">{{ entry.label }}</span>
+                <div class="flex-1 min-w-0">
+                  <span class="text-sm text-white">{{ entry.label }}</span>
+                  <p v-if="entry.plugin.description" class="text-xs text-gray-500 truncate">
+                    {{ entry.plugin.description }}
+                  </p>
+                </div>
                 <span
                   v-if="entry.pluginType === 'signal' || entry.pluginType === 'both'"
-                  class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400"
+                  class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0"
                 >
                   SIG
                 </span>
                 <span
                   v-if="entry.pluginType === 'indicator' || entry.pluginType === 'both'"
-                  class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400"
+                  class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 shrink-0"
                 >
                   IND
                 </span>
