@@ -13,6 +13,7 @@ const props = defineProps<{
   availableTimeframes: string[];
   activeIndicators: ActiveIndicator[];
   activeDrawingTool: string | null;
+  hasActiveIndicators: boolean;
   rangeInterval: string;
   rangeStartTime: string;
   rangeEndTime: string;
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   "update:range-use-open-close": [value: boolean];
   "update:session-enabled-ids": [value: string[]];
   "open-indicators": [];
+  "save-strategy": [];
   screenshot: [];
   "toggle-fullscreen": [];
   "zoom-in": [];
@@ -256,6 +258,20 @@ const lineToolItems = computed(() =>
         class="ml-1"
       />
     </UButton>
+
+    <USeparator orientation="vertical" class="h-6" />
+
+    <!-- Save strategy button -->
+    <UTooltip text="Aktuelle Indikatoren als Strategie speichern">
+      <UButton
+        icon="i-lucide-save"
+        variant="ghost"
+        :disabled="!hasActiveIndicators"
+        @click="emit('save-strategy')"
+      >
+        Strategie speichern
+      </UButton>
+    </UTooltip>
 
     <!-- Range Rectangles -->
     <UPopover>
