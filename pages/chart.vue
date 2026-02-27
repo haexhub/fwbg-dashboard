@@ -2,6 +2,11 @@
 import { useFullscreen } from "@vueuse/core";
 import type { PluginInfo } from "~/types/strategy";
 import type { CrosshairData } from "~/components/chart/Canvas.vue";
+import {
+  TRADE_MARKER_NAME,
+  ensureTradeMarkerRegistered,
+  updateTradeMarkerData,
+} from "~/composables/useChartIndicators";
 
 definePageMeta({ layout: "builder" });
 
@@ -27,7 +32,9 @@ const {
   setDrawingTool,
 } = useChart();
 
-const { plugins } = usePlugins();
+const pluginStore = usePluginStore();
+const { plugins } = storeToRefs(pluginStore);
+pluginStore.load();
 const indicatorPlugins = computed(
   () => plugins.value?.filter((p) => p.phase === "indicators") ?? [],
 );
@@ -48,14 +55,16 @@ const {
   syncToUrl,
 } = useChartQuery();
 
-// Apply timeframe and chart type early (before overlay watchers run)
-if (queryTimeframe.value) setTimeframe(queryTimeframe.value);
-if (
-  queryChartType.value &&
-  ["candle_solid", "ohlc", "area"].includes(queryChartType.value)
-) {
-  setChartType(queryChartType.value as "candle_solid" | "ohlc" | "area");
-}
+// Sync timeframe and chart type from URL
+watch(queryTimeframe, (tf: string | undefined) => {
+  if (tf && tf !== timeframe.value) setTimeframe(tf);
+}, { immediate: true });
+
+watch(queryChartType, (ct: string | undefined) => {
+  if (ct && ["candle_solid", "ohlc", "area"].includes(ct) && ct !== chartType.value) {
+    setChartType(ct as "candle_solid" | "ohlc" | "area");
+  }
+}, { immediate: true });
 
 // ── Chart Canvas & UI State ──
 
@@ -76,6 +85,7 @@ const scrollTo = (ts: number) => chartCanvas.value?.scrollToTimestamp(ts);
 const crosshairData = ref<CrosshairData | null>(null);
 const chartWrapperRef = useTemplateRef<HTMLElement>("chartWrapperRef");
 const indicatorPanelOpen = ref(false);
+const strategySaveOpen = ref(false);
 
 const pricePrecision = computed(() =>
   currentSymbol.value?.point
@@ -118,6 +128,9 @@ const {
 const tradeOverlay = useChartTradeOverlay();
 const { tradeOverlayActive, tradeOverlayCount, runIndicatorsLoaded } =
   tradeOverlay;
+
+const previewTrades = usePreviewTrades();
+const previewStrategyName = ref<string>();
 
 const indActions = useChartIndicatorActions();
 
@@ -313,6 +326,7 @@ function handleRemoveIndicator(id: string) {
 }
 function clearRunTradeOverlay() {
   tradeOverlay.clearOverlay(getChart);
+  previewStrategyName.value = undefined;
 }
 
 // ── Apply source/symbol from URL after sources load ──
@@ -351,7 +365,6 @@ watch(
 
 let _overlayLoaded = false;
 let _stateRestored = false;
-let _indicatorsRestored = false;
 
 function handleDataLoaded(count: number) {
   if (count === 0) return;
@@ -360,40 +373,49 @@ function handleDataLoaded(count: number) {
     _stateRestored = true;
     range.applyToChart(getChart);
     session.applyToChart(getChart);
-    if (
-      queryIndicators.value &&
-      !_indicatorsRestored &&
-      indicatorPlugins.value.length > 0
-    ) {
-      _indicatorsRestored = true;
-      void indActions.restoreFromUrl(queryIndicators.value, indicatorCtx);
-    }
   }
 
   if (_overlayLoaded) return;
+
+  // Preview trades from strategy preview panel
+  const preview = previewTrades.consume();
+  if (preview && preview.markers.length > 0) {
+    _overlayLoaded = true;
+    previewStrategyName.value = preview.strategyName;
+    updateTradeMarkerData(preview.markers);
+    tradeOverlay.tradeOverlayCount.value = preview.markers.length;
+    const chart = getChart();
+    if (chart) {
+      ensureTradeMarkerRegistered();
+      chart.removeIndicator({ name: TRADE_MARKER_NAME });
+      chart.createIndicator({ name: TRADE_MARKER_NAME }, true, { id: "candle_pane" });
+      tradeOverlay.tradeOverlayActive.value = true;
+      const first = preview.markers.reduce<(typeof preview.markers)[number] | null>(
+        (min, m) => (!min || m.entryTime < min.entryTime ? m : min),
+        null,
+      );
+      if (first) nextTick(() => scrollTo(first.entryTime));
+    }
+    return;
+  }
+
   if (!queryRunId.value || !querySymbol.value) return;
   _overlayLoaded = true;
   tradeOverlay.loadTradeOverlay(queryRunId.value, querySymbol.value, tradeCtx);
 }
 
-// Reactively load run indicators / restore indicators once plugins become available
-watch(indicatorPlugins, (list) => {
-  if (
-    list.length > 0 &&
-    queryRunId.value &&
-    !runIndicatorsLoaded.value &&
-    _overlayLoaded
-  ) {
-    tradeOverlay.loadRunIndicators(queryRunId.value, tradeCtx);
+// Restore indicators from URL — fires once both URL params and plugin list are available
+watch([queryIndicators, indicatorPlugins], ([json]: [string | undefined, PluginInfo[]]) => {
+  if (json && indicatorPlugins.value.length > 0) {
+    void indActions.restoreFromUrl(json, indicatorCtx);
   }
-  if (
-    list.length > 0 &&
-    queryIndicators.value &&
-    !_indicatorsRestored &&
-    _stateRestored
-  ) {
-    _indicatorsRestored = true;
-    void indActions.restoreFromUrl(queryIndicators.value, indicatorCtx);
+}, { immediate: true });
+
+// Load run indicators once plugins become available
+watch(indicatorPlugins, (list: PluginInfo[]) => {
+  if (list.length === 0) return;
+  if (queryRunId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
+    tradeOverlay.loadRunIndicators(queryRunId.value, tradeCtx);
   }
 });
 
@@ -493,7 +515,9 @@ watch(
         @update:range-weekdays="handleRangeWeekdaysChange"
         @update:range-use-open-close="handleRangeUseOpenCloseChange"
         @update:session-enabled-ids="handleSessionEnabledIdsChange"
+        :has-active-indicators="activeIndicators.length > 0"
         @open-indicators="indicatorPanelOpen = true"
+        @save-strategy="strategySaveOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
         @zoom-in="chartCanvas?.zoomIn()"
@@ -501,13 +525,21 @@ watch(
         @zoom-reset="chartCanvas?.resetZoom()"
       />
 
-      <!-- Run Trade Overlay Bar -->
+      <!-- Trade Overlay Bar -->
       <div
         v-if="tradeOverlayActive || (queryRunId && querySymbol)"
         class="flex items-center gap-3 px-3 py-1 bg-indigo-950/60 border-b border-indigo-800/40 text-xs text-indigo-300"
       >
         <span class="i-heroicons-chart-bar-square text-indigo-400 shrink-0" />
-        <span>
+        <span v-if="previewStrategyName">
+          Vorschau
+          <span class="font-mono font-semibold text-white">{{ previewStrategyName }}</span>
+          — <span class="font-mono text-indigo-200">{{ symbol }}</span>
+          <template v-if="tradeOverlayCount > 0">
+            · <span class="text-white">{{ tradeOverlayCount }} Trades</span>
+          </template>
+        </span>
+        <span v-else>
           Run
           <span class="font-mono font-semibold text-white">{{
             queryRunId
@@ -596,6 +628,16 @@ watch(
         @add="handleAddIndicator"
         @add-signal="handleAddSignalIndicator"
         @add-all-deps="handleAddAllDeps"
+      />
+
+      <!-- Strategy Save Slideover -->
+      <ChartStrategySave
+        :open="strategySaveOpen"
+        :source="source"
+        :symbol="symbol"
+        :timeframe="timeframe"
+        :active-indicators="activeIndicators"
+        @update:open="strategySaveOpen = $event"
       />
     </div>
 
