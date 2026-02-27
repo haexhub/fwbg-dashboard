@@ -14,6 +14,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const { createStrategy } = useStrategies();
 
 const strategyName = ref("");
 const strategyDescription = ref("");
@@ -22,7 +23,7 @@ const savedFilename = ref("");
 const errorMessage = ref("");
 
 const canSave = computed(
-  () => strategyName.value.trim().length > 0 && status.value !== "saving",
+  () => strategyName.value.trim().length > 0 && (status.value === "idle" || status.value === "error"),
 );
 
 // De-duplicate indicators by FQN (same indicator can appear as plot + signal)
@@ -47,47 +48,34 @@ async function save() {
   status.value = "saving";
   errorMessage.value = "";
 
-  // Build pipeline entries from active indicators (de-duplicated by FQN)
-  const seen = new Set<string>();
-  const indicators = props.activeIndicators
-    .filter((ind) => {
-      if (seen.has(ind.fqn)) return false;
-      seen.add(ind.fqn);
-      return true;
-    })
-    .map((ind) => ({
-      name: ind.name.replace(/ \(signal\)$/, ""),
-      params: ind.params,
-    }));
+  // Build pipeline entries from de-duplicated indicators
+  const indicators = uniqueIndicators.value.map((ind: ActiveIndicator) => ({
+    name: ind.fqn.split(":")[1] ?? ind.name.replace(/ \(signal\)$/, ""),
+    params: ind.params,
+  }));
 
   try {
-    const res = await $fetch<{ filename: string }>("/api/strategy/strategies", {
-      method: "POST",
-      body: {
-        name: strategyName.value.trim(),
-        data: {
-          description: strategyDescription.value.trim() || undefined,
-          datasource: props.source,
-          pipeline: {
-            indicators,
-            preprocessing: [],
-            feature_selection: [],
-            data_loading: [],
-          },
-          exit_strategy: "fixed",
-          exit_params: { tp: 50, sl: 50 },
-          model: {
-            type: "xgboost",
-            architecture: "long_short_separate",
-            trade_directions: ["long", "short"],
-            hyperparameters: {},
-          },
-          grids: {},
-          validation: { method: "walk_forward", folds: 8 },
-          filters: {},
-          resources: {},
-        },
+    const res = await createStrategy(strategyName.value.trim(), {
+      description: strategyDescription.value.trim() || undefined,
+      datasource: props.source,
+      pipeline: {
+        indicators,
+        preprocessing: [],
+        feature_selection: [],
+        data_loading: [],
       },
+      exit_strategy: "fixed",
+      exit_params: { tp: 50, sl: 50 },
+      model: {
+        type: "xgboost",
+        architecture: "long_short_separate",
+        trade_directions: ["long", "short"],
+        hyperparameters: {},
+      },
+      grids: {},
+      validation: { method: "walk_forward", folds: 8 },
+      filters: {},
+      resources: {},
     });
 
     savedFilename.value = res.filename;
