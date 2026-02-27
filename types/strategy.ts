@@ -98,6 +98,7 @@ export interface PluginInfo {
   feature_columns?: string[];
   signal_columns?: string[];
   plot_columns?: string[];
+  column_group_labels?: Record<string, string>;
 }
 
 // ──────────────────────────────────────────────
