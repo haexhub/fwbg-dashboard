@@ -41,7 +41,7 @@ const lastNBars = ref(10000);
 const panelStatus = ref<PanelStatus>("idle");
 const trades = ref<TradeEntry[]>([]);
 const errorMessage = ref("");
-const previewMeta = ref<{ timeframe?: string; totalBars?: number; tp?: number; sl?: number }>({});
+const previewMeta = ref<{ symbol?: string; timeframe?: string; totalBars?: number; tp?: number; sl?: number }>({});
 
 // Keep selectedAsset in sync when the available list changes
 watch(
@@ -78,14 +78,43 @@ function parseUTC(s: string): number {
   return new Date(s + "Z").getTime();
 }
 
-function formatTime(ts?: string): string {
-  if (!ts) return "-";
-  return new Date(parseUTC(ts)).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+const { set: setPreviewTrades } = usePreviewTrades();
+const store = useStrategyConfigStore();
+const { plugins } = storeToRefs(usePluginStore());
+
+function openInChart() {
+  const markers = trades.value
+    .filter((t: TradeEntry) => t.entry_time && t.entry_price != null)
+    .map((t: TradeEntry) => ({
+      entryTime: parseUTC(t.entry_time!),
+      exitTime: t.exit_time ? parseUTC(t.exit_time) : parseUTC(t.entry_time!),
+      entryPrice: t.entry_price!,
+      exitPrice: t.exit_price ?? t.entry_price!,
+      direction: (t.direction ?? "LONG") as "LONG" | "SHORT",
+      result: 0,
+      pnlRaw: t.pnl_raw ?? 0,
+    }));
+
+  setPreviewTrades({ strategyName: props.strategyName, markers });
+
+  // Resolve pipeline indicator names to FQN for chart URL restore
+  const pipelineEntries = store.config?.pipeline?.indicators ?? [];
+  const indicators = pipelineEntries
+    .map((e: { name: string; params: Record<string, unknown> }) => {
+      const plugin = plugins.value?.find((p: { name: string; fqn: string; defaults: Record<string, unknown> }) => p.name === e.name);
+      if (!plugin) return null;
+      return { fqn: plugin.fqn, params: { ...plugin.defaults, ...e.params }, columns: [], isSignal: false };
+    })
+    .filter(Boolean);
+
+  navigateTo({
+    path: "/chart",
+    query: {
+      source: props.datasource,
+      symbol: previewMeta.value.symbol,
+      timeframe: previewMeta.value.timeframe,
+      ...(indicators.length > 0 ? { indicators: JSON.stringify(indicators) } : {}),
+    },
   });
 }
 
@@ -119,6 +148,7 @@ async function startPreview() {
     });
 
     previewMeta.value = {
+      symbol: res.symbol,
       timeframe: res.timeframe,
       totalBars: res.total_bars,
       tp: res.tp_used,
@@ -158,7 +188,7 @@ async function startPreview() {
             class="w-full"
           />
           <p v-else class="text-xs text-gray-500">
-            Keine Assets konfiguriert. Bitte zuerst im Assets-Tab Asset-Klassen anlegen.
+            Keine Assets konfiguriert. Bitte zuerst im Assets-Tab Assets hinzufügen.
           </p>
         </UFormField>
 
@@ -237,44 +267,16 @@ async function startPreview() {
             Keine Einstiegssignale gefunden.
           </p>
 
-          <!-- Entry signals table -->
-          <div v-else class="overflow-y-auto max-h-[55vh] rounded border border-gray-800">
-            <table class="w-full text-xs">
-              <thead class="sticky top-0 bg-gray-900 z-10">
-                <tr class="text-gray-500 text-left">
-                  <th class="px-3 py-2 font-normal">Einstieg</th>
-                  <th class="px-3 py-2 font-normal">Richtung</th>
-                  <th class="px-3 py-2 font-normal text-right">Kurs</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-800/60">
-                <tr
-                  v-for="(trade, i) in trades"
-                  :key="i"
-                  class="hover:bg-gray-800/40 transition-colors"
-                >
-                  <td class="px-3 py-1.5 text-gray-300 font-mono">
-                    {{ formatTime(trade.entry_time) }}
-                  </td>
-                  <td class="px-3 py-1.5">
-                    <span
-                      :class="
-                        trade.direction === 'LONG'
-                          ? 'text-green-400'
-                          : 'text-red-400'
-                      "
-                      class="font-medium"
-                    >
-                      {{ trade.direction === "LONG" ? "▲ Long" : "▼ Short" }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-1.5 text-right text-gray-300 font-mono">
-                    {{ trade.entry_price?.toFixed(5) ?? "-" }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Show in chart -->
+          <UButton
+            v-if="trades.length > 0 && previewMeta.symbol"
+            icon="i-lucide-line-chart"
+            variant="soft"
+            block
+            @click="openInChart"
+          >
+            Im Chart anzeigen
+          </UButton>
         </template>
 
       </div>

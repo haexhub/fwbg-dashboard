@@ -461,7 +461,7 @@ const gridCombinations = computed(() => {
             <div class="grid grid-cols-2 gap-2">
               <UFormField v-for="(val, key) in entry" :key="key" :label="String(key)">
                 <UInput
-                  :model-value="val"
+                  :model-value="String(val)"
                   type="number"
                   step="0.1"
                   class="w-full"

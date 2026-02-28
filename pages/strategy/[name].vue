@@ -33,7 +33,7 @@ const runModalOpen = ref(false);
 
 // Preview panel
 const previewPanelOpen = ref(false);
-const previewAssetClasses = computed<string[]>(() => []);
+const previewAssets = computed<string[]>(() => config.value?.assets?.filter ?? []);
 const isSignalModel = computed(() => config.value?.model?.type === "signal");
 
 // ── Open in Chart ──
@@ -214,7 +214,7 @@ onKeyStroke("y", (e) => {
             v-else-if="chartSymbols.length === 1"
             icon="i-lucide-line-chart"
             variant="ghost"
-            @click="openInChart(chartSymbols[0].symbol)"
+            @click="openInChart(chartSymbols[0]?.symbol ?? '')"
           >
             Chart
           </UButton>
@@ -304,7 +304,7 @@ onKeyStroke("y", (e) => {
       v-model:open="previewPanelOpen"
       :strategy-name="strategyName"
       :datasource="config.datasource"
-      :available-assets="previewAssetClasses"
+      :available-assets="previewAssets"
     />
 
     <!-- Run Start Modal -->
