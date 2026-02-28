@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onKeyStroke } from "@vueuse/core";
+import type { ChartSource } from "~/types/chart";
 
 definePageMeta({ layout: "builder" });
 
@@ -9,6 +10,9 @@ const strategyName = computed(() => route.params.name as string);
 const store = useStrategyConfigStore();
 const { config, isDirty, canUndo, canRedo } = storeToRefs(store);
 const { load, save, resetToSaved, undo, redo } = store;
+const pluginStore = usePluginStore();
+const { plugins } = storeToRefs(pluginStore);
+pluginStore.load();
 
 // Load strategy — blocks SSR so children have data
 await load(strategyName.value);
@@ -35,6 +39,73 @@ const previewAssetClasses = computed(() =>
 );
 const isSignalModel = computed(() => config.value?.model?.type === "signal");
 
+// ── Open in Chart ──
+const { data: chartSources } = useFetch<ChartSource[]>("/api/chart/sources", {
+  default: () => [],
+});
+
+const chartSymbols = computed(() => {
+  const ds = config.value?.datasource;
+  if (!ds) return [];
+  const src = chartSources.value.find((s: ChartSource) => s.name === ds);
+  if (!src) return [];
+
+  const gridClasses = new Set(Object.keys(config.value?.grids ?? {}));
+  const filterSet = config.value?.assets?.filter?.length
+    ? new Set(config.value.assets.filter)
+    : null;
+  const excludeSet = config.value?.assets?.exclude?.length
+    ? new Set(config.value.assets.exclude)
+    : null;
+
+  return src.symbols.filter((s: { symbol: string; asset_class?: string }) => {
+    if (gridClasses.size > 0 && s.asset_class && !gridClasses.has(s.asset_class)) return false;
+    if (filterSet && !filterSet.has(s.symbol)) return false;
+    if (excludeSet && excludeSet.has(s.symbol)) return false;
+    return true;
+  });
+});
+
+const chartMenuItems = computed(() => {
+  const groups = new Map<string, { label: string; onSelect: () => void }[]>();
+  for (const sym of chartSymbols.value) {
+    const cls = sym.asset_class ?? "Other";
+    if (!groups.has(cls)) groups.set(cls, []);
+    groups.get(cls)!.push({
+      label: sym.symbol,
+      onSelect: () => openInChart(sym.symbol),
+    });
+  }
+  return [...groups.values()];
+});
+
+function openInChart(sym: string) {
+  const pipelineEntries = config.value?.pipeline?.indicators ?? [];
+  const indicators = pipelineEntries
+    .map((e: { name: string; params: Record<string, unknown> }) => {
+      const plugin = plugins.value?.find((p: { name: string; fqn: string; defaults: Record<string, unknown> }) => p.name === e.name);
+      if (!plugin) return null;
+      return {
+        fqn: plugin.fqn,
+        params: { ...plugin.defaults, ...e.params },
+        columns: [],
+        isSignal: false,
+      };
+    })
+    .filter(Boolean);
+
+  navigateTo({
+    path: "/chart",
+    query: {
+      source: config.value?.datasource,
+      symbol: sym,
+      ...(indicators.length > 0
+        ? { indicators: JSON.stringify(indicators) }
+        : {}),
+    },
+  });
+}
+
 function handleRunStarted(_jobId: string) {
   navigateTo("/runs");
 }
@@ -44,6 +115,7 @@ const tabs = [
   { label: "Übersicht", to: `/strategy/${strategyName.value}` },
   { label: "Pipeline", to: `/strategy/${strategyName.value}/pipeline` },
   { label: "Model", to: `/strategy/${strategyName.value}/model` },
+  { label: "Optimization", to: `/strategy/${strategyName.value}/optimization` },
   { label: "Assets", to: `/strategy/${strategyName.value}/grids` },
   { label: "Validation", to: `/strategy/${strategyName.value}/validation` },
   { label: "Filters", to: `/strategy/${strategyName.value}/filters` },
@@ -122,7 +194,7 @@ onKeyStroke("y", (e) => {
               Reset
             </UButton>
           </span>
-          <!-- Save / Run -->
+          <!-- Save / Chart / Run -->
           <UButton
             icon="i-heroicons-check"
             :loading="saving"
@@ -130,6 +202,26 @@ onKeyStroke("y", (e) => {
             @click="handleSave"
           >
             Save
+          </UButton>
+          <!-- Open in Chart -->
+          <UDropdownMenu
+            v-if="chartSymbols.length > 1"
+            :items="chartMenuItems"
+          >
+            <UButton
+              icon="i-lucide-line-chart"
+              variant="ghost"
+            >
+              Chart
+            </UButton>
+          </UDropdownMenu>
+          <UButton
+            v-else-if="chartSymbols.length === 1"
+            icon="i-lucide-line-chart"
+            variant="ghost"
+            @click="openInChart(chartSymbols[0].symbol)"
+          >
+            Chart
           </UButton>
           <template v-if="isSignalModel">
             <UTooltip
