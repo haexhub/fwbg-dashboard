@@ -94,6 +94,7 @@ function openInChart(sym: string) {
     query: {
       source: config.value?.datasource,
       symbol: sym,
+      timeframe: config.value?.timeframe,
       ...(indicators.length > 0
         ? { indicators: JSON.stringify(indicators) }
         : {}),
