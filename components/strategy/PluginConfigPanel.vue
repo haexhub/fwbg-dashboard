@@ -24,7 +24,7 @@ watch(
   () => props.instance,
   (inst) => {
     if (inst) {
-      localParams.value = { ...inst.params };
+      localParams.value = { ...props.pluginInfo?.defaults, ...inst.params };
       if (isExitStrategy.value) {
         const exitMeta = (inst as Record<string, unknown>)._exit as Record<string, unknown> | undefined;
         localExit.value = {
