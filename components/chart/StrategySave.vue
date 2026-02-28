@@ -82,7 +82,7 @@ async function save() {
       savedFilename.value = props.strategyFilename;
       toast.add({
         title: "Strategie aktualisiert",
-        description: `Pipeline von "${existingConfig.value.name}" wurde aktualisiert.`,
+        description: `"${existingConfig.value.name}" wurde aktualisiert.`,
         color: "success",
       });
     } else {
@@ -173,7 +173,7 @@ watch(
         </h3>
         <p class="text-xs text-gray-500 mt-0.5">
           {{ isUpdateMode
-            ? `Pipeline von "${existingConfig?.name}" aktualisieren`
+            ? `Indikatoren in "${existingConfig?.name}" aktualisieren`
             : 'Aktuelle Indikatoren als neue Strategie speichern'
           }}
         </p>
@@ -269,7 +269,7 @@ watch(
             block
             @click="save"
           >
-            {{ isUpdateMode ? 'Pipeline aktualisieren' : 'Strategie speichern' }}
+            {{ isUpdateMode ? 'Strategie aktualisieren' : 'Strategie speichern' }}
           </UButton>
 
           <template v-if="status === 'saved'">
