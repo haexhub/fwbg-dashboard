@@ -33,10 +33,7 @@ const runModalOpen = ref(false);
 
 // Preview panel
 const previewPanelOpen = ref(false);
-const ASSET_CLASSES = new Set(["FOREX", "INDEX", "COMMODITY", "CRYPTO"]);
-const previewAssetClasses = computed(() =>
-  Object.keys(config.value?.grids ?? {}).filter((k) => !ASSET_CLASSES.has(k)),
-);
+const previewAssetClasses = computed<string[]>(() => []);
 const isSignalModel = computed(() => config.value?.model?.type === "signal");
 
 // ── Open in Chart ──
@@ -50,7 +47,6 @@ const chartSymbols = computed(() => {
   const src = chartSources.value.find((s: ChartSource) => s.name === ds);
   if (!src) return [];
 
-  const gridClasses = new Set(Object.keys(config.value?.grids ?? {}));
   const filterSet = config.value?.assets?.filter?.length
     ? new Set(config.value.assets.filter)
     : null;
@@ -59,7 +55,6 @@ const chartSymbols = computed(() => {
     : null;
 
   return src.symbols.filter((s: { symbol: string; asset_class?: string }) => {
-    if (gridClasses.size > 0 && s.asset_class && !gridClasses.has(s.asset_class)) return false;
     if (filterSet && !filterSet.has(s.symbol)) return false;
     if (excludeSet && excludeSet.has(s.symbol)) return false;
     return true;

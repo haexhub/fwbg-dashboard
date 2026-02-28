@@ -69,7 +69,6 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
       expect(config).toHaveProperty("exit_strategy");
       expect(config).toHaveProperty("exit_params");
       expect(config).toHaveProperty("model");
-      expect(config).toHaveProperty("grids");
       expect(config).toHaveProperty("validation");
       expect(config).toHaveProperty("filters");
       expect(config).toHaveProperty("resources");
@@ -149,28 +148,19 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
       }
     });
 
-    test("should have correctly structured grids", async () => {
+    test("should have correctly structured exit_params", async () => {
       const response = await request.get(
         `/api/strategy/strategies/${firstStrategyFilename}`
       );
       const config = await response.json();
 
-      const grids = config.grids;
-      expect(grids).toBeDefined();
-      expect(typeof grids).toBe("object");
+      const exitParams = config.exit_params;
+      expect(exitParams).toBeDefined();
+      expect(typeof exitParams).toBe("object");
 
-      // Each grid is keyed by asset class
-      for (const [assetClass, grid] of Object.entries(grids) as [
-        string,
-        any,
-      ][]) {
-        expect(typeof assetClass).toBe("string");
-        expect(grid).toHaveProperty("tp");
-        expect(grid).toHaveProperty("sl");
-        expect(grid).toHaveProperty("ct");
-        expect(Array.isArray(grid.tp)).toBe(true);
-        expect(Array.isArray(grid.sl)).toBe(true);
-        expect(Array.isArray(grid.ct)).toBe(true);
+      // exit_params values should be arrays
+      for (const [key, value] of Object.entries(exitParams)) {
+        expect(Array.isArray(value)).toBe(true);
       }
     });
 
@@ -232,9 +222,9 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
 
   // ── Plugins API ───────────────────────────────────────────
 
-  test.describe("GET /api/strategy/plugins", () => {
+  test.describe("GET /api/plugins", () => {
     test("should list available plugins", async () => {
-      const response = await request.get("/api/strategy/plugins");
+      const response = await request.get("/api/plugins");
       expect(response.ok()).toBeTruthy();
 
       const plugins = await response.json();
@@ -249,7 +239,7 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
     });
 
     test("should filter plugins by model phase", async () => {
-      const response = await request.get("/api/strategy/plugins?phase=model");
+      const response = await request.get("/api/plugins?phase=model");
       expect(response.ok()).toBeTruthy();
 
       const plugins = await response.json();
@@ -267,7 +257,7 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
 
     test("should filter plugins by indicators phase", async () => {
       const response = await request.get(
-        "/api/strategy/plugins?phase=indicators"
+        "/api/plugins?phase=indicators"
       );
       expect(response.ok()).toBeTruthy();
 

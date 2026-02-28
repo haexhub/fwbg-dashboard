@@ -8,7 +8,6 @@ const SECTIONS = [
   { key: "validations", label: "Validation" },
   { key: "filters", label: "Filter" },
   { key: "resources", label: "Resources" },
-  { key: "grids", label: "Grids" },
   { key: "regime_filters", label: "Regime Filters" },
   { key: "risk_params", label: "Risk Params" },
 ];

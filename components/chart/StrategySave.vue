@@ -6,7 +6,9 @@ const props = defineProps<{
   source: string;
   symbol: string;
   timeframe: string;
+  assetClass?: string;
   activeIndicators: ActiveIndicator[];
+  defaultName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -58,6 +60,7 @@ async function save() {
     const res = await createStrategy(strategyName.value.trim(), {
       description: strategyDescription.value.trim() || undefined,
       datasource: props.source,
+      assets: { filter: [props.symbol] },
       pipeline: {
         indicators,
         preprocessing: [],
@@ -65,14 +68,14 @@ async function save() {
         data_loading: [],
       },
       exit_strategy: "fixed",
-      exit_params: { tp: 50, sl: 50 },
+      exit_params: { tp_mult: [2.0], sl_mult: [1.0] },
       model: {
         type: "xgboost",
         architecture: "long_short_separate",
         trade_directions: ["long", "short"],
         hyperparameters: {},
       },
-      grids: {},
+      optimization: { ct: [0.5] },
       validation: { method: "walk_forward", folds: 8 },
       filters: {},
       resources: {},
@@ -99,12 +102,12 @@ function openStrategy() {
   }
 }
 
-// Reset state when slideover opens
+// Reset state when slideover opens, pre-fill name from preview if available
 watch(
   () => props.open,
   (open) => {
     if (open) {
-      strategyName.value = "";
+      strategyName.value = props.defaultName ?? "";
       strategyDescription.value = "";
       status.value = "idle";
       savedFilename.value = "";

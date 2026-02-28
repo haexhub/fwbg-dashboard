@@ -16,7 +16,6 @@ const { strategies, loadStrategy, saveStrategy } = useStrategies();
 
 // ── Form State ──
 const selectedStrategy = ref("");
-const selectedAssetClass = ref("");
 const loadedConfig = ref<StrategyConfig | null>(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -35,15 +34,12 @@ const strategyOptions = computed(() =>
 watch(selectedStrategy, async (filename) => {
   if (!filename) {
     loadedConfig.value = null;
-    selectedAssetClass.value = "";
     return;
   }
   loading.value = true;
   error.value = "";
   try {
     loadedConfig.value = await loadStrategy(filename);
-    const classes = Object.keys(loadedConfig.value.grids ?? {});
-    selectedAssetClass.value = classes[0] ?? "";
   } catch (e: any) {
     error.value = e?.message || "Strategie konnte nicht geladen werden";
     loadedConfig.value = null;
@@ -52,27 +48,28 @@ watch(selectedStrategy, async (filename) => {
   }
 });
 
-// Asset class buttons from loaded strategy's grids
-const assetClassOptions = computed(() =>
-  Object.keys(loadedConfig.value?.grids ?? {})
-);
+// Current TP/SL from loaded strategy's exit_params
+const currentTp = computed(() => {
+  const ep = loadedConfig.value?.exit_params;
+  if (!ep) return [];
+  return (ep.tp_mult ?? []) as number[];
+});
 
-// Current grid values for selected asset class
-const currentGrid = computed(() => {
-  if (!loadedConfig.value?.grids || !selectedAssetClass.value) return null;
-  return loadedConfig.value.grids[selectedAssetClass.value] ?? null;
+const currentSl = computed(() => {
+  const ep = loadedConfig.value?.exit_params;
+  if (!ep) return [];
+  return (ep.sl_mult ?? []) as number[];
 });
 
 const canApply = computed(() =>
   !!selectedStrategy.value &&
-  !!selectedAssetClass.value &&
   !!loadedConfig.value &&
   !saving.value
 );
 
 // ── Apply ──
 async function apply() {
-  if (!loadedConfig.value || !selectedAssetClass.value) return;
+  if (!loadedConfig.value) return;
   saving.value = true;
   error.value = "";
   try {
@@ -82,13 +79,9 @@ async function apply() {
     updated.exit_strategy = props.result.exit_strategy;
     updated.exit_params = { ...props.result.exit_params };
 
-    // Update grid TP/SL for selected asset class
-    const ac = selectedAssetClass.value;
-    if (!updated.grids[ac]) {
-      updated.grids[ac] = { tp: [], sl: [], ct: [] };
-    }
-    updated.grids[ac]!.tp = [...props.result.suggested_grid.tp];
-    updated.grids[ac]!.sl = [...props.result.suggested_grid.sl];
+    // Update TP/SL in exit_params as arrays
+    updated.exit_params.tp_mult = [...props.result.suggested_grid.tp];
+    updated.exit_params.sl_mult = [...props.result.suggested_grid.sl];
 
     await saveStrategy(selectedStrategy.value, updated);
     saved.value = true;
@@ -106,7 +99,6 @@ async function apply() {
 watch(() => props.open, (isOpen) => {
   if (!isOpen) {
     selectedStrategy.value = "";
-    selectedAssetClass.value = "";
     loadedConfig.value = null;
     error.value = "";
     saved.value = false;
@@ -142,23 +134,8 @@ watch(() => props.open, (isOpen) => {
         <!-- Loading -->
         <div v-if="loading" class="text-sm text-gray-400">Lade Strategie...</div>
 
-        <!-- Asset class selection -->
-        <UFormField v-if="loadedConfig && assetClassOptions.length" label="Asset-Klasse">
-          <div class="flex gap-2 flex-wrap">
-            <UButton
-              v-for="ac in assetClassOptions"
-              :key="ac"
-              :variant="selectedAssetClass === ac ? 'solid' : 'outline'"
-              size="sm"
-              @click="selectedAssetClass = ac"
-            >
-              {{ ac }}
-            </UButton>
-          </div>
-        </UFormField>
-
         <!-- Diff preview -->
-        <div v-if="loadedConfig && selectedAssetClass" class="space-y-4">
+        <div v-if="loadedConfig" class="space-y-4">
           <!-- Exit Strategy -->
           <div class="text-sm">
             <span class="text-gray-400">Exit-Strategie</span>
@@ -173,27 +150,13 @@ watch(() => props.open, (isOpen) => {
             </div>
           </div>
 
-          <!-- Exit Params -->
-          <div class="text-sm">
-            <span class="text-gray-400">Exit-Params</span>
-            <div class="flex items-center gap-2 mt-1">
-              <code class="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded">
-                {{ JSON.stringify(loadedConfig.exit_params) }}
-              </code>
-              <UIcon name="i-heroicons-arrow-right" class="text-gray-500 shrink-0" />
-              <code class="text-xs text-white bg-gray-800 px-2 py-0.5 rounded">
-                {{ JSON.stringify(result.exit_params) }}
-              </code>
-            </div>
-          </div>
-
           <!-- TP diff -->
           <div class="text-sm">
             <span class="text-gray-400">Take Profit (ATR)</span>
             <div class="flex items-center gap-2 mt-1">
               <div class="flex gap-1">
                 <UBadge
-                  v-for="v in (currentGrid?.tp ?? [])"
+                  v-for="v in currentTp"
                   :key="v"
                   variant="subtle"
                   color="neutral"
@@ -201,7 +164,7 @@ watch(() => props.open, (isOpen) => {
                 >
                   {{ v }}
                 </UBadge>
-                <span v-if="!currentGrid?.tp?.length" class="text-gray-600">–</span>
+                <span v-if="!currentTp.length" class="text-gray-600">–</span>
               </div>
               <UIcon name="i-heroicons-arrow-right" class="text-gray-500 shrink-0" />
               <div class="flex gap-1">
@@ -224,7 +187,7 @@ watch(() => props.open, (isOpen) => {
             <div class="flex items-center gap-2 mt-1">
               <div class="flex gap-1">
                 <UBadge
-                  v-for="v in (currentGrid?.sl ?? [])"
+                  v-for="v in currentSl"
                   :key="v"
                   variant="subtle"
                   color="neutral"
@@ -232,7 +195,7 @@ watch(() => props.open, (isOpen) => {
                 >
                   {{ v }}
                 </UBadge>
-                <span v-if="!currentGrid?.sl?.length" class="text-gray-600">–</span>
+                <span v-if="!currentSl.length" class="text-gray-600">–</span>
               </div>
               <UIcon name="i-heroicons-arrow-right" class="text-gray-500 shrink-0" />
               <div class="flex gap-1">
@@ -248,10 +211,6 @@ watch(() => props.open, (isOpen) => {
               </div>
             </div>
           </div>
-
-          <p class="text-xs text-gray-500">
-            ct, timeout_bars und andere Grid-Parameter bleiben unverändert.
-          </p>
         </div>
 
         <!-- Error -->

@@ -31,9 +31,10 @@ const pipelineStats = computed(() => {
   };
 });
 
-const gridCount = computed(
-  () => Object.keys(config.value?.grids ?? {}).length
-);
+const gridCount = computed(() => {
+  const ep = config.value?.exit_params ?? {};
+  return Object.values(ep).reduce<number>((sum, v) => sum + (Array.isArray(v) ? v.length : 1), 0);
+});
 </script>
 
 <template>
