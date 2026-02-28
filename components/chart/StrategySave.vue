@@ -28,14 +28,18 @@ const canSave = computed(
   () => strategyName.value.trim().length > 0 && (status.value === "idle" || status.value === "error"),
 );
 
-// De-duplicate indicators by FQN (same indicator can appear as plot + signal)
+// De-duplicate indicators by FQN, but merge isSignal flag
 const uniqueIndicators = computed(() => {
-  const seen = new Set<string>();
-  return props.activeIndicators.filter((ind) => {
-    if (seen.has(ind.fqn)) return false;
-    seen.add(ind.fqn);
-    return true;
-  });
+  const map = new Map<string, ActiveIndicator & { hasSignal: boolean }>();
+  for (const ind of props.activeIndicators) {
+    const existing = map.get(ind.fqn);
+    if (existing) {
+      if (ind.isSignal) existing.hasSignal = true;
+    } else {
+      map.set(ind.fqn, { ...ind, hasSignal: !!ind.isSignal });
+    }
+  }
+  return [...map.values()];
 });
 
 // Build non-default params display for an indicator
@@ -51,9 +55,10 @@ async function save() {
   errorMessage.value = "";
 
   // Build pipeline entries from de-duplicated indicators
-  const indicators = uniqueIndicators.value.map((ind: ActiveIndicator) => ({
+  const indicators = uniqueIndicators.value.map((ind: ActiveIndicator & { hasSignal: boolean }) => ({
     name: ind.fqn.split(":")[1] ?? ind.name.replace(/ \(signal\)$/, ""),
     params: ind.params,
+    ...(ind.hasSignal ? { is_signal: true } : {}),
   }));
 
   try {
@@ -175,6 +180,7 @@ watch(
               <div class="flex items-center gap-2">
                 <span class="text-sm font-medium text-white">{{ ind.name }}</span>
                 <UBadge :label="ind.fqn" variant="subtle" size="xs" />
+                <UBadge v-if="ind.hasSignal" label="Signal" variant="subtle" color="success" size="xs" />
               </div>
               <p class="text-xs text-gray-500 mt-1 font-mono truncate">
                 {{ displayParams(ind.params) }}

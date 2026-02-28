@@ -122,6 +122,7 @@ export interface PipelineEntry {
   name: string;
   params: Record<string, unknown>;
   source?: string;
+  is_signal?: boolean;
 }
 
 export interface StrategyConfig {

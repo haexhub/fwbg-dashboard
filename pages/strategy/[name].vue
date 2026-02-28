@@ -77,14 +77,14 @@ const chartMenuItems = computed(() => {
 function openInChart(sym: string) {
   const pipelineEntries = config.value?.pipeline?.indicators ?? [];
   const indicators = pipelineEntries
-    .map((e: { name: string; params: Record<string, unknown> }) => {
+    .map((e: { name: string; params: Record<string, unknown>; is_signal?: boolean }) => {
       const plugin = plugins.value?.find((p: { name: string; fqn: string; defaults: Record<string, unknown> }) => p.name === e.name);
       if (!plugin) return null;
       return {
         fqn: plugin.fqn,
         params: { ...plugin.defaults, ...e.params },
         columns: [],
-        isSignal: false,
+        isSignal: !!e.is_signal,
       };
     })
     .filter(Boolean);
