@@ -272,16 +272,15 @@ watch(
             {{ isUpdateMode ? 'Strategie aktualisieren' : 'Strategie speichern' }}
           </UButton>
 
-          <template v-if="status === 'saved'">
-            <UButton
-              icon="i-lucide-external-link"
-              variant="soft"
-              block
-              @click="openStrategy"
-            >
-              Strategie bearbeiten
-            </UButton>
-          </template>
+          <UButton
+            v-if="status === 'saved' || (isUpdateMode && status !== 'saving')"
+            icon="i-lucide-external-link"
+            variant="soft"
+            block
+            @click="openStrategy"
+          >
+            Im Editor öffnen
+          </UButton>
         </div>
       </div>
     </template>
