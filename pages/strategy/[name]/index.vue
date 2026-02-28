@@ -31,10 +31,7 @@ const pipelineStats = computed(() => {
   };
 });
 
-const gridCount = computed(() => {
-  const ep = config.value?.exit_params ?? {};
-  return Object.values(ep).reduce<number>((sum, v) => sum + (Array.isArray(v) ? v.length : 1), 0);
-});
+const exitCount = computed(() => config.value?.exit_strategies?.length ?? 0);
 </script>
 
 <template>
@@ -109,9 +106,9 @@ const gridCount = computed(() => {
         <UCard>
           <div class="text-center">
             <p class="text-2xl font-bold text-white">
-              {{ config.exit_strategy || '-' }}
+              {{ exitCount }}
             </p>
-            <p class="text-xs text-gray-400">Exit-Strategie</p>
+            <p class="text-xs text-gray-400">Exit-Strategien</p>
           </div>
         </UCard>
         <UCard>
@@ -120,12 +117,6 @@ const gridCount = computed(() => {
               {{ config.model?.type ?? '-' }}
             </p>
             <p class="text-xs text-gray-400">Model</p>
-          </div>
-        </UCard>
-        <UCard>
-          <div class="text-center">
-            <p class="text-2xl font-bold text-white">{{ gridCount }}</p>
-            <p class="text-xs text-gray-400">Grid-Klassen</p>
           </div>
         </UCard>
       </div>

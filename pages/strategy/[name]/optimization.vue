@@ -2,62 +2,13 @@
 const store = useStrategyConfigStore();
 const { config } = storeToRefs(store);
 
-const pluginStore = usePluginStore();
-const { plugins } = storeToRefs(pluginStore);
-pluginStore.load();
-
 // Ensure optimization exists
 watch(config, (c) => {
-  if (c && !c.optimization) {
-    c.optimization = { ct: [0.5] };
-  }
+  if (!c) return;
+  if (!c.optimization) c.optimization = {};
 }, { immediate: true });
 
-// Exit strategy plugin info (for param schema)
-const exitPluginInfo = computed(() => {
-  if (!config.value?.exit_strategy || !plugins.value) return null;
-  return plugins.value.find(
-    (p) => p.name === config.value!.exit_strategy || p.fqn.endsWith(`:${config.value!.exit_strategy}`)
-  ) ?? null;
-});
-
-// Parameter schema for exit strategy
-const exitParamSchema = computed(() => exitPluginInfo.value?.param_schema ?? {});
-
-// Editable exit param keys (from schema)
-const exitParamKeys = computed(() => Object.keys(exitParamSchema.value));
-
-// ── Value list helpers ──────────────────────────────────────────────────────
-const newValues = ref<Record<string, string>>({});
-
-function addValue(key: string, target: Record<string, unknown[]>) {
-  const raw = newValues.value[key]?.trim();
-  if (!raw) return;
-  const parsed = raw === "null" ? null : Number(raw);
-  if (parsed !== null && isNaN(parsed)) return;
-  if (!target[key]) target[key] = [];
-  target[key].push(parsed);
-  newValues.value[key] = "";
-}
-
-function removeValue(key: string, index: number, target: Record<string, unknown[]>) {
-  target[key]?.splice(index, 1);
-}
-
-// ── Long/Short prefix helpers ───────────────────────────────────────────────
-const showLongShort = computed(() =>
-  config.value?.model?.architecture === "long_short_separate"
-);
-
 // ── Regime Filter Grid ──────────────────────────────────────────────────────
-type ConditionGrid = {
-  column: string;
-  operator: string;
-  values: (number | null)[];
-  directions: number;
-  else_directions: number;
-};
-
 const OPERATORS = [">=", "<=", ">", "<", "==", "!="];
 const newConditionValue = ref<Record<number, string>>({});
 
@@ -98,31 +49,19 @@ function removeRegimeFilterGrid() {
   }
 }
 
-// ── Exit Modifier Params Grid ───────────────────────────────────────────────
-function addExitModifierEntry() {
-  if (!config.value?.optimization) return;
-  if (!config.value.optimization.exit_modifier_params_grid) {
-    config.value.optimization.exit_modifier_params_grid = [];
-  }
-  config.value.optimization.exit_modifier_params_grid.push({});
-}
-
-function removeExitModifierEntry(index: number) {
-  config.value?.optimization?.exit_modifier_params_grid?.splice(index, 1);
-}
-
 // ── Grid Combinations Count ─────────────────────────────────────────────────
 const gridCombinations = computed(() => {
   if (!config.value) return 0;
-  const ep = config.value.exit_params ?? {};
   const opt = config.value.optimization ?? {};
 
-  let combos = 1;
-  for (const values of Object.values(ep)) {
-    if (Array.isArray(values) && values.length > 0) combos *= values.length;
+  // Exit strategies: sum of CT values across all instances
+  let nExit = 0;
+  for (const es of config.value.exit_strategies ?? []) {
+    nExit += (es.ct?.length || 1);
   }
-  if (Array.isArray(opt.ct) && opt.ct.length > 0) combos *= opt.ct.length;
-  if (opt.exit_modifier_params_grid?.length) combos *= opt.exit_modifier_params_grid.length;
+  if (nExit === 0) nExit = 1;
+
+  let combos = nExit;
   if (opt.model_hyperparameters_grid?.length) combos *= opt.model_hyperparameters_grid.length;
   if (opt.regime_filter_grid?.condition_grids?.length) {
     for (const cond of opt.regime_filter_grid.condition_grids) {
@@ -137,16 +76,6 @@ const gridCombinations = computed(() => {
   <div v-if="config" class="overflow-y-auto h-full p-1">
     <div class="space-y-6">
 
-      <!-- Preset Selector -->
-      <StrategyPresetSelectorBar
-        section="exit_params"
-        label="Exit-Parameter"
-        :current-ref="config._refs?.exit_params"
-        :model-value="config.exit_params as Record<string, unknown>"
-        @apply="(name, content) => store.applyPreset('exit_params', name, content)"
-        @detach="store.detachPreset('exit_params')"
-      />
-
       <!-- Grid Combinations Summary -->
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-medium text-white">Optimization</h2>
@@ -155,221 +84,42 @@ const gridCombinations = computed(() => {
         </UBadge>
       </div>
 
-      <!-- Exit Strategy Grid -->
+      <!-- Exit Strategies Summary -->
       <UCard>
         <template #header>
-          <div class="space-y-1">
-            <h3 class="text-lg font-medium text-white">
-              Exit-Strategie: {{ config.exit_strategy || '\u2014' }}
-            </h3>
-            <p class="text-xs text-gray-500">
-              Parameter als Wertelisten. Ein Eintrag = fester Wert, mehrere = Grid-Search.
+          <h3 class="text-lg font-medium text-white">Exit Strategies</h3>
+        </template>
+
+        <div v-if="!config.exit_strategies?.length" class="text-gray-400 text-sm">
+          Keine Exit-Strategien konfiguriert. Exit-Strategien werden im Pipeline-Tab hinzugefügt.
+        </div>
+
+        <div v-else class="space-y-2">
+          <div
+            v-for="(es, i) in config.exit_strategies"
+            :key="i"
+            class="border border-gray-700 rounded-lg p-3"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-white">{{ es.name }}</span>
+              <UBadge variant="subtle" color="neutral" size="sm">
+                CT: {{ (es.ct ?? [0.5]).join(', ') }}
+              </UBadge>
+              <UBadge v-if="es.min_rrr" variant="subtle" color="warning" size="sm">
+                min RRR: {{ es.min_rrr }}
+              </UBadge>
+              <UBadge v-if="es.exit_modifier" variant="subtle" color="info" size="sm">
+                {{ es.exit_modifier }}
+              </UBadge>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ Object.entries(es.params).map(([k, v]) => `${k}=${v}`).join(', ') }}
             </p>
           </div>
-        </template>
-
-        <div class="space-y-4">
-          <div v-for="key in exitParamKeys" :key="key">
-            <label class="block text-sm font-medium text-gray-300 mb-1">
-              {{ key }}
-              <span v-if="exitParamSchema[key]?.description" class="text-gray-500 font-normal">
-                — {{ exitParamSchema[key].description }}
-              </span>
-            </label>
-            <div class="flex flex-wrap gap-2 items-center">
-              <UBadge
-                v-for="(val, vi) in ((config.exit_params[key] as unknown[]) ?? [])"
-                :key="vi"
-                variant="subtle"
-                color="neutral"
-                size="md"
-                class="cursor-pointer"
-                @click="removeValue(key, vi as number, config.exit_params as Record<string, unknown[]>)"
-              >
-                {{ val === null ? 'null' : val }}
-                <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-              </UBadge>
-              <div class="flex gap-1">
-                <UInput
-                  v-model="newValues[key]"
-                  :placeholder="exitParamSchema[key]?.step ? `Step: ${exitParamSchema[key].step}` : '+'"
-                  class="w-28"
-                  @keydown.enter="addValue(key, config.exit_params as Record<string, unknown[]>)"
-                />
-                <UButton variant="ghost" @click="addValue(key, config.exit_params as Record<string, unknown[]>)">+</UButton>
-              </div>
-            </div>
-          </div>
-
-          <!-- Long/Short overrides -->
-          <template v-if="showLongShort">
-            <USeparator label="Long/Short Overrides" />
-            <p class="text-xs text-gray-500">
-              Optional: Richtungsspezifische Werte überschreiben den Basis-Wert.
-            </p>
-            <div v-for="key in exitParamKeys" :key="`ls-${key}`" class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-green-400 mb-1">long_{{ key }}</label>
-                <div class="flex flex-wrap gap-1 items-center">
-                  <UBadge
-                    v-for="(val, vi) in ((config.exit_params[`long_${key}`] as unknown[]) ?? [])"
-                    :key="vi"
-                    variant="subtle"
-                    color="success"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="removeValue(`long_${key}`, vi as number, config.exit_params as Record<string, unknown[]>)"
-                  >
-                    {{ val }} <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-                  </UBadge>
-                  <div class="flex gap-1">
-                    <UInput
-                      v-model="newValues[`long_${key}`]"
-                      placeholder="+"
-                      class="w-20"
-                      @keydown.enter="addValue(`long_${key}`, config.exit_params as Record<string, unknown[]>)"
-                    />
-                    <UButton size="xs" variant="ghost" @click="addValue(`long_${key}`, config.exit_params as Record<string, unknown[]>)">+</UButton>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-red-400 mb-1">short_{{ key }}</label>
-                <div class="flex flex-wrap gap-1 items-center">
-                  <UBadge
-                    v-for="(val, vi) in ((config.exit_params[`short_${key}`] as unknown[]) ?? [])"
-                    :key="vi"
-                    variant="subtle"
-                    color="error"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="removeValue(`short_${key}`, vi as number, config.exit_params as Record<string, unknown[]>)"
-                  >
-                    {{ val }} <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-                  </UBadge>
-                  <div class="flex gap-1">
-                    <UInput
-                      v-model="newValues[`short_${key}`]"
-                      placeholder="+"
-                      class="w-20"
-                      @keydown.enter="addValue(`short_${key}`, config.exit_params as Record<string, unknown[]>)"
-                    />
-                    <UButton size="xs" variant="ghost" @click="addValue(`short_${key}`, config.exit_params as Record<string, unknown[]>)">+</UButton>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
+          <p class="text-xs text-gray-500">
+            Exit-Strategien und ihre Parameter werden im Pipeline-Tab konfiguriert.
+          </p>
         </div>
-      </UCard>
-
-      <!-- Confidence Threshold -->
-      <UCard>
-        <template #header>
-          <h3 class="text-lg font-medium text-white">Confidence Threshold</h3>
-        </template>
-
-        <div class="space-y-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">CT</label>
-            <div class="flex flex-wrap gap-2 items-center">
-              <UBadge
-                v-for="(val, vi) in (config.optimization?.ct ?? [])"
-                :key="vi"
-                variant="subtle"
-                color="primary"
-                size="md"
-                class="cursor-pointer"
-                @click="config.optimization!.ct?.splice(vi, 1)"
-              >
-                {{ val }} <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-              </UBadge>
-              <div class="flex gap-1">
-                <UInput
-                  v-model="newValues['ct']"
-                  placeholder="0.50"
-                  class="w-28"
-                  @keydown.enter="() => { if (config!.optimization) addValue('ct', config!.optimization as any) }"
-                />
-                <UButton variant="ghost" @click="() => { if (config!.optimization) addValue('ct', config!.optimization as any) }">+</UButton>
-              </div>
-            </div>
-          </div>
-
-          <!-- Separate Long/Short CT -->
-          <template v-if="showLongShort">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-green-400 mb-1">Long CT</label>
-                <div class="flex flex-wrap gap-1 items-center">
-                  <UBadge
-                    v-for="(val, vi) in (config.optimization?.long_ct ?? [])"
-                    :key="vi"
-                    variant="subtle"
-                    color="success"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="config.optimization!.long_ct?.splice(vi, 1)"
-                  >
-                    {{ val }} <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-                  </UBadge>
-                  <div class="flex gap-1">
-                    <UInput
-                      v-model="newValues['long_ct']"
-                      placeholder="+"
-                      class="w-20"
-                      @keydown.enter="() => { if (config!.optimization) addValue('long_ct', config!.optimization as any) }"
-                    />
-                    <UButton size="xs" variant="ghost" @click="() => { if (config!.optimization) addValue('long_ct', config!.optimization as any) }">+</UButton>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-red-400 mb-1">Short CT</label>
-                <div class="flex flex-wrap gap-1 items-center">
-                  <UBadge
-                    v-for="(val, vi) in (config.optimization?.short_ct ?? [])"
-                    :key="vi"
-                    variant="subtle"
-                    color="error"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="config.optimization!.short_ct?.splice(vi, 1)"
-                  >
-                    {{ val }} <UIcon name="i-heroicons-x-mark" class="ml-1 w-3 h-3" />
-                  </UBadge>
-                  <div class="flex gap-1">
-                    <UInput
-                      v-model="newValues['short_ct']"
-                      placeholder="+"
-                      class="w-20"
-                      @keydown.enter="() => { if (config!.optimization) addValue('short_ct', config!.optimization as any) }"
-                    />
-                    <UButton size="xs" variant="ghost" @click="() => { if (config!.optimization) addValue('short_ct', config!.optimization as any) }">+</UButton>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-      </UCard>
-
-      <!-- Constraints -->
-      <UCard>
-        <template #header>
-          <h3 class="text-lg font-medium text-white">Constraints</h3>
-        </template>
-
-        <UFormField label="Minimum Risk-Reward-Ratio" description="Filtert Grid-Kombinationen mit TP/SL < Schwelle">
-          <UInput
-            :model-value="config.optimization?.min_rrr ?? ''"
-            type="number"
-            step="0.1"
-            placeholder="z.B. 1.0"
-            class="w-40"
-            @update:model-value="(v) => { if (config!.optimization) config!.optimization.min_rrr = v ? Number(v) : undefined }"
-          />
-        </UFormField>
       </UCard>
 
       <!-- Regime Filter Grid -->
@@ -440,42 +190,6 @@ const gridCombinations = computed(() => {
       <UButton v-else variant="soft" icon="i-heroicons-plus" @click="addCondition">
         Regime Filter Grid hinzufügen
       </UButton>
-
-      <!-- Exit Modifier Params Grid -->
-      <UCard v-if="(config as any).exit_modifier">
-        <template #header>
-          <h3 class="text-lg font-medium text-white">Exit Modifier Grid ({{ (config as any).exit_modifier }})</h3>
-        </template>
-
-        <div class="space-y-3">
-          <div
-            v-for="(entry, ei) in (config.optimization?.exit_modifier_params_grid ?? [])"
-            :key="ei"
-            class="border border-gray-700 rounded-lg p-3"
-          >
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs font-medium text-gray-400">Variante {{ ei + 1 }}</span>
-              <div class="flex-1" />
-              <UButton icon="i-heroicons-trash" variant="ghost" color="error" size="xs" @click="removeExitModifierEntry(ei)" />
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <UFormField v-for="(val, key) in entry" :key="key" :label="String(key)">
-                <UInput
-                  :model-value="String(val)"
-                  type="number"
-                  step="0.1"
-                  class="w-full"
-                  @update:model-value="(v) => (entry as any)[key] = Number(v)"
-                />
-              </UFormField>
-            </div>
-          </div>
-
-          <UButton variant="soft" icon="i-heroicons-plus" @click="addExitModifierEntry">
-            Variante hinzufügen
-          </UButton>
-        </div>
-      </UCard>
 
     </div>
   </div>

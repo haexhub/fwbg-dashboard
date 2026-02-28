@@ -48,17 +48,15 @@ watch(selectedStrategy, async (filename) => {
   }
 });
 
-// Current TP/SL from loaded strategy's exit_params
+// Current TP/SL from loaded strategy's exit_strategies
 const currentTp = computed(() => {
-  const ep = loadedConfig.value?.exit_params;
-  if (!ep) return [];
-  return (ep.tp_mult ?? []) as number[];
+  const es = loadedConfig.value?.exit_strategies ?? [];
+  return [...new Set(es.map((e: Record<string, any>) => e.params.tp_mult as number).filter(Boolean))];
 });
 
 const currentSl = computed(() => {
-  const ep = loadedConfig.value?.exit_params;
-  if (!ep) return [];
-  return (ep.sl_mult ?? []) as number[];
+  const es = loadedConfig.value?.exit_strategies ?? [];
+  return [...new Set(es.map((e: Record<string, any>) => e.params.sl_mult as number).filter(Boolean))];
 });
 
 const canApply = computed(() =>
@@ -75,13 +73,22 @@ async function apply() {
   try {
     const updated = JSON.parse(JSON.stringify(loadedConfig.value)) as StrategyConfig;
 
-    // Update exit strategy + params
-    updated.exit_strategy = props.result.exit_strategy;
-    updated.exit_params = { ...props.result.exit_params };
+    // Build exit strategy instances from cartesian product of suggested TP × SL
+    const baseParams = { ...props.result.exit_params };
+    delete baseParams.tp_mult;
+    delete baseParams.sl_mult;
 
-    // Update TP/SL in exit_params as arrays
-    updated.exit_params.tp_mult = [...props.result.suggested_grid.tp];
-    updated.exit_params.sl_mult = [...props.result.suggested_grid.sl];
+    const instances: Array<{ name: string; params: Record<string, unknown>; ct: number[] }> = [];
+    for (const tp of props.result.suggested_grid.tp) {
+      for (const sl of props.result.suggested_grid.sl) {
+        instances.push({
+          name: props.result.exit_strategy,
+          params: { ...baseParams, tp_mult: tp, sl_mult: sl },
+          ct: [0.5],
+        });
+      }
+    }
+    updated.exit_strategies = instances;
 
     await saveStrategy(selectedStrategy.value, updated);
     saved.value = true;
@@ -141,11 +148,11 @@ watch(() => props.open, (isOpen) => {
             <span class="text-gray-400">Exit-Strategie</span>
             <div class="flex items-center gap-2 mt-1">
               <UBadge variant="subtle" color="neutral" size="sm">
-                {{ loadedConfig.exit_strategy || '–' }}
+                {{ loadedConfig.exit_strategies?.map(e => e.name).join(', ') || '–' }}
               </UBadge>
               <UIcon name="i-heroicons-arrow-right" class="text-gray-500 shrink-0" />
               <UBadge variant="subtle" color="primary" size="sm">
-                {{ result.exit_strategy }}
+                {{ result.exit_strategy }} ({{ result.suggested_grid.tp.length * result.suggested_grid.sl.length }} Instanzen)
               </UBadge>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import type {
   StrategyConfig,
+  ExitStrategyInstance,
   PluginInstance,
   PluginInfo,
   PipelinePhase,
@@ -72,25 +73,43 @@ export function useStrategy() {
       "feature_selection",
     );
 
-    if (store.config.exit_strategy) {
-      lanes.value.exit_strategies = [
+    // Exit strategies: each instance in the array becomes a card
+    lanes.value.exit_strategies = (store.config.exit_strategies ?? []).map(
+      (es) => ({
+        id: crypto.randomUUID(),
+        fqn: resolvePluginFqn(es.name, "exit_strategies", plugins),
+        name: es.name,
+        phase: "exit_strategies" as PipelinePhase,
+        params: { ...es.params },
+        // Store exit-strategy-specific fields in _exit so toJson can round-trip them
+        _exit: {
+          ct: es.ct,
+          long_ct: es.long_ct,
+          short_ct: es.short_ct,
+          min_rrr: es.min_rrr,
+          exit_modifier: es.exit_modifier,
+          exit_modifier_params: es.exit_modifier_params,
+        },
+      }),
+    );
+
+    if (store.config.risk_management) {
+      lanes.value.risk_management = [
         {
           id: crypto.randomUUID(),
           fqn: resolvePluginFqn(
-            store.config.exit_strategy,
-            "exit_strategies",
+            store.config.risk_management,
+            "risk_management",
             plugins,
           ),
-          name: store.config.exit_strategy,
-          phase: "exit_strategies",
-          params: { ...(store.config.exit_params ?? {}) },
+          name: store.config.risk_management,
+          phase: "risk_management",
+          params: { ...(store.config.risk_params ?? {}) },
         },
       ];
     } else {
-      lanes.value.exit_strategies = [];
+      lanes.value.risk_management = [];
     }
-
-    lanes.value.risk_management = [];
 
     // Close config panel — lane IDs are regenerated
     selectedPlugin.value = null;
@@ -113,7 +132,27 @@ export function useStrategy() {
         params: { ...inst.params },
       }));
 
-    const exitInstance = lanes.value.exit_strategies[0];
+    // Convert exit strategy lane instances to ExitStrategyInstance[]
+    const exitStrategies: ExitStrategyInstance[] =
+      lanes.value.exit_strategies.map((inst) => {
+        const exitMeta = (inst as Record<string, unknown>)._exit as
+          | Record<string, unknown>
+          | undefined;
+        return {
+          name: inst.name,
+          params: { ...inst.params },
+          ct: (exitMeta?.ct as number[]) ?? [0.5],
+          long_ct: exitMeta?.long_ct as number[] | undefined,
+          short_ct: exitMeta?.short_ct as number[] | undefined,
+          min_rrr: (exitMeta?.min_rrr as number) ?? 0,
+          exit_modifier: exitMeta?.exit_modifier as string | undefined,
+          exit_modifier_params: exitMeta?.exit_modifier_params as
+            | Record<string, unknown>
+            | undefined,
+        };
+      });
+
+    const riskInstance = lanes.value.risk_management[0];
 
     return {
       ...store.config,
@@ -123,13 +162,15 @@ export function useStrategy() {
         indicators: toEntries(lanes.value.indicators),
         feature_selection: toEntries(lanes.value.feature_selection),
       },
-      exit_strategy: exitInstance?.name ?? store.config.exit_strategy,
-      exit_params: exitInstance?.params ?? store.config.exit_params,
+      exit_strategies: exitStrategies,
+      risk_management: riskInstance?.name ?? store.config.risk_management,
+      risk_params: riskInstance?.params ?? store.config.risk_params,
     };
   }
 
   /**
    * Add a plugin from the palette to a lane.
+   * Exit strategies allow multiple instances. Risk management is single.
    */
   function addPlugin(
     phase: PipelinePhase,
@@ -145,7 +186,15 @@ export function useStrategy() {
       params: { ...plugin.defaults },
     };
 
+    // Exit strategies: add _exit metadata with defaults
     if (phase === "exit_strategies") {
+      (instance as Record<string, unknown>)._exit = {
+        ct: [0.5],
+        min_rrr: 0,
+      };
+    }
+
+    if (phase === "risk_management") {
       lanes.value[phase] = [instance];
     } else if (
       index != null &&

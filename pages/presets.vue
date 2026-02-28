@@ -4,7 +4,7 @@ import type { PresetItem } from "~/types/preset";
 const SECTIONS = [
   { key: "models", label: "Models" },
   { key: "pipelines", label: "Pipelines" },
-  { key: "exit_params", label: "Exit Params" },
+  { key: "exit_strategies", label: "Exit Strategies" },
   { key: "validations", label: "Validation" },
   { key: "filters", label: "Filter" },
   { key: "resources", label: "Resources" },

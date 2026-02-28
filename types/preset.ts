@@ -12,7 +12,6 @@ export interface PresetItem {
 
 export interface StrategyRefs {
   pipeline?: string;
-  exit_params?: string;
   model?: string;
   validation?: string;
   filters?: string;

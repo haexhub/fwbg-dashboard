@@ -1,45 +1,20 @@
 <script setup lang="ts">
 import { DnDProvider } from "@vue-dnd-kit/core";
 import type { PluginInfo, PipelinePhase } from "~/types/strategy";
-import type { DataSourceBase } from "~/types/datasource";
 
-const { plugins } = usePlugins();
+const pluginStore = usePluginStore();
+const { plugins } = storeToRefs(pluginStore);
+pluginStore.load();
 const store = useStrategyConfigStore();
 const { config, isRestoring } = storeToRefs(store);
 
-// ── Datasource & Assets ──
-const { data: datasources } = useFetch<DataSourceBase[]>("/api/datasources", {
-  default: () => [],
-});
-
-const assetClasses = computed(() => Object.keys(config.value?.grids ?? {}));
-const datasourceConfigOpen = ref(false);
-
-const assetFilter = computed({
-  get: () => config.value?.assets?.filter ?? [],
-  set: (val: string[]) => {
-    if (!config.value) return;
-    if (!config.value.assets) config.value.assets = {};
-    config.value.assets.filter = val.length > 0 ? val : undefined;
-  },
-});
-
-const assetExclude = computed({
-  get: () => config.value?.assets?.exclude ?? [],
-  set: (val: string[]) => {
-    if (!config.value) return;
-    if (!config.value.assets) config.value.assets = {};
-    config.value.assets.exclude = val.length > 0 ? val : undefined;
-  },
-});
 const pipelineRef = computed(() => config.value?._refs?.pipeline);
 
 const pipelineModelValue = computed(() => {
   if (!config.value) return undefined;
   return {
     pipeline: config.value.pipeline,
-    exit_strategy: config.value.exit_strategy,
-    exit_params: config.value.exit_params,
+    exit_strategies: config.value.exit_strategies,
   } as Record<string, unknown>;
 });
 
@@ -55,15 +30,15 @@ const {
   movePlugin,
   updatePluginParams,
   openConfig,
-  closeConfig,
 } = useStrategy();
 
 // Sync lanes FROM config on load and on external changes (undo/redo)
 watch(
   [
     () => config.value?.pipeline,
-    () => config.value?.exit_strategy,
-    () => config.value?.exit_params,
+    () => config.value?.exit_strategies,
+    () => config.value?.risk_management,
+    () => config.value?.risk_params,
     plugins,
   ],
   () => {
@@ -82,8 +57,9 @@ watch(
     try {
       const json = toJson();
       config.value.pipeline = json.pipeline;
-      config.value.exit_strategy = json.exit_strategy;
-      config.value.exit_params = json.exit_params;
+      config.value.exit_strategies = json.exit_strategies;
+      config.value.risk_management = json.risk_management;
+      config.value.risk_params = json.risk_params;
     } catch {
       /* ignore during init */
     }
@@ -149,12 +125,9 @@ function handleSelectPlugin(plugin: PluginInfo) {
           >
             <StrategyPluginPalette
               :plugins="plugins ?? []"
-              :datasources="datasources"
-              :current-datasource="config?.datasource"
               @select-plugin="handleSelectPlugin"
               @add-plugin="(plugin) => handleAddPlugin(plugin.phase, plugin, undefined)"
               @remove-lane-plugin="removePlugin"
-              @select-datasource="(name) => { if (config) config.datasource = name }"
             />
           </div>
 
@@ -163,16 +136,10 @@ function handleSelectPlugin(plugin: PluginInfo) {
             <StrategyKanbanBoard
               :lanes="lanes"
               :plugins="plugins ?? []"
-              :datasource="config?.datasource"
-              :asset-filter="assetFilter"
-              :asset-exclude="assetExclude"
-              :asset-classes="assetClasses"
               @add-plugin="handleAddPlugin"
               @move-plugin="movePlugin"
               @remove-plugin="handleRemovePlugin"
               @configure-plugin="openConfig"
-              @update:datasource="(v) => { if (config) config.datasource = v }"
-              @configure-datasource="datasourceConfigOpen = true"
             />
           </div>
         </div>
@@ -195,15 +162,5 @@ function handleSelectPlugin(plugin: PluginInfo) {
       @save="handleConfigSave"
     />
 
-    <!-- Datasource Config Panel -->
-    <StrategyDatasourceConfigPanel
-      v-if="config?.datasource"
-      :open="datasourceConfigOpen"
-      :datasource="config.datasource"
-      :asset-classes="assetClasses"
-      v-model:asset-filter="assetFilter"
-      v-model:asset-exclude="assetExclude"
-      @update:open="datasourceConfigOpen = $event"
-    />
   </div>
 </template>

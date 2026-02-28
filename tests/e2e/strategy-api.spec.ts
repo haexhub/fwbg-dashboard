@@ -66,8 +66,8 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
       // Top-level required fields
       expect(config).toHaveProperty("name");
       expect(config).toHaveProperty("pipeline");
-      expect(config).toHaveProperty("exit_strategy");
-      expect(config).toHaveProperty("exit_params");
+      expect(config).toHaveProperty("exit_strategies");
+      expect(Array.isArray(config.exit_strategies)).toBe(true);
       expect(config).toHaveProperty("model");
       expect(config).toHaveProperty("validation");
       expect(config).toHaveProperty("filters");
@@ -148,19 +148,23 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
       }
     });
 
-    test("should have correctly structured exit_params", async () => {
+    test("should have correctly structured exit_strategies", async () => {
       const response = await request.get(
         `/api/strategy/strategies/${firstStrategyFilename}`
       );
       const config = await response.json();
 
-      const exitParams = config.exit_params;
-      expect(exitParams).toBeDefined();
-      expect(typeof exitParams).toBe("object");
+      const exitStrategies = config.exit_strategies;
+      expect(Array.isArray(exitStrategies)).toBe(true);
+      expect(exitStrategies.length).toBeGreaterThan(0);
 
-      // exit_params values should be arrays
-      for (const [key, value] of Object.entries(exitParams)) {
-        expect(Array.isArray(value)).toBe(true);
+      for (const es of exitStrategies) {
+        expect(es).toHaveProperty("name");
+        expect(typeof es.name).toBe("string");
+        expect(es).toHaveProperty("params");
+        expect(typeof es.params).toBe("object");
+        expect(es).toHaveProperty("ct");
+        expect(Array.isArray(es.ct)).toBe(true);
       }
     });
 
@@ -213,7 +217,7 @@ test.describe("Strategy API — Model Restructuring Compatibility", () => {
       expect(reloaded.model.hyperparameters).toEqual(
         original.model.hyperparameters
       );
-      expect(reloaded.exit_strategy).toBe(original.exit_strategy);
+      expect(reloaded.exit_strategies).toEqual(original.exit_strategies);
       expect(reloaded.resources.max_concurrent_assets).toBe(
         original.resources.max_concurrent_assets
       );

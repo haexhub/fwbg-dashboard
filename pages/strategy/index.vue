@@ -13,15 +13,16 @@ async function handleCreate() {
     const result = await createStrategy(newName.value.trim(), {
       name: newName.value.trim(),
       pipeline: { indicators: [], preprocessing: [], feature_selection: [], data_loading: [] },
-      exit_strategy: "fixed",
-      exit_params: { tp_mult: [2.0], sl_mult: [1.0] },
+      exit_strategies: [
+        { name: "fixed", params: { tp_mult: 2.0, sl_mult: 1.0 }, ct: [0.5] },
+      ],
       model: {
         type: "xgboost",
         architecture: "long_short_separate",
         trade_directions: ["long", "short"],
         hyperparameters: {},
       },
-      optimization: { ct: [0.5] },
+      optimization: {},
       validation: { method: "walk_forward", folds: 8 },
       filters: {},
       resources: {},
