@@ -79,12 +79,13 @@ function handleRemovePlugin(phase: PipelinePhase, instanceId: string) {
   removePlugin(phase, instanceId);
 }
 
-function handleConfigSave(params: Record<string, unknown>) {
+function handleConfigSave(params: Record<string, unknown>, exitMeta?: Record<string, unknown>) {
   if (!selectedPlugin.value) return;
   updatePluginParams(
     selectedPlugin.value.phase,
     selectedPlugin.value.id,
     params,
+    exitMeta,
   );
 }
 

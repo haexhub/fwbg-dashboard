@@ -231,11 +231,15 @@ export function useStrategy() {
     phase: PipelinePhase,
     instanceId: string,
     params: Record<string, unknown>,
+    exitMeta?: Record<string, unknown>,
   ) {
     const instance = lanes.value[phase].find((p) => p.id === instanceId);
     if (instance) {
       store.commitSnapshot();
       instance.params = { ...params };
+      if (exitMeta) {
+        (instance as Record<string, unknown>)._exit = exitMeta;
+      }
     }
   }
 

@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  save: [params: Record<string, unknown>];
+  save: [params: Record<string, unknown>, exitMeta?: Record<string, unknown>];
 }>();
 
 // Local copy of params for editing
@@ -54,10 +54,9 @@ function parseNumberList(str: string): number[] {
 }
 
 function handleSave() {
-  emit("save", { ...localParams.value });
+  let exitMeta: Record<string, unknown> | undefined;
 
-  // Update _exit metadata on the instance for exit strategies
-  if (isExitStrategy.value && props.instance) {
+  if (isExitStrategy.value) {
     const ctStr = String(localExit.value.ct ?? "0.5");
     const ct = parseNumberList(ctStr);
     const longCtStr = String(localExit.value.long_ct ?? "");
@@ -69,7 +68,7 @@ function handleSave() {
       try { exitModifierParams = JSON.parse(emParamsStr); } catch { /* ignore */ }
     }
 
-    (props.instance as Record<string, unknown>)._exit = {
+    exitMeta = {
       ct: ct.length ? ct : [0.5],
       long_ct: longCtStr ? parseNumberList(longCtStr) : undefined,
       short_ct: shortCtStr ? parseNumberList(shortCtStr) : undefined,
@@ -79,6 +78,7 @@ function handleSave() {
     };
   }
 
+  emit("save", { ...localParams.value }, exitMeta);
   emit("update:open", false);
 }
 
