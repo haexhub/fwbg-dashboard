@@ -91,6 +91,7 @@ export interface PluginInfo {
   phase: PipelinePhase;
   version: string;
   description: string;
+  group?: string;
   stateful: boolean;
   cacheable: boolean;
   param_schema: Record<string, ParamSchema>;
@@ -131,6 +132,7 @@ export interface StrategyConfig {
   hypothesis?: string;
   expected_outcome?: string;
   datasource?: string;
+  timeframe?: string;
   pipeline: {
     indicators?: PipelineEntry[];
     preprocessing?: PipelineEntry[];
@@ -147,18 +149,23 @@ export interface StrategyConfig {
     trade_directions: string[];
     hyperparameters: Record<string, unknown>;
   };
-  grids: Record<
-    string,
-    {
-      tp: number[];
-      sl: number[];
-      ct: number[];
-      timeout_bars?: (number | null)[];
-      long_ct?: number[];
-      short_ct?: number[];
-      regime_filter_grid?: unknown;
-    }
-  >;
+  optimization?: {
+    ct?: number[];
+    long_ct?: number[];
+    short_ct?: number[];
+    min_rrr?: number;
+    regime_filter_grid?: {
+      condition_grids: Array<{
+        column: string;
+        operator: string;
+        values: (number | null)[];
+        directions: number;
+        else_directions: number;
+      }>;
+    };
+    exit_modifier_params_grid?: Record<string, unknown>[];
+    model_hyperparameters_grid?: Record<string, unknown>[];
+  };
   assets?: {
     filter?: string[];
     exclude?: string[];
