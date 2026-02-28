@@ -203,7 +203,7 @@ const gridCombinations = computed(() => {
 
           <!-- Long/Short overrides -->
           <template v-if="showLongShort">
-            <UDivider label="Long/Short Overrides" />
+            <USeparator label="Long/Short Overrides" />
             <p class="text-xs text-gray-500">
               Optional: Richtungsspezifische Werte überschreiben den Basis-Wert.
             </p>
