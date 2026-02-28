@@ -52,6 +52,7 @@ const {
   querySessionIds,
   queryRunId,
   queryIndicators,
+  queryStrategy,
   syncToUrl,
 } = useChartQuery();
 
@@ -85,6 +86,7 @@ const scrollTo = (ts: number) => chartCanvas.value?.scrollToTimestamp(ts);
 const crosshairData = ref<CrosshairData | null>(null);
 const chartWrapperRef = useTemplateRef<HTMLElement>("chartWrapperRef");
 const indicatorPanelOpen = ref(false);
+const editIndicator = ref<import("~/types/chart").ActiveIndicator | null>(null);
 const strategySaveOpen = ref(false);
 
 const pricePrecision = computed(() =>
@@ -133,6 +135,7 @@ const previewTrades = usePreviewTrades();
 const previewStrategyName = ref<string>();
 
 const indActions = useChartIndicatorActions();
+const { loading: indicatorLoading } = indActions;
 
 // ── Overlay timeframe sync ──
 
@@ -152,6 +155,29 @@ watch(signalTimestampsKey, () =>
 
 const collapsedPanes = ref<Record<string, boolean>>({});
 
+function toggleOverlay(id: string) {
+  const indicator = activeIndicators.value.find((i) => i.id === id);
+  if (!indicator || indicator.isSignal) return;
+  const chart = getChart();
+  if (!chart) return;
+
+  // Remove from current position
+  chart.removeIndicator({ name: id });
+  delete collapsedPanes.value[id];
+
+  if (indicator.paneId === "candle_pane") {
+    // Move from main chart to own pane
+    chart.createIndicator({ name: id }, false, { height: 150 });
+    const inds = chart.getIndicators({ name: id });
+    indicator.paneId = (inds[0] as any)?.paneId ?? "";
+  } else {
+    // Move from own pane to main chart overlay
+    chart.createIndicator({ name: id }, true, { id: "candle_pane" });
+    indicator.paneId = "candle_pane";
+  }
+  nextTick(adjustLayout);
+}
+
 function togglePaneCollapse(id: string) {
   const indicator = activeIndicators.value.find((i) => i.id === id);
   if (!indicator) return;
@@ -161,8 +187,8 @@ function togglePaneCollapse(id: string) {
   if (collapsedPanes.value[id]) {
     delete collapsedPanes.value[id];
     const height = indicator.isSignal ? 80 : 120;
-    indicator.paneId =
-      chart.createIndicator({ name: id }, false, { height }) ?? "";
+    chart.createIndicator({ name: id }, false, { height });
+    indicator.paneId = (chart.getIndicators({ name: id })[0] as any)?.paneId ?? "";
     adjustLayout();
   } else {
     collapsedPanes.value[id] = true;
@@ -188,8 +214,8 @@ function expandAllPanes() {
   for (const ind of activeIndicators.value) {
     if (collapsedPanes.value[ind.id]) {
       const height = ind.isSignal ? 80 : 120;
-      ind.paneId =
-        chart.createIndicator({ name: ind.id }, false, { height }) ?? "";
+      chart.createIndicator({ name: ind.id }, false, { height });
+      ind.paneId = (chart.getIndicators({ name: ind.id })[0] as any)?.paneId ?? "";
     }
   }
   collapsedPanes.value = {};
@@ -321,6 +347,35 @@ function handleAddSignalIndicator(
 function handleAddAllDeps(p: PluginInfo) {
   indActions.handleAddAllDeps(p, indicatorCtx);
 }
+function handleEditIndicator(id: string) {
+  const ind = activeIndicators.value.find((i: { id: string }) => i.id === id);
+  if (!ind) return;
+  editIndicator.value = ind;
+  indicatorPanelOpen.value = true;
+}
+function handleUpdateIndicator(
+  indicatorId: string,
+  p: PluginInfo,
+  params: Record<string, unknown>,
+  cols: string[],
+  colors: Record<string, string>,
+  isMainOverlay: boolean = false,
+) {
+  indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
+  indActions.handleAddIndicator(p, params, cols, colors, isMainOverlay, indicatorCtx);
+  editIndicator.value = null;
+}
+function handleUpdateSignalIndicator(
+  indicatorId: string,
+  p: PluginInfo,
+  params: Record<string, unknown>,
+  cols: string[],
+  colors: Record<string, string>,
+) {
+  indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
+  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx);
+  editIndicator.value = null;
+}
 function handleRemoveIndicator(id: string) {
   indActions.handleRemoveIndicator(id, indicatorCtx);
 }
@@ -330,12 +385,13 @@ function clearRunTradeOverlay() {
 }
 
 // ── Apply source/symbol from URL after sources load ──
+// Set source + symbol synchronously so Canvas sees both in ONE reactive flush
+// (prevents multiple overlapping data loads during initial page load).
 
 watch(
   sources,
-  async (list) => {
+  (list) => {
     if (!list?.length) return;
-    await nextTick();
 
     if (querySource.value) {
       const sourceExists = list.find((src) => src.name === querySource.value);
@@ -343,7 +399,6 @@ watch(
     }
 
     if (querySymbol.value) {
-      await nextTick();
       const inCurrentSource = availableSymbols.value.some(
         (s) => s.symbol === querySymbol.value,
       );
@@ -365,6 +420,7 @@ watch(
 
 let _overlayLoaded = false;
 let _stateRestored = false;
+let _indicatorsRestored = false;
 
 function handleDataLoaded(count: number) {
   if (count === 0) return;
@@ -373,6 +429,13 @@ function handleDataLoaded(count: number) {
     _stateRestored = true;
     range.applyToChart(getChart);
     session.applyToChart(getChart);
+  }
+
+  // Restore URL indicators once the correct symbol's data is loaded
+  if (!_indicatorsRestored && queryIndicators.value && indicatorPlugins.value.length > 0
+    && source.value && symbol.value === querySymbol.value) {
+    _indicatorsRestored = true;
+    void indActions.restoreFromUrl(queryIndicators.value, indicatorCtx);
   }
 
   if (_overlayLoaded) return;
@@ -404,12 +467,15 @@ function handleDataLoaded(count: number) {
   tradeOverlay.loadTradeOverlay(queryRunId.value, querySymbol.value, tradeCtx);
 }
 
-// Restore indicators from URL — fires once both URL params and plugin list are available
-watch([queryIndicators, indicatorPlugins], ([json]: [string | undefined, PluginInfo[]]) => {
-  if (json && indicatorPlugins.value.length > 0) {
-    void indActions.restoreFromUrl(json, indicatorCtx);
+// Restore indicators from URL — handled in handleDataLoaded once correct symbol is loaded
+// Also trigger when plugins load after data is already available
+watch(indicatorPlugins, () => {
+  if (!_indicatorsRestored && queryIndicators.value && indicatorPlugins.value.length > 0
+    && source.value && symbol.value === querySymbol.value) {
+    _indicatorsRestored = true;
+    void indActions.restoreFromUrl(queryIndicators.value, indicatorCtx);
   }
-}, { immediate: true });
+});
 
 // Load run indicators once plugins become available
 watch(indicatorPlugins, (list: PluginInfo[]) => {
@@ -587,6 +653,8 @@ watch(
         @toggle-collapse="togglePaneCollapse"
         @collapse-all="collapseAllPanes"
         @expand-all="expandAllPanes"
+        @edit="handleEditIndicator"
+        @toggle-overlay="toggleOverlay"
         @remove="handleRemoveIndicator"
         @signal-prev="goToPrevSignal"
         @signal-next="goToNextSignal"
@@ -601,7 +669,7 @@ watch(
       />
 
       <!-- Chart Canvas -->
-      <div ref="chartWrapperRef" class="flex-1 min-h-0">
+      <div ref="chartWrapperRef" class="flex-1 min-h-0 relative">
         <ChartCanvas
           ref="chartCanvas"
           :source="source"
@@ -615,6 +683,18 @@ watch(
           @drawing-cancelled="setDrawingTool(null)"
           @data-loaded="handleDataLoaded"
         />
+        <!-- Indicator loading overlay -->
+        <Transition name="fade">
+          <div
+            v-if="indicatorLoading"
+            class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none"
+          >
+            <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900/90 text-sm text-gray-300">
+              <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
+              Indikatoren werden geladen...
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <!-- Indicator Panel -->
@@ -624,10 +704,13 @@ watch(
         :source="source"
         :symbol="symbol"
         :timeframe="timeframe"
-        @update:open="indicatorPanelOpen = $event"
+        :edit-indicator="editIndicator"
+        @update:open="indicatorPanelOpen = $event; if (!$event) editIndicator = null"
         @add="handleAddIndicator"
         @add-signal="handleAddSignalIndicator"
         @add-all-deps="handleAddAllDeps"
+        @update="handleUpdateIndicator"
+        @update-signal="handleUpdateSignalIndicator"
       />
 
       <!-- Strategy Save Slideover -->
@@ -636,7 +719,10 @@ watch(
         :source="source"
         :symbol="symbol"
         :timeframe="timeframe"
+        :asset-class="currentSymbol?.asset_class"
         :active-indicators="activeIndicators"
+        :default-name="previewStrategyName"
+        :strategy-filename="queryStrategy"
         @update:open="strategySaveOpen = $event"
       />
     </div>

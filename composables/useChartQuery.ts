@@ -1,3 +1,5 @@
+import { useDebounceFn } from "@vueuse/core";
+
 /**
  * URL query-param persistence for the chart view.
  *
@@ -44,6 +46,7 @@ export interface ChartUrlState {
 export function useChartQuery() {
   const route = useRoute();
   const router = useRouter();
+  const { plugins } = storeToRefs(usePluginStore());
 
   // ── Reactive query-param accessors ──
   const querySource            = computed(() => route.query.source            as string | undefined);
@@ -58,42 +61,43 @@ export function useChartQuery() {
   const querySessionIds        = computed(() => route.query.sessionIds        as string | undefined);
   const queryRunId             = computed(() => route.query.run               as string | undefined);
   const queryIndicators        = computed(() => route.query.indicators        as string | undefined);
+  const queryStrategy          = computed(() => route.query.strategy          as string | undefined);
 
   // ── Debounced URL sync ──
-  let syncTimer: ReturnType<typeof setTimeout> | null = null;
+  const syncToUrl = useDebounceFn((state: ChartUrlState) => {
+    if (!state.source) return;
 
-  function syncToUrl(state: ChartUrlState) {
-    if (syncTimer) clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => {
-      if (!state.source) return;
+    const query: Record<string, string> = {};
 
-      const query: Record<string, string> = {};
+    // Preserve the trade-overlay run param when active
+    if (queryRunId.value) query.run = queryRunId.value;
+    // Preserve strategy reference
+    if (queryStrategy.value) query.strategy = queryStrategy.value;
 
-      // Preserve the trade-overlay run param when active
-      if (queryRunId.value) query.run = queryRunId.value;
+    query.source    = state.source;
+    query.symbol    = state.symbol;
+    query.timeframe = state.timeframe;
+    if (state.chartType !== "candle_solid") query.chartType = state.chartType;
 
-      query.source    = state.source;
-      query.symbol    = state.symbol;
-      query.timeframe = state.timeframe;
-      if (state.chartType !== "candle_solid") query.chartType = state.chartType;
-
-      if (state.rangeInterval) {
-        query.rangeInterval  = state.rangeInterval;
-        query.rangeStartTime = state.rangeStartTime;
-        query.rangeEndTime   = state.rangeEndTime;
-        if (state.rangeWeekdays.join(",") !== "1,2,3,4,5") {
-          query.rangeWeekdays = state.rangeWeekdays.join(",");
-        }
-        if (state.rangeUseOpenClose) query.rangeUseOpenClose = "1";
+    if (state.rangeInterval) {
+      query.rangeInterval  = state.rangeInterval;
+      query.rangeStartTime = state.rangeStartTime;
+      query.rangeEndTime   = state.rangeEndTime;
+      if (state.rangeWeekdays.join(",") !== "1,2,3,4,5") {
+        query.rangeWeekdays = state.rangeWeekdays.join(",");
       }
+      if (state.rangeUseOpenClose) query.rangeUseOpenClose = "1";
+    }
 
-      if (state.sessionIds.length) query.sessionIds = state.sessionIds.join(",");
+    if (state.sessionIds.length) query.sessionIds = state.sessionIds.join(",");
 
-      if (state.indicators.length) query.indicators = JSON.stringify(state.indicators);
+    const validIndicators = state.indicators.filter((ind) =>
+      plugins.value.some((p) => p.fqn === ind.fqn),
+    );
+    if (validIndicators.length) query.indicators = JSON.stringify(validIndicators);
 
-      router.replace({ query });
-    }, 500);
-  }
+    router.replace({ query });
+  }, 500);
 
   return {
     querySource,
@@ -108,6 +112,7 @@ export function useChartQuery() {
     querySessionIds,
     queryRunId,
     queryIndicators,
+    queryStrategy,
     syncToUrl,
   };
 }

@@ -9,6 +9,8 @@ const props = defineProps<{
   assetClass?: string;
   activeIndicators: ActiveIndicator[];
   defaultName?: string;
+  /** When set, enables update mode for an existing strategy */
+  strategyFilename?: string;
 }>();
 
 const emit = defineEmits<{
@@ -16,16 +18,18 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
-const { createStrategy } = useStrategies();
+const { createStrategy, loadStrategy, saveStrategy } = useStrategies();
 
 const strategyName = ref("");
 const strategyDescription = ref("");
 const status = ref<"idle" | "saving" | "saved" | "error">("idle");
 const savedFilename = ref("");
 const errorMessage = ref("");
+const isUpdateMode = ref(false);
+const existingConfig = ref<import("~/types/strategy").StrategyConfig | null>(null);
 
 const canSave = computed(
-  () => strategyName.value.trim().length > 0 && (status.value === "idle" || status.value === "error"),
+  () => (isUpdateMode.value || strategyName.value.trim().length > 0) && (status.value === "idle" || status.value === "error"),
 );
 
 // De-duplicate indicators by FQN, but merge isSignal flag
@@ -49,50 +53,72 @@ function displayParams(params: Record<string, unknown>): string {
   return entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ");
 }
 
+function buildIndicatorEntries() {
+  return uniqueIndicators.value.map((ind: ActiveIndicator & { hasSignal: boolean }) => ({
+    name: ind.fqn.split(":")[1] ?? ind.name.replace(/ \(signal\)$/, ""),
+    params: ind.params,
+    ...(ind.hasSignal ? { is_signal: true } : {}),
+  }));
+}
+
 async function save() {
   if (!canSave.value) return;
   status.value = "saving";
   errorMessage.value = "";
 
-  // Build pipeline entries from de-duplicated indicators
-  const indicators = uniqueIndicators.value.map((ind: ActiveIndicator & { hasSignal: boolean }) => ({
-    name: ind.fqn.split(":")[1] ?? ind.name.replace(/ \(signal\)$/, ""),
-    params: ind.params,
-    ...(ind.hasSignal ? { is_signal: true } : {}),
-  }));
+  const indicators = buildIndicatorEntries();
 
   try {
-    const res = await createStrategy(strategyName.value.trim(), {
-      description: strategyDescription.value.trim() || undefined,
-      datasource: props.source,
-      assets: { filter: [props.symbol] },
-      pipeline: {
-        indicators,
-        preprocessing: [],
-        feature_selection: [],
-        data_loading: [],
-      },
-      exit_strategy: "fixed",
-      exit_params: { tp_mult: [2.0], sl_mult: [1.0] },
-      model: {
-        type: "xgboost",
-        architecture: "long_short_separate",
-        trade_directions: ["long", "short"],
-        hyperparameters: {},
-      },
-      optimization: { ct: [0.5] },
-      validation: { method: "walk_forward", folds: 8 },
-      filters: {},
-      resources: {},
-    });
+    if (isUpdateMode.value && existingConfig.value && props.strategyFilename) {
+      // Update existing strategy — only touch pipeline indicators
+      const updated = {
+        ...existingConfig.value,
+        pipeline: {
+          ...existingConfig.value.pipeline,
+          indicators,
+        },
+      };
+      await saveStrategy(props.strategyFilename, updated);
+      savedFilename.value = props.strategyFilename;
+      toast.add({
+        title: "Strategie aktualisiert",
+        description: `Pipeline von "${existingConfig.value.name}" wurde aktualisiert.`,
+        color: "success",
+      });
+    } else {
+      // Create new strategy
+      const res = await createStrategy(strategyName.value.trim(), {
+        description: strategyDescription.value.trim() || undefined,
+        datasource: props.source,
+        assets: { filter: [props.symbol] },
+        pipeline: {
+          indicators,
+          preprocessing: [],
+          feature_selection: [],
+          data_loading: [],
+        },
+        exit_strategy: "fixed",
+        exit_params: { tp_mult: [2.0], sl_mult: [1.0] },
+        model: {
+          type: "xgboost",
+          architecture: "long_short_separate",
+          trade_directions: ["long", "short"],
+          hyperparameters: {},
+        },
+        optimization: { ct: [0.5] },
+        validation: { method: "walk_forward", folds: 8 },
+        filters: {},
+        resources: {},
+      });
+      savedFilename.value = res.filename;
+      toast.add({
+        title: "Strategie erstellt",
+        description: `"${strategyName.value}" wurde gespeichert.`,
+        color: "success",
+      });
+    }
 
-    savedFilename.value = res.filename;
     status.value = "saved";
-    toast.add({
-      title: "Strategie erstellt",
-      description: `"${strategyName.value}" wurde gespeichert.`,
-      color: "success",
-    });
   } catch (e: unknown) {
     status.value = "error";
     const err = e as { statusMessage?: string; message?: string; data?: { detail?: string; message?: string } };
@@ -107,16 +133,32 @@ function openStrategy() {
   }
 }
 
-// Reset state when slideover opens, pre-fill name from preview if available
+// Reset state when slideover opens, load existing strategy if available
 watch(
   () => props.open,
-  (open) => {
+  async (open: boolean) => {
     if (open) {
-      strategyName.value = props.defaultName ?? "";
-      strategyDescription.value = "";
       status.value = "idle";
       savedFilename.value = "";
       errorMessage.value = "";
+      existingConfig.value = null;
+      isUpdateMode.value = false;
+
+      if (props.strategyFilename) {
+        try {
+          existingConfig.value = await loadStrategy(props.strategyFilename);
+          strategyName.value = existingConfig.value.name;
+          strategyDescription.value = existingConfig.value.description ?? "";
+          isUpdateMode.value = true;
+        } catch {
+          // Strategy not found — fall back to create mode
+          strategyName.value = props.defaultName ?? "";
+          strategyDescription.value = "";
+        }
+      } else {
+        strategyName.value = props.defaultName ?? "";
+        strategyDescription.value = "";
+      }
     }
   },
 );
@@ -126,17 +168,40 @@ watch(
   <USlideover :open="open" @update:open="emit('update:open', $event)">
     <template #header>
       <div>
-        <h3 class="text-lg font-semibold text-white">Strategie speichern</h3>
+        <h3 class="text-lg font-semibold text-white">
+          {{ isUpdateMode ? 'Strategie aktualisieren' : 'Strategie speichern' }}
+        </h3>
         <p class="text-xs text-gray-500 mt-0.5">
-          Aktuelle Indikatoren als neue Strategie speichern
+          {{ isUpdateMode
+            ? `Pipeline von "${existingConfig?.name}" aktualisieren`
+            : 'Aktuelle Indikatoren als neue Strategie speichern'
+          }}
         </p>
       </div>
     </template>
 
     <template #body>
       <div class="space-y-5 p-1">
+        <!-- Mode toggle when strategy is loaded -->
+        <div v-if="strategyFilename" class="flex gap-2">
+          <UButton
+            :variant="isUpdateMode ? 'solid' : 'outline'"
+            size="sm"
+            @click="isUpdateMode = true"
+          >
+            Aktualisieren
+          </UButton>
+          <UButton
+            :variant="!isUpdateMode ? 'solid' : 'outline'"
+            size="sm"
+            @click="isUpdateMode = false"
+          >
+            Neue Strategie
+          </UButton>
+        </div>
+
         <!-- Name -->
-        <UFormField label="Name" required>
+        <UFormField v-if="!isUpdateMode" label="Name" required>
           <UInput
             v-model="strategyName"
             placeholder="z.B. Trend Momentum V1"
@@ -146,7 +211,7 @@ watch(
         </UFormField>
 
         <!-- Description -->
-        <UFormField label="Beschreibung">
+        <UFormField v-if="!isUpdateMode" label="Beschreibung">
           <UTextarea
             v-model="strategyDescription"
             placeholder="Kurze Beschreibung der Strategie..."
@@ -204,7 +269,7 @@ watch(
             block
             @click="save"
           >
-            Strategie speichern
+            {{ isUpdateMode ? 'Pipeline aktualisieren' : 'Strategie speichern' }}
           </UButton>
 
           <template v-if="status === 'saved'">

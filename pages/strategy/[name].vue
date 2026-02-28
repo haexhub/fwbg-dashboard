@@ -95,6 +95,7 @@ function openInChart(sym: string) {
       source: config.value?.datasource,
       symbol: sym,
       timeframe: config.value?.timeframe,
+      strategy: strategyName.value,
       ...(indicators.length > 0
         ? { indicators: JSON.stringify(indicators) }
         : {}),
