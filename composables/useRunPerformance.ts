@@ -68,7 +68,7 @@ function getAssetConfig(d: GridDetail): Record<string, unknown> | undefined {
   return d.selected_config ?? d.best_config;
 }
 
-// ── Equity Simulation (mirrors fwbg simulate_equity) ──
+// ── PnL-based Equity Simulation (mirrors fwbg simulate_equity_from_pnl) ──
 
 interface EquitySimResult {
   equityCurve: number[];
@@ -78,13 +78,41 @@ interface EquitySimResult {
   profitPerTrade: number[];
 }
 
-function simulateEquity(
-  tradeResults: number[], // +1 win, -1 loss
+/**
+ * Convert raw PnL values to Kelly-scaled returns.
+ * Mirrors fwbg.simulation.trade.pnl_to_returns:
+ * Scales so average loss return = exactly -fk.
+ */
+function pnlToReturns(pnlRaw: number[], fk: number): number[] {
+  const losses = pnlRaw.filter((p) => p < 0).map((p) => Math.abs(p));
+  const scale =
+    losses.length > 0
+      ? losses.reduce((s, v) => s + v, 0) / losses.length
+      : pnlRaw.reduce((s, v) => s + Math.abs(v), 0) / pnlRaw.length || 1;
+  return pnlRaw.map((p) => (fk * p) / scale);
+}
+
+/**
+ * Equity simulation using actual PnL values (not binary win/loss).
+ * Mirrors fwbg.simulation.equity.simulate_equity_from_pnl.
+ */
+function simulateEquityFromPnl(
+  pnlRaw: number[],
   riskPerTrade: number,
-  rrr: number,
   startEquity = 100.0,
   compoundCap = 1e6,
 ): EquitySimResult {
+  if (!pnlRaw.length) {
+    return {
+      equityCurve: [startEquity],
+      finalEquity: startEquity,
+      maxDrawdown: 0,
+      drawdowns: [0],
+      profitPerTrade: [],
+    };
+  }
+
+  const returns = pnlToReturns(pnlRaw, riskPerTrade);
   let equity = startEquity;
   const equityCurve = [equity];
   let peak = equity;
@@ -92,15 +120,10 @@ function simulateEquity(
   const drawdowns = [0];
   const profitPerTrade: number[] = [];
 
-  for (const result of tradeResults) {
+  for (const r of returns) {
     const effectiveEquity = Math.min(equity, compoundCap);
     const prevEquity = equity;
-
-    if (result > 0) {
-      equity += effectiveEquity * riskPerTrade * rrr;
-    } else {
-      equity -= effectiveEquity * riskPerTrade;
-    }
+    equity += effectiveEquity * r;
 
     equityCurve.push(equity);
     profitPerTrade.push(equity - prevEquity);
@@ -132,100 +155,53 @@ interface PreparedFold {
   foldIdx: number;
   traces: NormalizedTrace[];
   hasPnl: boolean;
-  winPnl: number; // price-based per-trade P&L for wins
-  lossPnl: number; // price-based per-trade P&L for losses (negative)
+  winPnl: number;
+  lossPnl: number;
   slMult: number | undefined;
-  timestamp: string; // fold date or "WF-N" fallback
-  testSize: number; // number of bars in test period
+  timestamp: string;
+  testSize: number;
 }
 
 export function aggregatePerformance(details: GridDetail[]): PerformanceData {
   const assetBreakdown: AssetPerformance[] = [];
-  let totalTrades = 0;
-  let totalWins = 0;
-  let totalLosses = 0;
+
+  // Unified metrics that only the backend can compute
   let sumSharpe = 0;
   let countSharpe = 0;
   let sumCalmar = 0;
   let countCalmar = 0;
-  let sumRisk = 0;
-  let sumRrr = 0;
-  let countRiskRrr = 0;
-  let grossProfit = 0;
-  let grossLoss = 0;
-  let sumAvgWin = 0;
-  let sumAvgLoss = 0;
-  let countAvgWinLoss = 0;
-
-  // Aggregate unified metrics from all assets
   let sumAnnualReturn = 0;
   let countAnnualReturn = 0;
   let sumMaxDdPct = 0;
   let countMaxDd = 0;
-  let totalNetPnl = 0;
 
-  // ── Pass 1: read unified metrics from each asset ──
+  // Risk per trade for equity simulation
+  let sumRisk = 0;
+  let countRisk = 0;
+
+  // ── Pass 1: read backend-only metrics + prepare fold data ──
   const foldsByIndex = new Map<number, PreparedFold[]>();
 
   for (const d of details) {
     const config = getAssetConfig(d);
 
-    // Read metrics directly from top-level (merged from unified_metrics.json)
-    const assetTrades = d.trades ?? d.walk_forward?.total_trades ?? 0;
-    const winRate = d.win_rate ?? d.walk_forward?.mean_win_rate ?? 0;
-    const pnl = d.pnl ?? d.walk_forward?.mean_pnl ?? 0;
+    // Backend-only metrics (can't be computed from fold traces)
     const sharpe = d.sharpe ?? null;
     const calmar = d.calmar ?? null;
-    const assetRrr = d.rrr ?? 1;
-    const assetProfitFactor = d.profit_factor ?? null;
-
-    totalTrades += assetTrades;
-    totalWins += d.n_wins ?? Math.round(assetTrades * winRate);
-    totalLosses += d.n_losses ?? Math.round(assetTrades * (1 - winRate));
-    totalNetPnl += pnl;
 
     if (sharpe != null && sharpe !== 0) { sumSharpe += sharpe; countSharpe++; }
     if (calmar != null && calmar !== 0) { sumCalmar += calmar; countCalmar++; }
+    if (d.annual_return != null) { sumAnnualReturn += d.annual_return; countAnnualReturn++; }
+    if (d.max_drawdown != null) { sumMaxDdPct += d.max_drawdown * 100; countMaxDd++; }
 
-    if (d.annual_return != null) {
-      sumAnnualReturn += d.annual_return;
-      countAnnualReturn++;
-    }
-    if (d.max_drawdown != null) {
-      sumMaxDdPct += d.max_drawdown * 100;
-      countMaxDd++;
-    }
-    if (d.avg_win != null && d.avg_loss != null) {
-      sumAvgWin += d.avg_win;
-      sumAvgLoss += d.avg_loss;
-      countAvgWinLoss++;
-    }
-    if (d.profit_factor != null) {
-      grossProfit += d.avg_win != null && d.n_wins != null ? d.avg_win * d.n_wins : 0;
-      grossLoss += d.avg_loss != null && d.n_losses != null ? d.avg_loss * d.n_losses : 0;
-    }
-
-    // Collect risk/rrr for equity simulation
     const risk = d.risk_per_trade ?? (config?.risk_per_trade as number) ?? 0.01;
     sumRisk += risk;
-    sumRrr += assetRrr;
-    countRiskRrr++;
+    countRisk++;
 
-    assetBreakdown.push({
-      symbol: d.symbol,
-      status: d.status,
-      trades: assetTrades,
-      winRate: Math.round(winRate * 100 * 10) / 10,
-      pnl: Math.round(pnl * 1000) / 1000,
-      sharpeRatio: sharpe != null ? Math.round(sharpe * 100) / 100 : null,
-      calmarRatio: calmar != null ? Math.round(calmar * 100) / 100 : null,
-      profitFactor: assetProfitFactor,
-    });
-
-    // Asset spread for price-based P&L conversion (old runs)
+    // Asset spread for price-based P&L conversion (old runs without pnl_raw)
     const assetSpread = (config?.spread as number) ?? 0;
 
-    // Prepare fold data grouped by fold index (for equity curve visualization)
+    // Prepare fold data grouped by fold index
     if (d.walk_forward?.fold_details) {
       for (let fi = 0; fi < d.walk_forward.fold_details.length; fi++) {
         const fold = d.walk_forward.fold_details[fi]!;
@@ -265,18 +241,26 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     }
   }
 
-  // ── Pass 2: build trades from fold data (for equity curve visualization) ──
+  // ── Pass 2: build trades + compute all metrics from fold data ──
   const trades: TradeRecord[] = [];
+  const tradePnlValues: number[] = [];
   const equityCurve: EquityPoint[] = [];
-  const tradeResults: number[] = [];
   let cumulative = 0;
-  let peak = 0;
-  let maxDrawdown = 0;
+  let cumulativePeak = 0;
+  let absoluteMaxDrawdown = 0;
   let tradeIdx = 0;
 
-  // Only recompute from folds if unified metrics are missing
-  let foldGrossProfit = 0;
-  let foldGrossLoss = 0;
+  let totalWins = 0;
+  let totalLosses = 0;
+  let grossProfit = 0;
+  let grossLoss = 0;
+
+  // Per-asset accumulators for breakdown
+  const assetPnl = new Map<string, number>();
+  const assetWins = new Map<string, number>();
+  const assetLosses = new Map<string, number>();
+  const assetGrossProfit = new Map<string, number>();
+  const assetGrossLoss = new Map<string, number>();
 
   const sortedFoldIndices = [...foldsByIndex.keys()].sort((a, b) => a - b);
 
@@ -297,10 +281,21 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
           tradePnl = t.result === 1 ? pf.winPnl : pf.lossPnl;
         }
 
-        if (tradePnl > 0) foldGrossProfit += tradePnl;
-        else if (tradePnl < 0) foldGrossLoss += Math.abs(tradePnl);
+        tradePnlValues.push(tradePnl);
 
-        tradeResults.push(t.result);
+        if (tradePnl > 0) {
+          totalWins++;
+          grossProfit += tradePnl;
+          assetWins.set(pf.symbol, (assetWins.get(pf.symbol) ?? 0) + 1);
+          assetGrossProfit.set(pf.symbol, (assetGrossProfit.get(pf.symbol) ?? 0) + tradePnl);
+        } else if (tradePnl < 0) {
+          totalLosses++;
+          grossLoss += Math.abs(tradePnl);
+          assetLosses.set(pf.symbol, (assetLosses.get(pf.symbol) ?? 0) + 1);
+          assetGrossLoss.set(pf.symbol, (assetGrossLoss.get(pf.symbol) ?? 0) + Math.abs(tradePnl));
+        }
+
+        assetPnl.set(pf.symbol, (assetPnl.get(pf.symbol) ?? 0) + tradePnl);
 
         trades.push({
           timestamp: pf.timestamp,
@@ -312,9 +307,10 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
         });
 
         cumulative += tradePnl;
-        if (cumulative > peak) peak = cumulative;
-        const dd = peak - cumulative;
-        if (dd > maxDrawdown) maxDrawdown = dd;
+        if (cumulative > cumulativePeak) cumulativePeak = cumulative;
+        const dd = cumulativePeak - cumulative;
+        if (dd > absoluteMaxDrawdown) absoluteMaxDrawdown = dd;
+
         equityCurve.push({
           index: tradeIdx,
           label: `#${tradeIdx + 1}`,
@@ -325,55 +321,69 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     }
   }
 
-  // ── Equity Simulation (for chart visualization) ──
-  const avgRisk = countRiskRrr > 0 ? sumRisk / countRiskRrr : 0.01;
-  const avgWin = countAvgWinLoss > 0 ? sumAvgWin / countAvgWinLoss : 0;
-  const avgLoss = countAvgWinLoss > 0 ? sumAvgLoss / countAvgWinLoss : 0;
-  const realizedRrr = avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : (countRiskRrr > 0 ? sumRrr / countRiskRrr : 1);
+  // ── Compute metrics from trade data (single source of truth) ──
+  const totalTrades = trades.length;
+  const netPnl = Math.round(cumulative * 1000) / 1000;
+  const winRate = totalTrades > 0
+    ? Math.round((totalWins / totalTrades) * 100 * 10) / 10
+    : 0;
+  const profitFactor = grossLoss > 0
+    ? Math.round((grossProfit / grossLoss) * 100) / 100
+    : 0;
+  const avgWin = totalWins > 0
+    ? Math.round((grossProfit / totalWins) * 1000) / 1000
+    : 0;
+  const avgLoss = totalLosses > 0
+    ? Math.round((grossLoss / totalLosses) * 1000) / 1000
+    : 0;
 
-  const sim = simulateEquity(tradeResults, avgRisk, realizedRrr);
+  // ── Build asset breakdown from trade data ──
+  for (const d of details) {
+    const sym = d.symbol;
+    const aTrades = (assetWins.get(sym) ?? 0) + (assetLosses.get(sym) ?? 0);
+    const aWins = assetWins.get(sym) ?? 0;
+    const aPnl = assetPnl.get(sym) ?? 0;
+    const aGrossProfit = assetGrossProfit.get(sym) ?? 0;
+    const aGrossLoss = assetGrossLoss.get(sym) ?? 0;
+
+    assetBreakdown.push({
+      symbol: sym,
+      status: d.status,
+      trades: aTrades,
+      winRate: aTrades > 0 ? Math.round((aWins / aTrades) * 100 * 10) / 10 : 0,
+      pnl: Math.round(aPnl * 1000) / 1000,
+      sharpeRatio: d.sharpe != null ? Math.round(d.sharpe * 100) / 100 : null,
+      calmarRatio: d.calmar != null ? Math.round(d.calmar * 100) / 100 : null,
+      profitFactor: aGrossLoss > 0 ? Math.round((aGrossProfit / aGrossLoss) * 100) / 100 : null,
+    });
+  }
+
+  // ── Equity Simulation (PnL-based, mirrors backend) ──
+  const avgRisk = countRisk > 0 ? sumRisk / countRisk : 0.01;
+  const sim = simulateEquityFromPnl(tradePnlValues, avgRisk);
   const equitySimulation: EquitySimPoint[] = sim.equityCurve.map((eq, i) => ({
     index: i,
     equity: Math.round(eq * 100) / 100,
     drawdownPct: Math.round((sim.drawdowns[i] ?? 0) * 100) / 100,
   }));
 
-  // ── Use unified metrics as source of truth ──
+  // Max drawdown %: prefer unified_metrics (backend equity sim), fallback to frontend sim
+  const maxDrawdownPct = countMaxDd > 0
+    ? Math.round((sumMaxDdPct / countMaxDd) * 10) / 10
+    : Math.round(sim.maxDrawdown * 100 * 10) / 10;
+
+  // Annual return: only from unified_metrics (requires test_period_years)
   const annualReturn = countAnnualReturn > 0
     ? Math.round((sumAnnualReturn / countAnnualReturn) * 10) / 10
     : null;
 
-  const maxDrawdownPct = countMaxDd > 0
-    ? Math.round((sumMaxDdPct / countMaxDd) * 10) / 10
-    : 0;
-
-  // Profit factor: prefer from unified metrics, fallback to fold computation
-  const profitFactor = grossLoss > 0
-    ? Math.round((grossProfit / grossLoss) * 100) / 100
-    : (foldGrossLoss > 0
-        ? Math.round((foldGrossProfit / foldGrossLoss) * 100) / 100
-        : 0);
-
-  // Avg win/loss: fallback to fold computation if unified metrics missing
-  let finalAvgWin = avgWin;
-  let finalAvgLoss = avgLoss;
-  if (countAvgWinLoss === 0) {
-    const winTrades = trades.filter((t) => t.result === "win");
-    const lossTrades = trades.filter((t) => t.result === "loss");
-    if (winTrades.length) finalAvgWin = winTrades.reduce((s, t) => s + t.pnl, 0) / winTrades.length;
-    if (lossTrades.length) finalAvgLoss = lossTrades.reduce((s, t) => s + t.pnl, 0) / lossTrades.length;
-  }
-
   return {
     totalTrades,
-    winRate:
-      totalTrades > 0
-        ? Math.round((totalWins / totalTrades) * 100 * 10) / 10
-        : 0,
-    netPnl: Math.round(totalNetPnl * 1000) / 1000,
+    winRate,
+    netPnl,
     profitFactor,
-    avgWin: Math.round(finalAvgWin * 1000) / 1000,
-    avgLoss: Math.round(finalAvgLoss * 1000) / 1000,
+    avgWin,
+    avgLoss,
     sharpeRatio:
       countSharpe > 0
         ? Math.round((sumSharpe / countSharpe) * 100) / 100
@@ -382,7 +392,7 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
       countCalmar > 0
         ? Math.round((sumCalmar / countCalmar) * 100) / 100
         : null,
-    maxDrawdown: Math.round(maxDrawdown * 100) / 100,
+    maxDrawdown: Math.round(absoluteMaxDrawdown * 100) / 100,
     maxDrawdownPct,
     annualReturn,
     equityCurve,
