@@ -1,5 +1,5 @@
 /**
- * GET /api/strategy/plugins/:fqn/docs
+ * GET /api/plugins/:fqn/docs
  * Proxy to fwbg API: get plugin documentation (README).
  */
 export default defineEventHandler(async (event) => {

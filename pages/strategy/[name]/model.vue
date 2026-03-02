@@ -3,7 +3,9 @@ const store = useStrategyConfigStore();
 const { config } = storeToRefs(store);
 const modelRef = computed(() => config.value?._refs?.model);
 
-const { plugins } = usePlugins();
+const pluginStore = usePluginStore();
+const { plugins } = storeToRefs(pluginStore);
+pluginStore.load();
 const modelPlugins = computed(() =>
   plugins.value?.filter((p) => p.phase === "model") ?? []
 );

@@ -1,5 +1,5 @@
 /**
- * POST /api/strategy/plugins/:fqn/tests
+ * POST /api/plugins/:fqn/tests
  * Proxy to fwbg API: run tests for a plugin.
  */
 export default defineEventHandler(async (event) => {

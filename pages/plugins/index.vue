@@ -7,7 +7,9 @@ import {
 } from "~/types/strategy";
 import type { PluginInfo, PipelinePhase } from "~/types/strategy";
 
-const { plugins, pluginsByPhase, status } = usePlugins();
+const pluginStore = usePluginStore();
+const { plugins, pluginsByPhase, status } = storeToRefs(pluginStore);
+pluginStore.load();
 
 const searchQuery = ref("");
 const selectedPhase = ref<PipelinePhase | "all">("all");

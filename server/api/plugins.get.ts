@@ -1,5 +1,5 @@
 /**
- * GET /api/strategy/plugins
+ * GET /api/plugins
  * Proxy to fwbg API: list all plugins with schemas.
  * Query: ?phase=indicators
  */

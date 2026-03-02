@@ -12,10 +12,9 @@ const { config, isDirty, canUndo, canRedo } = storeToRefs(store);
 const { load, save, resetToSaved, undo, redo } = store;
 const pluginStore = usePluginStore();
 const { plugins } = storeToRefs(pluginStore);
-pluginStore.load();
 
-// Load strategy — blocks SSR so children have data
-await load(strategyName.value);
+// Load both — blocks SSR so children have data
+await Promise.all([pluginStore.load(), load(strategyName.value)]);
 
 const saving = ref(false);
 

@@ -5,8 +5,9 @@ import type { PluginInfo, PluginTestResult } from "~/types/strategy";
 const route = useRoute();
 const fqn = computed(() => (route.params.fqn as string[]).join("/"));
 
-const { getPlugin } = usePlugins();
-const plugin = computed(() => getPlugin(fqn.value));
+const pluginStore = usePluginStore();
+pluginStore.load();
+const plugin = computed(() => pluginStore.getPlugin(fqn.value));
 
 const testResult = ref<PluginTestResult | null>(null);
 const testing = ref(false);
@@ -16,7 +17,7 @@ async function runTests() {
   testResult.value = null;
   try {
     testResult.value = await $fetch<PluginTestResult>(
-      `/api/strategy/plugins/${encodeURIComponent(fqn.value)}/tests`,
+      `/api/plugins/${encodeURIComponent(fqn.value)}/tests`,
       { method: "POST" }
     );
   } catch (e: any) {
@@ -38,7 +39,7 @@ const paramEntries = computed(() => {
 
 // ── Plugin docs (README) ──
 const { data: docs } = useFetch<{ has_docs: boolean; readme: string | null }>(
-  () => `/api/strategy/plugins/${encodeURIComponent(fqn.value)}/docs`,
+  () => `/api/plugins/${encodeURIComponent(fqn.value)}/docs`,
   { watch: [fqn] }
 );
 </script>
@@ -132,8 +133,21 @@ const { data: docs } = useFetch<{ has_docs: boolean; readme: string | null }>(
               <span v-else>{{ schema.default }}</span>
             </div>
             <div class="col-span-2 text-gray-500 text-xs">
-              <span v-if="schema.min != null || schema.max != null">
+              <template v-if="schema.type === 'choice' && schema.choices">
+                <UBadge
+                  v-for="opt in schema.choices"
+                  :key="opt"
+                  :color="opt === schema.default ? 'primary' : 'neutral'"
+                  variant="subtle"
+                  size="xs"
+                  class="mr-1"
+                >
+                  {{ opt }}
+                </UBadge>
+              </template>
+              <span v-else-if="schema.min != null || schema.max != null">
                 {{ schema.min ?? '...' }} – {{ schema.max ?? '...' }}
+                <span v-if="schema.step">({{ schema.step }})</span>
               </span>
             </div>
             <div class="col-span-3 text-gray-500 text-xs">
