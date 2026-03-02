@@ -178,6 +178,7 @@ export interface StrategyConfig {
     trade_directions: string[];
     hyperparameters: Record<string, unknown>;
   };
+  signal_rules?: SignalRules;
   optimization?: {
     regime_filter_grid?: {
       condition_grids: Array<{
@@ -197,6 +198,63 @@ export interface StrategyConfig {
   validation: Record<string, unknown>;
   filters: Record<string, unknown>;
   resources: Record<string, unknown>;
+}
+
+// ──────────────────────────────────────────────
+// Signal Composer Types
+// ──────────────────────────────────────────────
+
+export type SignalConditionType =
+  | "signal_active"
+  | "value_check"
+  | "col_compare"
+  | "crossing"
+  | "group";
+
+export interface SignalCondition {
+  type: SignalConditionType;
+  column?: string;
+  column_a?: string;
+  column_b?: string;
+  op?: string;
+  value?: number;
+  direction?: "above" | "below";
+  operator?: "AND" | "OR";
+  conditions?: SignalCondition[];
+}
+
+export interface SignalRuleSet {
+  operator: "AND" | "OR";
+  conditions: SignalCondition[];
+}
+
+export interface SignalRules {
+  long?: SignalRuleSet;
+  short?: SignalRuleSet;
+}
+
+export interface ColumnInfo {
+  name: string;
+  full_name: string;
+  label: string;
+  type: "signal" | "plot";
+}
+
+export interface ColumnGroup {
+  fqn: string;
+  label: string;
+  group_labels: Record<string, string>;
+  columns: ColumnInfo[];
+}
+
+export interface AvailableColumnsResponse {
+  groups: ColumnGroup[];
+}
+
+export interface SignalPreviewResponse {
+  match_count: number;
+  total_bars: number;
+  timestamps: number[];
 }
 
 export interface StrategySummary {
