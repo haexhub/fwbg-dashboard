@@ -134,9 +134,19 @@ export interface ExitStrategyInstance {
   min_rrr?: number;
   exit_modifier?: string;
   exit_modifier_params?: Record<string, unknown>;
+  entry_modifier?: string;
+  entry_modifier_params?: Record<string, unknown>;
 }
 
 export interface ExitModifierInfo {
+  name: string;
+  description: string;
+  version: string;
+  param_schema: Record<string, ParamSchema>;
+  defaults: Record<string, unknown>;
+}
+
+export interface EntryModifierInfo {
   name: string;
   description: string;
   version: string;

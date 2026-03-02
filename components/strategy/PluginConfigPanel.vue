@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginInstance, PluginInfo, ParamSchema, ExitModifierInfo } from "~/types/strategy";
+import type { PluginInstance, PluginInfo, ParamSchema, ExitModifierInfo, EntryModifierInfo } from "~/types/strategy";
 
 const props = defineProps<{
   instance: PluginInstance | null;
@@ -22,11 +22,15 @@ interface ExitFields {
   short_ct: string;
   min_rrr: number;
   exit_modifier: string;
+  entry_modifier: string;
 }
-const localExit = ref<ExitFields>({ ct: "0.5", long_ct: "", short_ct: "", min_rrr: 0, exit_modifier: "" });
+const localExit = ref<ExitFields>({ ct: "0.5", long_ct: "", short_ct: "", min_rrr: 0, exit_modifier: "", entry_modifier: "" });
 
 // Exit modifier params as structured object
 const localModifierParams = ref<Record<string, unknown>>({});
+
+// Entry modifier params as structured object
+const localEntryModifierParams = ref<Record<string, unknown>>({});
 
 const isExitStrategy = computed(() => props.instance?.phase === "exit_strategies");
 
@@ -72,6 +76,44 @@ watch(
   },
 );
 
+// Fetch available entry modifiers
+const { data: entryModifiers } = useFetch<EntryModifierInfo[]>("/api/entry-modifiers", {
+  default: () => [],
+});
+
+// Dropdown items for entry modifier selection
+const entryModifierItems = computed(() => [
+  { label: "Kein Modifier", value: MODIFIER_NONE },
+  ...entryModifiers.value.map((m: EntryModifierInfo) => ({
+    label: m.name,
+    value: m.name,
+  })),
+]);
+
+// Currently selected entry modifier's info
+const selectedEntryModifierInfo = computed(() =>
+  entryModifiers.value.find((m: EntryModifierInfo) => m.name === localExit.value.entry_modifier),
+);
+
+const entryModifierParamEntries = computed(() =>
+  Object.entries(selectedEntryModifierInfo.value?.param_schema ?? {}),
+);
+
+// When entry modifier selection changes, initialize params with defaults
+watch(
+  () => localExit.value.entry_modifier,
+  (newModifier: string, oldModifier: string) => {
+    if (newModifier !== oldModifier) {
+      const info = entryModifiers.value.find((m: EntryModifierInfo) => m.name === newModifier);
+      if (info) {
+        localEntryModifierParams.value = { ...info.defaults, ...localEntryModifierParams.value };
+      } else {
+        localEntryModifierParams.value = {};
+      }
+    }
+  },
+);
+
 watch(
   () => props.instance,
   (inst) => {
@@ -85,8 +127,10 @@ watch(
           short_ct: (exitMeta?.short_ct as number[])?.join(", ") ?? "",
           min_rrr: (exitMeta?.min_rrr as number) ?? 0,
           exit_modifier: (exitMeta?.exit_modifier as string) ?? "",
+          entry_modifier: (exitMeta?.entry_modifier as string) ?? "",
         };
         localModifierParams.value = (exitMeta?.exit_modifier_params as Record<string, unknown>) ?? {};
+        localEntryModifierParams.value = (exitMeta?.entry_modifier_params as Record<string, unknown>) ?? {};
       }
     }
   },
@@ -120,6 +164,10 @@ function handleSave() {
       exit_modifier: String(localExit.value.exit_modifier || "") || undefined,
       exit_modifier_params: localExit.value.exit_modifier
         ? { ...localModifierParams.value }
+        : undefined,
+      entry_modifier: String(localExit.value.entry_modifier || "") || undefined,
+      entry_modifier_params: localExit.value.entry_modifier
+        ? { ...localEntryModifierParams.value }
         : undefined,
     };
   }
@@ -213,6 +261,30 @@ function handleReset() {
               :schema="paramSchema"
               :model-value="localModifierParams[name]"
               @update:model-value="localModifierParams[name] = $event"
+            />
+          </template>
+
+          <USeparator label="Entry Modifier" />
+
+          <UFormField label="Entry Modifier" :description="selectedEntryModifierInfo?.description || 'Optionaler Scale-In Modifier'">
+            <USelect
+              :model-value="String(localExit.entry_modifier || MODIFIER_NONE)"
+              :items="entryModifierItems"
+              value-key="value"
+              class="w-full"
+              @update:model-value="localExit.entry_modifier = $event === MODIFIER_NONE ? '' : $event"
+            />
+          </UFormField>
+
+          <!-- Entry modifier params (schema-driven) -->
+          <template v-if="localExit.entry_modifier && localExit.entry_modifier !== MODIFIER_NONE && entryModifierParamEntries.length">
+            <StrategyParamField
+              v-for="[paramName, paramSchema] in entryModifierParamEntries"
+              :key="`entry-mod-${paramName}`"
+              :name="paramName"
+              :schema="paramSchema"
+              :model-value="localEntryModifierParams[paramName]"
+              @update:model-value="localEntryModifierParams[paramName] = $event"
             />
           </template>
         </template>
