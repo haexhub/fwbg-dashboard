@@ -3,6 +3,27 @@ const store = useStrategyConfigStore();
 const { config } = storeToRefs(store);
 const modelRef = computed(() => config.value?._refs?.model);
 
+const route = useRoute();
+const strategyName = computed(() => String(route.params.name));
+
+const hasSignalRules = computed(() => {
+  const sr = config.value?.signal_rules;
+  return sr && (sr.long?.conditions?.length || sr.short?.conditions?.length);
+});
+
+const showRuleEditor = computed(() =>
+  config.value?.model?.type === "signal" || hasSignalRules.value
+);
+
+watch(() => config.value?.model?.type, (newType) => {
+  if (newType === "signal" && !config.value?.signal_rules) {
+    config.value!.signal_rules = {
+      long: { operator: "AND", conditions: [] },
+      short: { operator: "AND", conditions: [] },
+    };
+  }
+});
+
 const pluginStore = usePluginStore();
 const { plugins } = storeToRefs(pluginStore);
 pluginStore.load();
@@ -109,8 +130,23 @@ function toggleDirection(dir: string) {
         </div>
       </UCard>
 
-      <!-- Hyperparameters -->
-      <UCard>
+      <!-- Signal Rule Editor (when signal model or signal_rules exist) -->
+      <UCard v-if="showRuleEditor">
+        <template #header>
+          <h3 class="text-lg font-medium text-white">Signal Rules</h3>
+          <p v-if="config.model.type !== 'signal'" class="text-sm text-neutral-400 mt-1">
+            Regeln werden als Features für das ML-Modell verwendet.
+          </p>
+        </template>
+        <StrategySignalRuleEditor
+          :model-value="config.signal_rules"
+          :strategy-name="strategyName"
+          @update:model-value="config.signal_rules = $event"
+        />
+      </UCard>
+
+      <!-- Standard Hyperparameters (when NOT using signal rules) -->
+      <UCard v-else>
         <template #header>
           <h3 class="text-lg font-medium text-white">Hyperparameter</h3>
         </template>
