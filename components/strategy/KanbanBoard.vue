@@ -5,10 +5,6 @@ import type { PluginInfo, PluginInstance, PipelinePhase } from "~/types/strategy
 defineProps<{
   lanes: Record<PipelinePhase, PluginInstance[]>;
   plugins: PluginInfo[];
-  datasource?: string;
-  assetFilter: string[];
-  assetExclude: string[];
-  assetClasses: string[];
 }>();
 
 const emit = defineEmits<{
@@ -16,20 +12,11 @@ const emit = defineEmits<{
   movePlugin: [phase: PipelinePhase, instanceId: string, targetIndex: number];
   removePlugin: [phase: PipelinePhase, instanceId: string];
   configurePlugin: [instance: PluginInstance];
-  "update:datasource": [value: string | undefined];
-  configureDatasource: [];
 }>();
 </script>
 
 <template>
   <div class="flex gap-3 overflow-x-auto h-full">
-    <StrategyDatasourceLane
-      :datasource="datasource"
-      :asset-filter="assetFilter"
-      :asset-exclude="assetExclude"
-      @update:datasource="emit('update:datasource', $event)"
-      @configure="emit('configureDatasource')"
-    />
     <StrategyKanbanLane
       v-for="phase in PIPELINE_PHASES"
       :key="phase"

@@ -419,15 +419,19 @@ onMounted(() => {
     },
   });
 
-  // Set initial symbol and period
-  chart.setSymbol({
-    ticker: props.symbol,
-    pricePrecision: props.pricePrecision,
-    volumePrecision: 0,
-  });
-
+  // Set period first (no data load without symbol)
   const period = PERIOD_MAP[props.timeframe] ?? { type: "hour", span: 1 };
   chart.setPeriod(period as any);
+
+  // Only trigger initial data load if source is available;
+  // otherwise the combined source+symbol watch will handle it.
+  if (props.source) {
+    chart.setSymbol({
+      ticker: props.symbol,
+      pricePrecision: props.pricePrecision,
+      volumePrecision: 0,
+    });
+  }
 
   // Handle resize
   const observer = new ResizeObserver(() => {
@@ -470,17 +474,30 @@ onBeforeUnmount(() => {
   }
 });
 
-// Watch symbol changes → update chart symbol (triggers data reload via DataLoader)
+// Combined watch for source + symbol changes.
+// Vue batches reactive updates, so when both change in the same tick
+// (e.g. navigating from strategy page), this fires ONCE instead of
+// triggering multiple overlapping data loads.
 watch(
-  () => props.symbol,
-  (newSymbol) => {
-    if (!chart) return;
+  () => [props.source, props.symbol] as const,
+  ([newSource, newSymbol], [oldSource, oldSymbol]) => {
+    if (!chart || !newSource) return;
+    // Capture scroll position before reload
+    if (newSource !== oldSource || newSymbol !== oldSymbol) {
+      const dataList = chart.getDataList();
+      const range = chart.getVisibleRange();
+      if (dataList.length > 0 && range) {
+        const centerIdx = Math.round((range.from + range.to) / 2);
+        const clampedIdx = Math.max(0, Math.min(centerIdx, dataList.length - 1));
+        _restoreTimestamp = dataList[clampedIdx]?.timestamp ?? null;
+      }
+      streamDisconnect();
+    }
     chart.setSymbol({
       ticker: newSymbol,
       pricePrecision: props.pricePrecision,
       volumePrecision: 0,
     });
-    // Stream resubscribe happens after data reload in getBars callback
   }
 );
 
@@ -518,30 +535,6 @@ watch(
     chart.setSymbol({
       ticker: props.symbol,
       pricePrecision: prec,
-      volumePrecision: 0,
-    });
-  }
-);
-
-// Watch source changes → reset data (symbol stays same but source changes)
-watch(
-  () => props.source,
-  () => {
-    if (!chart) return;
-    // Capture position before reload
-    const dataList = chart.getDataList();
-    const range = chart.getVisibleRange();
-    if (dataList.length > 0 && range) {
-      const centerIdx = Math.round((range.from + range.to) / 2);
-      const clampedIdx = Math.max(0, Math.min(centerIdx, dataList.length - 1));
-      _restoreTimestamp = dataList[clampedIdx]?.timestamp ?? null;
-    }
-    // Disconnect stream first — will reconnect after data reload
-    streamDisconnect();
-    // Re-set symbol to trigger DataLoader reload
-    chart.setSymbol({
-      ticker: props.symbol,
-      pricePrecision: props.pricePrecision,
       volumePrecision: 0,
     });
   }

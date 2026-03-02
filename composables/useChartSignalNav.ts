@@ -6,9 +6,20 @@ import {
   updateSignalMarkerData,
 } from "~/composables/useChartIndicators";
 
+/** Bearish signal column name patterns — transitions in these columns get negated */
+const BEARISH_PATTERNS = /(?:_down|_bear|_short|_sell)/i;
+
+/** Retest signal column name patterns — rendered as circles instead of triangles */
+const RETEST_PATTERNS = /(?:_retest_)/i;
+
 /**
  * Extract signal TRANSITION timestamps + values from indicator response.
  * A transition is a point where the signal value changes from its previous value.
+ * Direction is inferred from column names: bearish columns (down/bear/short/sell)
+ * produce negative values, bullish columns produce positive values.
+ * Signal type is encoded in magnitude: |value| >= 1 = breakout (triangle),
+ * 0 < |value| < 1 = retest (circle).
+ * Transitions to 0 (resets) are skipped — only actual signal firings are included.
  */
 export function extractSignalTransitions(
   response: IndicatorResponse,
@@ -21,15 +32,17 @@ export function extractSignalTransitions(
     for (const col of columns) {
       const val = response.data[col]?.[i] ?? null;
       const prevVal = i > 0 ? (response.data[col]?.[i - 1] ?? null) : null;
-      if (val === null) continue;
-      if (prevVal === null && val !== 0) {
-        transitionValue = val;
-        break;
-      }
-      if (prevVal !== null && val !== prevVal) {
-        transitionValue = val;
-        break;
-      }
+      if (val === null || val === 0) continue;
+      const isTransition =
+        (prevVal === null && val !== 0) ||
+        (prevVal !== null && val !== prevVal);
+      if (!isTransition) continue;
+      // Infer direction from column name
+      const sign = BEARISH_PATTERNS.test(col) ? -1 : 1;
+      // Encode type in magnitude: 0.5 for retest, 1.0 for breakout
+      const magnitude = RETEST_PATTERNS.test(col) ? 0.5 : Math.abs(val);
+      transitionValue = magnitude * sign;
+      break;
     }
     if (transitionValue !== null) {
       const ts = response.timestamps[i]!;

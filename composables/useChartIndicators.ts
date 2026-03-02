@@ -25,7 +25,7 @@ export const LINE_COLORS = [
  * Strip common prefix from column names for a shorter legend.
  * e.g. ["ichi_tenkan", "ichi_kijun", "ichi_senkou_a"] → ["tenkan", "kijun", "senkou_a"]
  */
-function _shortenColumns(columns: string[]): string[] {
+export function _shortenColumns(columns: string[]): string[] {
   if (columns.length <= 1) return columns;
   // Find common prefix up to last underscore
   const parts = columns.map((c) => c.split("_"));
@@ -45,7 +45,7 @@ function _shortenColumns(columns: string[]): string[] {
  * Auto-detect appropriate decimal precision from indicator data.
  * Looks at actual values to determine if they're integers, low-precision, etc.
  */
-function _detectPrecision(
+export function _detectPrecision(
   response: IndicatorResponse,
   columns: string[]
 ): number {
@@ -72,7 +72,7 @@ function _detectPrecision(
 /**
  * Build a timestamp → index lookup map from IndicatorResponse.
  */
-function _buildTimestampIndex(
+export function _buildTimestampIndex(
   response: IndicatorResponse
 ): Map<number, number> {
   const map = new Map<number, number>();
@@ -86,7 +86,7 @@ function _buildTimestampIndex(
  * Build a calc function that maps kline bars to pre-computed indicator data.
  * Uses index-based alignment with timestamp verification fallback.
  */
-function _buildCalc(
+export function _buildCalc(
   response: IndicatorResponse,
   columns: string[]
 ): (klineDataList: { timestamp: number }[]) => Record<string, number | null>[] {
@@ -163,13 +163,9 @@ export function registerFwbgIndicator(
   columns: string[],
   colors?: Record<string, string>
 ) {
-  // Shorten column names for legend: strip common prefix
   const shortNames = _shortenColumns(columns);
-
-  // Auto-detect precision from data values
   const precision = _detectPrecision(response, columns);
 
-  // Build line styles for the indicator-level styles property
   const lines = columns.map((col, i) => {
     const color = colors?.[col] ?? LINE_COLORS[i % LINE_COLORS.length]!;
     return { style: "solid" as const, size: 1, color, smooth: false, dashedValue: [2, 2] };
@@ -288,33 +284,49 @@ export function ensureSignalMarkerRegistered() {
         const x = xAxis.convertToPixel(i);
         const value = _signalValueMap.get(bar.timestamp) ?? 0;
         const color = _getSignalColor(value);
+        // |value| < 1 = retest (circle), |value| >= 1 = breakout (triangle)
+        const isRetest = Math.abs(value) > 0 && Math.abs(value) < 1;
 
         if (value > 0) {
-          // Green upward triangle below candle low
-          const y = yAxis.convertToPixel(bar.low) + 12;
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x - 5, y + 9);
-          ctx.lineTo(x + 5, y + 9);
-          ctx.closePath();
-          ctx.fill();
-        } else if (value < 0) {
-          // Red downward triangle above candle high
-          const y = yAxis.convertToPixel(bar.high) - 12;
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x - 5, y - 9);
-          ctx.lineTo(x + 5, y - 9);
-          ctx.closePath();
-          ctx.fill();
-        } else {
-          // Gray dot below candle low
           const y = yAxis.convertToPixel(bar.low) + 14;
           ctx.fillStyle = color;
+          if (isRetest) {
+            // Green circle below candle low
+            ctx.beginPath();
+            ctx.arc(x, y + 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Green upward triangle below candle low
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - 7, y + 12);
+            ctx.lineTo(x + 7, y + 12);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else if (value < 0) {
+          const y = yAxis.convertToPixel(bar.high) - 14;
+          ctx.fillStyle = color;
+          if (isRetest) {
+            // Red circle above candle high
+            ctx.beginPath();
+            ctx.arc(x, y - 6, 6, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Red downward triangle above candle high
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - 7, y - 12);
+            ctx.lineTo(x + 7, y - 12);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else {
+          // Gray dot below candle low
+          const y = yAxis.convertToPixel(bar.low) + 16;
+          ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -693,6 +705,145 @@ export function ensureRangeRectRegistered() {
         ctx.lineWidth = 1;
         ctx.strokeRect(rx, ry, rw, rh);
       }
+      ctx.restore();
+      return true;
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORB Range Zones — semi-transparent rectangles showing which candles define
+// each session's opening range and the resulting price bounds
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ORB_ZONE_NAME = "fwbg_orb_zones";
+
+interface OrbZoneEntry {
+  indicatorId: string;
+  fqn: string;
+  startTs: number;
+  endTs: number;
+  high: number;
+  low: number;
+  session: string;
+}
+
+const _orbZones: OrbZoneEntry[] = [];
+let _orbZoneRegistered = false;
+
+export function addOrbZoneData(
+  indicatorId: string,
+  fqn: string,
+  zones: Array<{ start_ts: number; end_ts: number; high: number; low: number; session: string }>,
+) {
+  // Defensively remove any stale zones for the same plugin FQN before adding.
+  // This handles edge cases where removeOrbZoneData(oldId) missed entries
+  // (e.g. ID mismatch after URL restore, module reload, or rapid updates).
+  for (let i = _orbZones.length - 1; i >= 0; i--) {
+    if (_orbZones[i]!.fqn === fqn) {
+      _orbZones.splice(i, 1);
+    }
+  }
+  for (const z of zones) {
+    _orbZones.push({
+      indicatorId,
+      fqn,
+      startTs: z.start_ts,
+      endTs: z.end_ts,
+      high: z.high,
+      low: z.low,
+      session: z.session,
+    });
+  }
+}
+
+export function removeOrbZoneData(indicatorId: string) {
+  for (let i = _orbZones.length - 1; i >= 0; i--) {
+    if (_orbZones[i]!.indicatorId === indicatorId) {
+      _orbZones.splice(i, 1);
+    }
+  }
+}
+
+export function hasOrbZones(): boolean {
+  return _orbZones.length > 0;
+}
+
+export function ensureOrbZoneRegistered() {
+  if (_orbZoneRegistered) return;
+  _orbZoneRegistered = true;
+
+  registerIndicator({
+    name: ORB_ZONE_NAME,
+    shortName: "",
+    calcParams: [],
+    figures: [],
+    calc: (klineDataList) => klineDataList.map(() => ({})),
+    draw: ({ ctx, chart, xAxis, yAxis }) => {
+      if (_orbZones.length === 0) return true;
+
+      const data = chart.getDataList();
+      if (data.length === 0) return true;
+
+      const range = chart.getVisibleRange();
+
+      // Build timestamp → bar-index map
+      const tsToIdx = new Map<number, number>();
+      for (let i = 0; i < data.length; i++) {
+        tsToIdx.set(data[i]!.timestamp, i);
+      }
+
+      function findFloorIndex(targetTs: number): number {
+        const exact = tsToIdx.get(targetTs);
+        if (exact !== undefined) return exact;
+        let lo = 0, hi = data.length - 1, floor = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (data[mid]!.timestamp <= targetTs) { floor = mid; lo = mid + 1; }
+          else { hi = mid - 1; }
+        }
+        return floor >= 0 ? floor : 0;
+      }
+
+      ctx.save();
+
+      for (const zone of _orbZones) {
+        const startIdx = findFloorIndex(zone.startTs);
+        const endIdx = findFloorIndex(zone.endTs);
+
+        // Skip zones outside visible range
+        if (endIdx < range.from - 2 || startIdx > range.to + 2) continue;
+
+        const x1 = xAxis.convertToPixel(startIdx);
+        const x2 = xAxis.convertToPixel(endIdx);
+        const yTop = yAxis.convertToPixel(zone.high);
+        const yBot = yAxis.convertToPixel(zone.low);
+
+        // Half-bar padding
+        const barCount = endIdx - startIdx;
+        const oneBarPx = barCount > 0 ? (x2 - x1) / barCount : 12;
+        const halfBar = Math.max(2, Math.min(oneBarPx * 0.5, 8));
+
+        const rx = x1 - halfBar;
+        const rw = (x2 - x1) + halfBar * 2;
+        const rh = Math.max(yBot - yTop, 1);
+
+        // Filled rectangle
+        ctx.fillStyle = "rgba(255, 152, 0, 0.10)";
+        ctx.fillRect(rx, yTop, rw, rh);
+
+        // Border
+        ctx.strokeStyle = "rgba(255, 152, 0, 0.35)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx, yTop, rw, rh);
+
+        // Session label
+        ctx.fillStyle = "rgba(255, 152, 0, 0.6)";
+        ctx.font = "9px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(zone.session, rx + 2, yTop + 10);
+      }
+
       ctx.restore();
       return true;
     },

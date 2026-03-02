@@ -466,7 +466,7 @@ function colDropdownItems(col: string) {
           </p>
         </UFormField>
         <UFormField label="Zeitzone">
-          <USelect v-model="timezone" :items="timezoneOptions" :content="{ class: 'min-w-64' }" class="w-full font-mono" />
+          <USelect v-model="timezone" :items="timezoneOptions" :ui="{ content: 'min-w-64' }" class="w-full font-mono" />
         </UFormField>
       </div>
 

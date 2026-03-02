@@ -92,7 +92,8 @@ export function useChartTradeOverlay() {
             const colors: Record<string, string> = {};
             plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgIndicator(instanceId, response, plotCols, colors);
-            const paneId = chart?.createIndicator({ name: instanceId }, false, { height: 120 }) ?? "";
+            chart?.createIndicator({ name: instanceId }, false, { height: 120 });
+            const paneId = chart ? (chart.getIndicators({ name: instanceId })[0] as any)?.paneId ?? "" : "";
             ctx.addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: entry.params ?? plugin.defaults, columns: plotCols, paneId });
           }
 
@@ -101,7 +102,8 @@ export function useChartTradeOverlay() {
             const sigColors: Record<string, string> = {};
             sigCols.forEach((col, i) => { sigColors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgSignalIndicator(sigId, response, sigCols, sigColors);
-            const paneId = chart?.createIndicator({ name: sigId }, false, { height: 80 }) ?? "";
+            chart?.createIndicator({ name: sigId }, false, { height: 80 });
+            const paneId = chart ? (chart.getIndicators({ name: sigId })[0] as any)?.paneId ?? "" : "";
             const transitions = extractSignalTransitions(response, sigCols);
             ctx.addIndicator({ id: sigId, fqn: plugin.fqn, name: `${plugin.name} (signal)`, params: entry.params ?? plugin.defaults, columns: sigCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap });
           }

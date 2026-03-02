@@ -88,6 +88,7 @@ const chartWrapperRef = useTemplateRef<HTMLElement>("chartWrapperRef");
 const indicatorPanelOpen = ref(false);
 const editIndicator = ref<import("~/types/chart").ActiveIndicator | null>(null);
 const strategySaveOpen = ref(false);
+const signalBuilderOpen = ref(false);
 
 const pricePrecision = computed(() =>
   currentSymbol.value?.point
@@ -583,6 +584,7 @@ watch(
         @update:session-enabled-ids="handleSessionEnabledIdsChange"
         :has-active-indicators="activeIndicators.length > 0"
         @open-indicators="indicatorPanelOpen = true"
+        @create-signal="signalBuilderOpen = true"
         @save-strategy="strategySaveOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
@@ -724,6 +726,14 @@ watch(
         :default-name="previewStrategyName"
         :strategy-filename="queryStrategy"
         @update:open="strategySaveOpen = $event"
+      />
+
+      <!-- Signal Rule Builder -->
+      <ChartSignalRuleBuilder
+        :open="signalBuilderOpen"
+        :active-indicators="activeIndicators"
+        @update:open="signalBuilderOpen = $event"
+        @saved="pluginStore.refresh()"
       />
     </div>
 

@@ -36,6 +36,7 @@ const emit = defineEmits<{
   "update:range-use-open-close": [value: boolean];
   "update:session-enabled-ids": [value: string[]];
   "open-indicators": [];
+  "create-signal": [];
   "save-strategy": [];
   screenshot: [];
   "toggle-fullscreen": [];
@@ -258,6 +259,18 @@ const lineToolItems = computed(() =>
         class="ml-1"
       />
     </UButton>
+
+    <!-- Custom Signal button -->
+    <UTooltip text="Custom Signal aus Indikator-Kombinationen erstellen">
+      <UButton
+        icon="i-lucide-wand-sparkles"
+        variant="ghost"
+        :disabled="!hasActiveIndicators"
+        @click="emit('create-signal')"
+      >
+        Custom Signal
+      </UButton>
+    </UTooltip>
 
     <USeparator orientation="vertical" class="h-6" />
 

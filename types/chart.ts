@@ -50,6 +50,14 @@ export interface OhlcvBar {
 
 // ── Indicator API response ──
 
+export interface RangeZone {
+  start_ts: number;
+  end_ts: number;
+  high: number;
+  low: number;
+  session: string;
+}
+
 export interface IndicatorResponse {
   fqn: string;
   columns: string[];
@@ -57,6 +65,7 @@ export interface IndicatorResponse {
   signal_columns: string[];
   timestamps: number[];
   data: Record<string, (number | null)[]>;
+  range_zones?: RangeZone[];
 }
 
 // ── Active indicator on chart ──

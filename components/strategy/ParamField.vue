@@ -44,9 +44,9 @@ const listString = computed({
   },
 });
 
-// Choices for select fields
+// Choices for select/choice fields
 const choiceItems = computed(() =>
-  (props.schema.choices ?? []).map((c) => ({ label: c, value: c }))
+  (props.schema.choices ?? []).map((c: string) => ({ label: c, value: c }))
 );
 </script>
 
@@ -75,6 +75,7 @@ const choiceItems = computed(() =>
         :model-value="String(value ?? '')"
         :items="choiceItems"
         value-key="value"
+        class="w-full"
         @update:model-value="emit('update:modelValue', $event)"
       />
 

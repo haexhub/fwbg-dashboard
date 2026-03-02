@@ -13,6 +13,8 @@ const emit = defineEmits<{
   "toggle-collapse": [id: string];
   "collapse-all": [];
   "expand-all": [];
+  "edit": [id: string];
+  "toggle-overlay": [id: string];
   "remove": [id: string];
   "signal-prev": [];
   "signal-next": [];
@@ -87,6 +89,25 @@ function handleSignalInput() {
         class="p-0"
         :title="collapsedIds[ind.id] ? 'Erweitern' : 'Minimieren'"
         @click="emit('toggle-collapse', ind.id)"
+      />
+      <UButton
+        icon="i-lucide-pencil"
+        variant="ghost"
+        color="neutral"
+        size="xs"
+        class="p-0"
+        title="Bearbeiten"
+        @click="emit('edit', ind.id)"
+      />
+      <UButton
+        v-if="!ind.isSignal"
+        :icon="ind.paneId === 'candle_pane' ? 'i-lucide-arrow-down-from-line' : 'i-lucide-arrow-up-to-line'"
+        variant="ghost"
+        color="neutral"
+        size="xs"
+        class="p-0"
+        :title="ind.paneId === 'candle_pane' ? 'Eigenes Pane' : 'Auf Hauptchart'"
+        @click="emit('toggle-overlay', ind.id)"
       />
       <UButton
         icon="i-lucide-x"

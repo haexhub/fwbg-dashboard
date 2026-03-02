@@ -28,6 +28,10 @@ const errorMessage = ref("");
 const isUpdateMode = ref(false);
 const existingConfig = ref<import("~/types/strategy").StrategyConfig | null>(null);
 
+const SIGNAL_NONE = "__none__";
+const signalColumnLong = ref(SIGNAL_NONE);
+const signalColumnShort = ref(SIGNAL_NONE);
+
 const canSave = computed(
   () => (isUpdateMode.value || strategyName.value.trim().length > 0) && (status.value === "idle" || status.value === "error"),
 );
@@ -45,6 +49,30 @@ const uniqueIndicators = computed(() => {
   }
   return [...map.values()];
 });
+
+// Collect all signal columns from active signal indicators
+const allSignalColumns = computed(() => {
+  const cols: string[] = [];
+  for (const ind of props.activeIndicators) {
+    if (ind.isSignal) cols.push(...ind.columns);
+  }
+  return cols;
+});
+
+const signalColumnOptions = computed(() => {
+  const cols = new Set<string>(allSignalColumns.value);
+  // Include existing mapping values so they stay visible in update mode
+  if (signalColumnLong.value !== SIGNAL_NONE) cols.add(signalColumnLong.value);
+  if (signalColumnShort.value !== SIGNAL_NONE) cols.add(signalColumnShort.value);
+  return [
+    { label: "— Nicht gesetzt —", value: SIGNAL_NONE },
+    ...Array.from(cols, (col) => ({ label: col, value: col })),
+  ];
+});
+
+const showSignalMapping = computed(() =>
+  allSignalColumns.value.length > 0 || signalColumnLong.value !== SIGNAL_NONE || signalColumnShort.value !== SIGNAL_NONE,
+);
 
 // Build non-default params display for an indicator
 function displayParams(params: Record<string, unknown>): string {
@@ -70,13 +98,30 @@ async function save() {
 
   try {
     if (isUpdateMode.value && existingConfig.value && props.strategyFilename) {
-      // Update existing strategy — only touch pipeline indicators
+      // Update existing strategy — touch pipeline indicators + signal mapping
+      const longCol = signalColumnLong.value !== SIGNAL_NONE ? signalColumnLong.value : "";
+      const shortCol = signalColumnShort.value !== SIGNAL_NONE ? signalColumnShort.value : "";
+      const hasSignalMapping = longCol || shortCol;
+      const existingModel = existingConfig.value.model ?? {};
+      const updatedModel = hasSignalMapping
+        ? {
+            ...existingModel,
+            type: "signal",
+            hyperparameters: {
+              ...(existingModel.hyperparameters ?? {}),
+              ...(longCol ? { signal_column_long: longCol } : {}),
+              ...(shortCol ? { signal_column_short: shortCol } : {}),
+            },
+          }
+        : existingModel;
+
       const updated = {
         ...existingConfig.value,
         pipeline: {
           ...existingConfig.value.pipeline,
           indicators,
         },
+        model: updatedModel,
       };
       await saveStrategy(props.strategyFilename, updated);
       savedFilename.value = props.strategyFilename;
@@ -87,6 +132,26 @@ async function save() {
       });
     } else {
       // Create new strategy
+      const longCol = signalColumnLong.value !== SIGNAL_NONE ? signalColumnLong.value : "";
+      const shortCol = signalColumnShort.value !== SIGNAL_NONE ? signalColumnShort.value : "";
+      const hasSignalMapping = longCol || shortCol;
+      const modelConfig = hasSignalMapping
+        ? {
+            type: "signal",
+            architecture: "long_short_separate",
+            trade_directions: ["long", "short"],
+            hyperparameters: {
+              ...(longCol ? { signal_column_long: longCol } : {}),
+              ...(shortCol ? { signal_column_short: shortCol } : {}),
+            },
+          }
+        : {
+            type: "xgboost",
+            architecture: "long_short_separate",
+            trade_directions: ["long", "short"],
+            hyperparameters: {},
+          };
+
       const res = await createStrategy(strategyName.value.trim(), {
         description: strategyDescription.value.trim() || undefined,
         datasource: props.source,
@@ -100,12 +165,7 @@ async function save() {
         exit_strategies: [
           { name: "fixed", params: { tp_mult: 2.0, sl_mult: 1.0 }, ct: [0.5] },
         ],
-        model: {
-          type: "xgboost",
-          architecture: "long_short_separate",
-          trade_directions: ["long", "short"],
-          hyperparameters: {},
-        },
+        model: modelConfig,
         optimization: {},
         validation: { method: "walk_forward", folds: 8 },
         filters: {},
@@ -144,6 +204,8 @@ watch(
       errorMessage.value = "";
       existingConfig.value = null;
       isUpdateMode.value = false;
+      signalColumnLong.value = SIGNAL_NONE;
+      signalColumnShort.value = SIGNAL_NONE;
 
       if (props.strategyFilename) {
         try {
@@ -151,6 +213,13 @@ watch(
           strategyName.value = existingConfig.value.name;
           strategyDescription.value = existingConfig.value.description ?? "";
           isUpdateMode.value = true;
+
+          // Restore signal column mapping from existing config
+          const hp = existingConfig.value.model?.hyperparameters;
+          if (hp) {
+            signalColumnLong.value = hp.signal_column_long ? String(hp.signal_column_long) : SIGNAL_NONE;
+            signalColumnShort.value = hp.signal_column_short ? String(hp.signal_column_short) : SIGNAL_NONE;
+          }
         } catch {
           // Strategy not found — fall back to create mode
           strategyName.value = props.defaultName ?? "";
@@ -254,6 +323,30 @@ watch(
             </div>
           </div>
         </div>
+
+        <!-- Signal Column Mapping -->
+        <template v-if="showSignalMapping">
+          <USeparator label="Signal Mapping" />
+          <p class="text-xs text-gray-500">
+            Signal-Columns als Long/Short-Entry zuweisen. Setzt automatisch das Signal-Modell.
+          </p>
+          <UFormField label="Long Signal">
+            <USelect
+              v-model="signalColumnLong"
+              :items="signalColumnOptions"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField label="Short Signal">
+            <USelect
+              v-model="signalColumnShort"
+              :items="signalColumnOptions"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+        </template>
 
         <!-- Error -->
         <div v-if="status === 'error'" class="rounded-md bg-red-900/30 border border-red-700/40 p-3">
