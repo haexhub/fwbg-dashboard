@@ -125,6 +125,25 @@ export interface PipelineEntry {
   is_signal?: boolean;
 }
 
+export interface ExitStrategyInstance {
+  name: string;
+  params: Record<string, unknown>;
+  ct?: number[];
+  long_ct?: number[];
+  short_ct?: number[];
+  min_rrr?: number;
+  exit_modifier?: string;
+  exit_modifier_params?: Record<string, unknown>;
+}
+
+export interface ExitModifierInfo {
+  name: string;
+  description: string;
+  version: string;
+  param_schema: Record<string, ParamSchema>;
+  defaults: Record<string, unknown>;
+}
+
 export interface StrategyConfig {
   _refs?: import("~/types/preset").StrategyRefs;
   name: string;
@@ -140,8 +159,7 @@ export interface StrategyConfig {
     feature_selection?: PipelineEntry[];
     data_loading?: PipelineEntry[];
   };
-  exit_strategy: string;
-  exit_params: Record<string, unknown>;
+  exit_strategies: ExitStrategyInstance[];
   risk_management?: string;
   risk_params?: Record<string, unknown>;
   model: {
@@ -151,10 +169,6 @@ export interface StrategyConfig {
     hyperparameters: Record<string, unknown>;
   };
   optimization?: {
-    ct?: number[];
-    long_ct?: number[];
-    short_ct?: number[];
-    min_rrr?: number;
     regime_filter_grid?: {
       condition_grids: Array<{
         column: string;
@@ -164,7 +178,6 @@ export interface StrategyConfig {
         else_directions: number;
       }>;
     };
-    exit_modifier_params_grid?: Record<string, unknown>[];
     model_hyperparameters_grid?: Record<string, unknown>[];
   };
   assets?: {

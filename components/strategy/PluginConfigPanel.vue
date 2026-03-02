@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginInstance, PluginInfo, ParamSchema } from "~/types/strategy";
+import type { PluginInstance, PluginInfo, ParamSchema, ExitModifierInfo } from "~/types/strategy";
 
 const props = defineProps<{
   instance: PluginInstance | null;
@@ -18,7 +18,50 @@ const localParams = ref<Record<string, unknown>>({});
 // Exit-strategy-specific fields (CT, min_rrr, exit_modifier)
 const localExit = ref<Record<string, unknown>>({});
 
+// Exit modifier params as structured object
+const localModifierParams = ref<Record<string, unknown>>({});
+
 const isExitStrategy = computed(() => props.instance?.phase === "exit_strategies");
+
+// Fetch available exit modifiers
+const { data: exitModifiers } = useFetch<ExitModifierInfo[]>("/api/exit-modifiers", {
+  default: () => [],
+});
+
+// Dropdown items for exit modifier selection
+const modifierItems = computed(() => [
+  { label: "Kein Modifier", value: "" },
+  ...exitModifiers.value.map((m: ExitModifierInfo) => ({
+    label: m.name,
+    value: m.name,
+  })),
+]);
+
+// Currently selected modifier's schema
+const selectedModifierInfo = computed(() =>
+  exitModifiers.value.find((m: ExitModifierInfo) => m.name === localExit.value.exit_modifier),
+);
+
+const modifierParamSchema = computed<Record<string, ParamSchema>>(() =>
+  selectedModifierInfo.value?.param_schema ?? {},
+);
+
+const modifierParamNames = computed(() => Object.keys(modifierParamSchema.value));
+
+// When modifier selection changes, initialize params with defaults
+watch(
+  () => localExit.value.exit_modifier,
+  (newModifier: unknown, oldModifier: unknown) => {
+    if (newModifier !== oldModifier) {
+      const info = exitModifiers.value.find((m: ExitModifierInfo) => m.name === newModifier);
+      if (info) {
+        localModifierParams.value = { ...info.defaults, ...localModifierParams.value };
+      } else {
+        localModifierParams.value = {};
+      }
+    }
+  },
+);
 
 watch(
   () => props.instance,
@@ -33,14 +76,12 @@ watch(
           short_ct: (exitMeta?.short_ct as number[])?.join(", ") ?? "",
           min_rrr: exitMeta?.min_rrr ?? 0,
           exit_modifier: exitMeta?.exit_modifier ?? "",
-          exit_modifier_params: exitMeta?.exit_modifier_params
-            ? JSON.stringify(exitMeta.exit_modifier_params)
-            : "",
         };
+        localModifierParams.value = (exitMeta?.exit_modifier_params as Record<string, unknown>) ?? {};
       }
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const schema = computed<Record<string, ParamSchema>>(() => {
@@ -62,19 +103,15 @@ function handleSave() {
     const longCtStr = String(localExit.value.long_ct ?? "");
     const shortCtStr = String(localExit.value.short_ct ?? "");
 
-    let exitModifierParams: Record<string, unknown> | undefined;
-    const emParamsStr = String(localExit.value.exit_modifier_params ?? "").trim();
-    if (emParamsStr) {
-      try { exitModifierParams = JSON.parse(emParamsStr); } catch { /* ignore */ }
-    }
-
     exitMeta = {
       ct: ct.length ? ct : [0.5],
       long_ct: longCtStr ? parseNumberList(longCtStr) : undefined,
       short_ct: shortCtStr ? parseNumberList(shortCtStr) : undefined,
       min_rrr: Number(localExit.value.min_rrr) || 0,
       exit_modifier: String(localExit.value.exit_modifier || "") || undefined,
-      exit_modifier_params: exitModifierParams,
+      exit_modifier_params: localExit.value.exit_modifier
+        ? { ...localModifierParams.value }
+        : undefined,
     };
   }
 
@@ -146,13 +183,29 @@ function handleReset() {
             <UInput v-model="localExit.min_rrr" type="number" step="0.1" placeholder="0" class="w-32" />
           </UFormField>
 
-          <UFormField label="Exit Modifier" description="Optionales Plugin (z.B. trailing_stop)">
-            <UInput v-model="localExit.exit_modifier" placeholder="z.B. trailing_stop" />
+          <USeparator label="Exit Modifier" />
+
+          <UFormField label="Exit Modifier" :description="selectedModifierInfo?.description || 'Optionales Modifier-Plugin (z.B. Trailing Stop)'">
+            <USelect
+              :model-value="String(localExit.exit_modifier ?? '')"
+              :items="modifierItems"
+              value-key="value"
+              class="w-full"
+              @update:model-value="localExit.exit_modifier = $event"
+            />
           </UFormField>
 
-          <UFormField v-if="localExit.exit_modifier" label="Exit Modifier Params" description="JSON-Objekt">
-            <UTextarea v-model="localExit.exit_modifier_params" placeholder='{"breakeven_trigger": 0.5}' :rows="3" />
-          </UFormField>
+          <!-- Exit modifier params (schema-driven) -->
+          <template v-if="localExit.exit_modifier && modifierParamNames.length">
+            <StrategyParamField
+              v-for="name in modifierParamNames"
+              :key="`mod-${name}`"
+              :name="name"
+              :schema="modifierParamSchema[name]"
+              :model-value="localModifierParams[name]"
+              @update:model-value="localModifierParams[name] = $event"
+            />
+          </template>
         </template>
       </div>
     </template>
