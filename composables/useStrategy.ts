@@ -188,7 +188,7 @@ export function useStrategy() {
 
     // Exit strategies: add _exit metadata with defaults
     if (phase === "exit_strategies") {
-      (instance as Record<string, unknown>)._exit = {
+      (instance as unknown as Record<string, unknown>)._exit = {
         ct: [0.5],
         min_rrr: 0,
       };

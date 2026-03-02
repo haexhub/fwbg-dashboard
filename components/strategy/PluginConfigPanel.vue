@@ -16,7 +16,14 @@ const emit = defineEmits<{
 const localParams = ref<Record<string, unknown>>({});
 
 // Exit-strategy-specific fields (CT, min_rrr, exit_modifier)
-const localExit = ref<Record<string, unknown>>({});
+interface ExitFields {
+  ct: string;
+  long_ct: string;
+  short_ct: string;
+  min_rrr: number;
+  exit_modifier: string;
+}
+const localExit = ref<ExitFields>({ ct: "0.5", long_ct: "", short_ct: "", min_rrr: 0, exit_modifier: "" });
 
 // Exit modifier params as structured object
 const localModifierParams = ref<Record<string, unknown>>({});
@@ -29,8 +36,10 @@ const { data: exitModifiers } = useFetch<ExitModifierInfo[]>("/api/exit-modifier
 });
 
 // Dropdown items for exit modifier selection
+const MODIFIER_NONE = "__none__";
+
 const modifierItems = computed(() => [
-  { label: "Kein Modifier", value: "" },
+  { label: "Kein Modifier", value: MODIFIER_NONE },
   ...exitModifiers.value.map((m: ExitModifierInfo) => ({
     label: m.name,
     value: m.name,
@@ -46,12 +55,12 @@ const modifierParamSchema = computed<Record<string, ParamSchema>>(() =>
   selectedModifierInfo.value?.param_schema ?? {},
 );
 
-const modifierParamNames = computed(() => Object.keys(modifierParamSchema.value));
+const modifierParamEntries = computed(() => Object.entries(modifierParamSchema.value));
 
 // When modifier selection changes, initialize params with defaults
 watch(
   () => localExit.value.exit_modifier,
-  (newModifier: unknown, oldModifier: unknown) => {
+  (newModifier: string, oldModifier: string) => {
     if (newModifier !== oldModifier) {
       const info = exitModifiers.value.find((m: ExitModifierInfo) => m.name === newModifier);
       if (info) {
@@ -69,13 +78,13 @@ watch(
     if (inst) {
       localParams.value = { ...props.pluginInfo?.defaults, ...inst.params };
       if (isExitStrategy.value) {
-        const exitMeta = (inst as Record<string, unknown>)._exit as Record<string, unknown> | undefined;
+        const exitMeta = (inst as unknown as Record<string, unknown>)._exit as Record<string, unknown> | undefined;
         localExit.value = {
           ct: (exitMeta?.ct as number[])?.join(", ") ?? "0.5",
           long_ct: (exitMeta?.long_ct as number[])?.join(", ") ?? "",
           short_ct: (exitMeta?.short_ct as number[])?.join(", ") ?? "",
-          min_rrr: exitMeta?.min_rrr ?? 0,
-          exit_modifier: exitMeta?.exit_modifier ?? "",
+          min_rrr: (exitMeta?.min_rrr as number) ?? 0,
+          exit_modifier: (exitMeta?.exit_modifier as string) ?? "",
         };
         localModifierParams.value = (exitMeta?.exit_modifier_params as Record<string, unknown>) ?? {};
       }
@@ -88,7 +97,7 @@ const schema = computed<Record<string, ParamSchema>>(() => {
   return props.pluginInfo?.param_schema ?? {};
 });
 
-const paramNames = computed(() => Object.keys(schema.value));
+const paramEntries = computed(() => Object.entries(schema.value));
 
 function parseNumberList(str: string): number[] {
   return str.split(",").map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n));
@@ -149,16 +158,16 @@ function handleReset() {
 
     <template #body>
       <div class="space-y-4">
-        <div v-if="!paramNames.length && !isExitStrategy" class="text-gray-400 text-sm py-4">
+        <div v-if="!paramEntries.length && !isExitStrategy" class="text-gray-400 text-sm py-4">
           This plugin has no configurable parameters.
         </div>
 
         <!-- Plugin params -->
         <StrategyParamField
-          v-for="name in paramNames"
+          v-for="[name, paramSchema] in paramEntries"
           :key="name"
           :name="name"
-          :schema="schema[name]!"
+          :schema="paramSchema"
           :model-value="localParams[name]"
           @update:model-value="localParams[name] = $event"
         />
@@ -187,21 +196,21 @@ function handleReset() {
 
           <UFormField label="Exit Modifier" :description="selectedModifierInfo?.description || 'Optionales Modifier-Plugin (z.B. Trailing Stop)'">
             <USelect
-              :model-value="String(localExit.exit_modifier ?? '')"
+              :model-value="String(localExit.exit_modifier || MODIFIER_NONE)"
               :items="modifierItems"
               value-key="value"
               class="w-full"
-              @update:model-value="localExit.exit_modifier = $event"
+              @update:model-value="localExit.exit_modifier = $event === MODIFIER_NONE ? '' : $event"
             />
           </UFormField>
 
           <!-- Exit modifier params (schema-driven) -->
-          <template v-if="localExit.exit_modifier && modifierParamNames.length">
+          <template v-if="localExit.exit_modifier && modifierParamEntries.length">
             <StrategyParamField
-              v-for="name in modifierParamNames"
+              v-for="[name, paramSchema] in modifierParamEntries"
               :key="`mod-${name}`"
               :name="name"
-              :schema="modifierParamSchema[name]"
+              :schema="paramSchema"
               :model-value="localModifierParams[name]"
               @update:model-value="localModifierParams[name] = $event"
             />
