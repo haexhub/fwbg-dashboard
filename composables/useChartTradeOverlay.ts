@@ -3,9 +3,13 @@ import type { PluginInfo } from "~/types/strategy";
 import type { ActiveIndicator, IndicatorResponse } from "~/types/chart";
 import {
   TRADE_MARKER_NAME,
+  ORB_ZONE_NAME,
   ensureTradeMarkerRegistered,
+  ensureOrbZoneRegistered,
   updateTradeMarkerData,
   clearTradeMarkerData,
+  addOrbZoneData,
+  hasOrbZones,
   type RunTradeMarker,
   registerFwbgIndicator,
   registerFwbgSignalIndicator,
@@ -48,18 +52,38 @@ export interface TradeOverlayContext {
   limit: number;
 }
 
+interface RunDetail {
+  config?: { timeframe?: string };
+  strategy?: {
+    timeframe?: string;
+    pipeline?: { indicators?: Array<{ name: string; params: Record<string, unknown> }> };
+  };
+}
+
 export function useChartTradeOverlay() {
   const tradeOverlayActive = ref(false);
   const tradeOverlayCount = ref(0);
   const runIndicatorsLoaded = ref(false);
+
+  // Cached run detail to avoid double-fetching
+  let cachedRunDetail: RunDetail | null = null;
+  let cachedRunId: string | null = null;
+
+  /** Pre-fetch run config to get the correct timeframe before data loading. */
+  async function prefetchRunConfig(runId: string): Promise<RunDetail> {
+    if (cachedRunId === runId && cachedRunDetail) return cachedRunDetail;
+    const detail = await $fetch<RunDetail>(`/api/runs/${runId}`);
+    cachedRunDetail = detail;
+    cachedRunId = runId;
+    return detail;
+  }
 
   async function loadRunIndicators(runId: string, ctx: TradeOverlayContext) {
     if (runIndicatorsLoaded.value) return;
     if (ctx.indicatorPlugins.value.length === 0) return;
 
     try {
-      type RunWithStrategy = { strategy?: { pipeline?: { indicators?: Array<{ name: string; params: Record<string, unknown> }> } } };
-      const runDetail = await $fetch<RunWithStrategy>(`/api/runs/${runId}`);
+      const runDetail = await prefetchRunConfig(runId);
       const indicatorEntries = runDetail.strategy?.pipeline?.indicators ?? [];
       if (indicatorEntries.length === 0) return;
 
@@ -94,6 +118,25 @@ export function useChartTradeOverlay() {
             registerFwbgIndicator(instanceId, response, plotCols, colors);
             chart?.createIndicator({ name: instanceId }, false, { height: 120 });
             const paneId = chart ? (chart.getIndicators({ name: instanceId })[0] as any)?.paneId ?? "" : "";
+
+            // Add ORB range zone rectangles on candle pane (if indicator provides them)
+            if (response.range_zones?.length && chart) {
+              const activeSessions = new Set<string>();
+              for (const col of plotCols) {
+                const match = col.match(/_s(\d{2})_/);
+                if (match) activeSessions.add(`s${match[1]}`);
+              }
+              const filtered = response.range_zones.filter(z => activeSessions.has(z.session));
+              if (filtered.length > 0) {
+                addOrbZoneData(instanceId, plugin.fqn, filtered);
+                chart.removeIndicator({ name: ORB_ZONE_NAME });
+                if (hasOrbZones()) {
+                  ensureOrbZoneRegistered();
+                  chart.createIndicator({ name: ORB_ZONE_NAME }, true, { id: "candle_pane" });
+                }
+              }
+            }
+
             ctx.addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: entry.params ?? plugin.defaults, columns: plotCols, paneId });
           }
 
@@ -172,12 +215,15 @@ export function useChartTradeOverlay() {
 
   function resetFlags() {
     runIndicatorsLoaded.value = false;
+    cachedRunDetail = null;
+    cachedRunId = null;
   }
 
   return {
     tradeOverlayActive,
     tradeOverlayCount,
     runIndicatorsLoaded,
+    prefetchRunConfig,
     loadRunIndicators,
     loadTradeOverlay,
     clearOverlay,

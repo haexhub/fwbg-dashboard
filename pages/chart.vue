@@ -386,13 +386,23 @@ function clearRunTradeOverlay() {
 }
 
 // ── Apply source/symbol from URL after sources load ──
-// Set source + symbol synchronously so Canvas sees both in ONE reactive flush
-// (prevents multiple overlapping data loads during initial page load).
+// When viewing a run, fetch run config first to apply the correct timeframe
+// BEFORE Canvas starts loading data (prevents loading at wrong timeframe).
 
 watch(
   sources,
-  (list) => {
+  async (list: typeof sources.value) => {
     if (!list?.length) return;
+
+    // If viewing a run without explicit timeframe in URL, fetch run config
+    // to apply the correct timeframe before data loading starts
+    if (queryRunId.value && !queryTimeframe.value) {
+      try {
+        const detail = await tradeOverlay.prefetchRunConfig(queryRunId.value);
+        const runTf = detail.strategy?.timeframe ?? detail.config?.timeframe;
+        if (runTf) setTimeframe(runTf);
+      } catch { /* ignore – will fall back to default */ }
+    }
 
     if (querySource.value) {
       const sourceExists = list.find((src) => src.name === querySource.value);
