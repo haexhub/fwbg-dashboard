@@ -11,6 +11,7 @@ import {
   addOrbZoneData,
   hasOrbZones,
   type RunTradeMarker,
+  type ScaleInFill,
   registerFwbgIndicator,
   registerFwbgSignalIndicator,
   LINE_COLORS,
@@ -31,6 +32,8 @@ interface RunTradesResponse {
     tp_level?: number;
     sl_level?: number;
     fold_id?: number;
+    avg_entry_price?: number;
+    scale_in_fills?: Array<{ price: number; qty: number; fill_time?: string }>;
   }>;
 }
 
@@ -169,18 +172,27 @@ export function useChartTradeOverlay() {
 
       const markers: RunTradeMarker[] = resp.trades
         .filter((t) => t.entry_time && t.entry_price != null)
-        .map((t) => ({
-          entryTime: parseUTC(t.entry_time!),
-          exitTime: t.exit_time ? parseUTC(t.exit_time) : parseUTC(t.entry_time!),
-          entryPrice: t.entry_price!,
-          exitPrice: t.exit_price ?? t.entry_price!,
-          direction: (t.direction ?? "LONG") as "LONG" | "SHORT",
-          result: t.result ?? 0,
-          pnlRaw: t.pnl_raw ?? 0,
-          tpLevel: t.tp_level,
-          slLevel: t.sl_level,
-          foldId: t.fold_id,
-        }));
+        .map((t) => {
+          const fills: ScaleInFill[] | undefined = t.scale_in_fills?.length
+            ? t.scale_in_fills
+                .filter((f) => f.fill_time)
+                .map((f) => ({ time: parseUTC(f.fill_time!), price: f.price, qty: f.qty }))
+            : undefined;
+          return {
+            entryTime: parseUTC(t.entry_time!),
+            exitTime: t.exit_time ? parseUTC(t.exit_time) : parseUTC(t.entry_time!),
+            entryPrice: t.entry_price!,
+            exitPrice: t.exit_price ?? t.entry_price!,
+            direction: (t.direction ?? "LONG") as "LONG" | "SHORT",
+            result: t.result ?? 0,
+            pnlRaw: t.pnl_raw ?? 0,
+            tpLevel: t.tp_level,
+            slLevel: t.sl_level,
+            foldId: t.fold_id,
+            avgEntryPrice: t.avg_entry_price,
+            scaleInFills: fills,
+          };
+        });
 
       updateTradeMarkerData(markers);
       tradeOverlayCount.value = markers.length;

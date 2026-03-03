@@ -362,7 +362,7 @@ onMounted(() => {
 
       // ── Init: load most recent page (or all data if loadAll is set) ──
       try {
-        const initLimit = props.loadAll ? 50000 : PAGE_SIZE;
+        const initLimit = props.loadAll ? 999_999 : PAGE_SIZE;
         const result = await fetchOhlcvData(
           params.symbol.ticker,
           props.timeframe,

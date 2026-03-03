@@ -89,6 +89,8 @@ export function useStrategy() {
           min_rrr: es.min_rrr,
           exit_modifier: es.exit_modifier,
           exit_modifier_params: es.exit_modifier_params,
+          entry_modifier: es.entry_modifier,
+          entry_modifier_params: es.entry_modifier_params,
         },
       }),
     );
@@ -147,6 +149,10 @@ export function useStrategy() {
           min_rrr: (exitMeta?.min_rrr as number) ?? 0,
           exit_modifier: exitMeta?.exit_modifier as string | undefined,
           exit_modifier_params: exitMeta?.exit_modifier_params as
+            | Record<string, unknown>
+            | undefined,
+          entry_modifier: exitMeta?.entry_modifier as string | undefined,
+          entry_modifier_params: exitMeta?.entry_modifier_params as
             | Record<string, unknown>
             | undefined,
         };

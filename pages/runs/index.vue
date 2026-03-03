@@ -4,7 +4,7 @@ import type { TableColumn } from "@nuxt/ui";
 import { statusColor } from "~/types/strategy";
 import type { RunSummary } from "~/types/strategy";
 
-const { runs, status, refresh } = useRuns();
+const { runs, total, totalPages, page, status, refresh } = useRuns();
 
 // ── Sorting & filtering ──
 const sorting = ref<{ id: string; desc: boolean }[]>([
@@ -316,6 +316,14 @@ const columns: TableColumn<RunSummary>[] = [
         </template>
       </UTable>
     </UCard>
+
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" class="flex items-center justify-between">
+      <span class="text-sm text-gray-500">
+        {{ total }} Runs gesamt
+      </span>
+      <UPagination v-model="page" :total="total" :items-per-page="20" />
+    </div>
 
     <!-- Single delete confirmation -->
     <UModal v-model:open="deleteModalOpen">

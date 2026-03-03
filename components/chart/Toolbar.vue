@@ -260,15 +260,15 @@ const lineToolItems = computed(() =>
       />
     </UButton>
 
-    <!-- Custom Signal button -->
-    <UTooltip text="Custom Signal aus Indikator-Kombinationen erstellen">
+    <!-- Signal Config button -->
+    <UTooltip text="Entry-Signale aus Indikator-Spalten konfigurieren">
       <UButton
-        icon="i-lucide-wand-sparkles"
+        icon="i-heroicons-bolt"
         variant="ghost"
         :disabled="!hasActiveIndicators"
         @click="emit('create-signal')"
       >
-        Custom Signal
+        Signale
       </UButton>
     </UTooltip>
 

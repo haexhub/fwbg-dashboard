@@ -344,6 +344,7 @@ export function statusColor(
       return "error";
     case "running":
     case "pending":
+    case "initializing":
       return "warning";
     case "cancelled":
       return "neutral";

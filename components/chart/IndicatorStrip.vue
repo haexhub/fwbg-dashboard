@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ActiveIndicator } from "~/types/chart";
+import { TIMEFRAME_LABELS } from "~/types/chart";
 
 const props = defineProps<{
   indicators: ActiveIndicator[];
@@ -80,6 +81,9 @@ function handleSignalInput() {
     >
       <span class="text-gray-300 truncate max-w-28" :title="ind.name">
         {{ ind.name }}
+      </span>
+      <span v-if="ind.indicatorTimeframe" class="text-[10px] text-amber-400 font-medium">
+        {{ TIMEFRAME_LABELS[ind.indicatorTimeframe] ?? ind.indicatorTimeframe }}
       </span>
       <UButton
         :icon="collapsedIds[ind.id] ? 'i-lucide-eye-off' : 'i-lucide-eye'"

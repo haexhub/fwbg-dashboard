@@ -63,6 +63,8 @@ export interface IndicatorResponse {
   columns: string[];
   plot_columns: string[];
   signal_columns: string[];
+  overlay_columns?: string[];
+  overlay_data?: Record<string, (number | null)[]>;
   timestamps: number[];
   data: Record<string, (number | null)[]>;
   range_zones?: RangeZone[];
@@ -81,4 +83,8 @@ export interface ActiveIndicator {
   signalTimestamps?: number[];
   /** Maps signal timestamp → value at that transition (e.g. -1, 0, 1) */
   signalValueMap?: Map<number, number>;
+  /** ID of the companion overlay indicator on candle_pane (if any) */
+  overlayId?: string;
+  /** If set, indicator was computed on this timeframe (MTF) instead of the chart timeframe */
+  indicatorTimeframe?: string;
 }

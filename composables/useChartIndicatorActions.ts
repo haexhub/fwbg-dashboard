@@ -4,6 +4,7 @@ import type { ActiveIndicator, IndicatorResponse } from "~/types/chart";
 import {
   registerFwbgIndicator,
   registerFwbgSignalIndicator,
+  registerFwbgOverlayIndicator,
   LINE_COLORS,
   ORB_ZONE_NAME,
   addOrbZoneData,
@@ -94,6 +95,7 @@ export function useChartIndicatorActions() {
     colors: Record<string, string>,
     isMainOverlay: boolean,
     ctx: IndicatorActionContext,
+    indicatorTimeframe?: string,
   ) {
     loading.value = true;
     try {
@@ -106,6 +108,7 @@ export function useChartIndicatorActions() {
           fqn: plugin.fqn,
           params,
           limit: ctx.limit,
+          ...(indicatorTimeframe ? { indicator_timeframe: indicatorTimeframe } : {}),
         },
       });
 
@@ -145,6 +148,19 @@ export function useChartIndicatorActions() {
         }
       }
 
+      // Auto-register overlay columns (absolute price-scale values) on candle_pane
+      let overlayId: string | undefined;
+      const overlayCols = response.overlay_columns ?? [];
+      if (overlayCols.length > 0 && chart) {
+        overlayId = `${instanceId}_overlay`;
+        const overlayColors: Record<string, string> = {};
+        overlayCols.forEach((col, i) => {
+          overlayColors[col] = LINE_COLORS[i % LINE_COLORS.length]!;
+        });
+        registerFwbgOverlayIndicator(overlayId, response, overlayCols, overlayColors);
+        chart.createIndicator({ name: overlayId }, true, { id: "candle_pane" });
+      }
+
       ctx.addIndicator({
         id: instanceId,
         fqn: plugin.fqn,
@@ -152,6 +168,8 @@ export function useChartIndicatorActions() {
         params,
         columns: validColumns,
         paneId,
+        overlayId,
+        indicatorTimeframe,
       });
       nextTick(ctx.adjustLayout);
     } catch (e) {
@@ -167,6 +185,7 @@ export function useChartIndicatorActions() {
     selectedColumns: string[],
     colors: Record<string, string>,
     ctx: IndicatorActionContext,
+    indicatorTimeframe?: string,
   ) {
     loading.value = true;
     try {
@@ -179,6 +198,7 @@ export function useChartIndicatorActions() {
           fqn: plugin.fqn,
           params,
           limit: ctx.limit,
+          ...(indicatorTimeframe ? { indicator_timeframe: indicatorTimeframe } : {}),
         },
       });
 
@@ -214,6 +234,7 @@ export function useChartIndicatorActions() {
         isSignal: true,
         signalTimestamps: transitions.timestamps,
         signalValueMap: transitions.valueMap,
+        indicatorTimeframe,
       });
       nextTick(ctx.adjustLayout);
     } catch (e) {
@@ -264,7 +285,17 @@ export function useChartIndicatorActions() {
             const filtered = response.range_zones.filter(z => activeSessions.has(z.session));
             if (filtered.length > 0) addOrbZoneData(instanceId, plugin.fqn, filtered);
           }
-          ctx.addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: plugin.defaults, columns: plotCols, paneId });
+          // Auto-register overlay columns on candle_pane
+          let overlayId: string | undefined;
+          const overlayCols = response.overlay_columns ?? [];
+          if (overlayCols.length > 0 && chart) {
+            overlayId = `${instanceId}_overlay`;
+            const overlayColors: Record<string, string> = {};
+            overlayCols.forEach((col, i) => { overlayColors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
+            registerFwbgOverlayIndicator(overlayId, response, overlayCols, overlayColors);
+            chart.createIndicator({ name: overlayId }, true, { id: "candle_pane" });
+          }
+          ctx.addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: plugin.defaults, columns: plotCols, paneId, overlayId });
         }
 
         if (sigCols.length > 0) {
@@ -287,6 +318,11 @@ export function useChartIndicatorActions() {
 
   function handleRemoveIndicator(id: string, ctx: IndicatorActionContext) {
     const chart = ctx.getChart();
+    // Remove companion overlay indicator if present
+    const indicator = ctx.activeIndicators.value.find((a) => a.id === id);
+    if (indicator?.overlayId && chart) {
+      chart.removeIndicator({ name: indicator.overlayId });
+    }
     if (chart && !ctx.collapsedPanes.value[id]) {
       chart.removeIndicator({ name: id });
     }
@@ -312,6 +348,7 @@ export function useChartIndicatorActions() {
         params: Record<string, unknown>;
         columns: string[];
         isSignal?: boolean;
+        indicatorTimeframe?: string;
       }> = JSON.parse(indJson);
 
       for (const entry of entries) {
@@ -329,6 +366,7 @@ export function useChartIndicatorActions() {
               fqn: entry.fqn,
               params: entry.params,
               limit: ctx.limit,
+              ...(entry.indicatorTimeframe ? { indicator_timeframe: entry.indicatorTimeframe } : {}),
             },
           });
 
@@ -344,7 +382,7 @@ export function useChartIndicatorActions() {
             chart?.createIndicator({ name: sigId }, false, { height: 80 });
             const paneId = chart ? getIndicatorPaneId(chart, sigId) : "";
             const transitions = extractSignalTransitions(response, plotCols);
-            ctx.addIndicator({ id: sigId, fqn: entry.fqn, name: `${plugin.name} (signal)`, params: entry.params, columns: plotCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap });
+            ctx.addIndicator({ id: sigId, fqn: entry.fqn, name: `${plugin.name} (signal)`, params: entry.params, columns: plotCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap, indicatorTimeframe: entry.indicatorTimeframe });
           } else {
             const instanceId = `fwbg_${plugin.name}_${Date.now()}`;
             const colors: Record<string, string> = {};
@@ -357,7 +395,7 @@ export function useChartIndicatorActions() {
               const filtered = response.range_zones.filter(z => activeSessions.has(z.session));
               if (filtered.length > 0) addOrbZoneData(instanceId, entry.fqn, filtered);
             }
-            ctx.addIndicator({ id: instanceId, fqn: entry.fqn, name: plugin.name, params: entry.params, columns: plotCols, paneId });
+            ctx.addIndicator({ id: instanceId, fqn: entry.fqn, name: plugin.name, params: entry.params, columns: plotCols, paneId, indicatorTimeframe: entry.indicatorTimeframe });
           }
 
           // Settle layout after each indicator — matches manual add flow

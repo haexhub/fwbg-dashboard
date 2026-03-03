@@ -10,7 +10,7 @@ import {
 
 definePageMeta({ layout: "builder" });
 
-const INDICATOR_LIMIT = 10000;
+const INDICATOR_LIMIT = 999_999;
 
 const {
   source,
@@ -88,7 +88,24 @@ const chartWrapperRef = useTemplateRef<HTMLElement>("chartWrapperRef");
 const indicatorPanelOpen = ref(false);
 const editIndicator = ref<import("~/types/chart").ActiveIndicator | null>(null);
 const strategySaveOpen = ref(false);
-const signalBuilderOpen = ref(false);
+const signalConfigOpen = ref(false);
+const signalRules = ref<import("~/types/strategy").SignalRules>({});
+
+// Load signal rules from strategy when viewing one
+const { loadStrategy } = useStrategies();
+watch(
+  () => queryStrategy.value,
+  async (strategyFilename) => {
+    if (!strategyFilename) return;
+    try {
+      const config = await loadStrategy(strategyFilename);
+      if (config.signal_rules) {
+        signalRules.value = config.signal_rules;
+      }
+    } catch { /* strategy not found */ }
+  },
+  { immediate: true },
+);
 
 const pricePrecision = computed(() =>
   currentSymbol.value?.point
@@ -327,6 +344,7 @@ function handleAddIndicator(
   cols: string[],
   colors: Record<string, string>,
   isMainOverlay: boolean = false,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleAddIndicator(
     p,
@@ -335,6 +353,7 @@ function handleAddIndicator(
     colors,
     isMainOverlay,
     indicatorCtx,
+    indicatorTimeframe,
   );
 }
 function handleAddSignalIndicator(
@@ -342,8 +361,9 @@ function handleAddSignalIndicator(
   params: Record<string, unknown>,
   cols: string[],
   colors: Record<string, string>,
+  indicatorTimeframe?: string,
 ) {
-  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx);
+  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx, indicatorTimeframe);
 }
 function handleAddAllDeps(p: PluginInfo) {
   indActions.handleAddAllDeps(p, indicatorCtx);
@@ -361,9 +381,10 @@ function handleUpdateIndicator(
   cols: string[],
   colors: Record<string, string>,
   isMainOverlay: boolean = false,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
-  indActions.handleAddIndicator(p, params, cols, colors, isMainOverlay, indicatorCtx);
+  indActions.handleAddIndicator(p, params, cols, colors, isMainOverlay, indicatorCtx, indicatorTimeframe);
   editIndicator.value = null;
 }
 function handleUpdateSignalIndicator(
@@ -372,9 +393,10 @@ function handleUpdateSignalIndicator(
   params: Record<string, unknown>,
   cols: string[],
   colors: Record<string, string>,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
-  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx);
+  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx, indicatorTimeframe);
   editIndicator.value = null;
 }
 function handleRemoveIndicator(id: string) {
@@ -544,6 +566,7 @@ watch(
         params: i.params,
         columns: i.columns,
         isSignal: i.isSignal || false,
+        ...(i.indicatorTimeframe ? { indicatorTimeframe: i.indicatorTimeframe } : {}),
       })),
     }),
   { deep: true },
@@ -594,7 +617,7 @@ watch(
         @update:session-enabled-ids="handleSessionEnabledIdsChange"
         :has-active-indicators="activeIndicators.length > 0"
         @open-indicators="indicatorPanelOpen = true"
-        @create-signal="signalBuilderOpen = true"
+        @create-signal="signalConfigOpen = true"
         @save-strategy="strategySaveOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
@@ -735,15 +758,17 @@ watch(
         :active-indicators="activeIndicators"
         :default-name="previewStrategyName"
         :strategy-filename="queryStrategy"
+        :signal-rules="signalRules"
         @update:open="strategySaveOpen = $event"
       />
 
-      <!-- Signal Rule Builder -->
-      <ChartSignalRuleBuilder
-        :open="signalBuilderOpen"
+      <!-- Signal Config Sidebar -->
+      <ChartSignalConfig
+        :open="signalConfigOpen"
         :active-indicators="activeIndicators"
-        @update:open="signalBuilderOpen = $event"
-        @saved="pluginStore.refresh()"
+        :model-value="signalRules"
+        @update:open="signalConfigOpen = $event"
+        @update:model-value="signalRules = $event"
       />
     </div>
 
