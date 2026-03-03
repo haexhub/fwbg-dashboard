@@ -9,8 +9,10 @@ const props = defineProps<{
 const levelFilter = defineModel<LogLevel | undefined>("levelFilter");
 const symbolFilter = defineModel<string | undefined>("symbolFilter");
 
+const ALL = "__all__";
+
 const levelOptions = [
-  { label: "Alle", value: "" },
+  { label: "Alle", value: ALL },
   { label: "Info", value: "info" },
   { label: "Debug", value: "debug" },
   { label: "Warning", value: "warning" },
@@ -18,22 +20,22 @@ const levelOptions = [
 ];
 
 const symbolOptions = computed(() => {
-  const opts = [{ label: "Alle Symbole", value: "" }];
+  const opts = [{ label: "Alle Symbole", value: ALL }];
   for (const s of props.availableSymbols) {
     opts.push({ label: s, value: s });
   }
   return opts;
 });
 
-// Proxy for USelect (converts "" ↔ undefined)
+// Proxy for USelect (converts ALL ↔ undefined)
 const selectedLevel = computed({
-  get: () => levelFilter.value ?? "",
-  set: (v: string) => { levelFilter.value = (v || undefined) as LogLevel | undefined; },
+  get: () => levelFilter.value ?? ALL,
+  set: (v: string) => { levelFilter.value = (v === ALL ? undefined : v) as LogLevel | undefined; },
 });
 
 const selectedSymbol = computed({
-  get: () => symbolFilter.value ?? "",
-  set: (v: string) => { symbolFilter.value = v || undefined; },
+  get: () => symbolFilter.value ?? ALL,
+  set: (v: string) => { symbolFilter.value = v === ALL ? undefined : v; },
 });
 
 // ── Auto-scroll ──
