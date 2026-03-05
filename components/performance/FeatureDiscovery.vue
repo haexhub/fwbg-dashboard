@@ -25,6 +25,27 @@ interface DirectionFeature {
   loss_mean: number;
 }
 
+interface CombinationResult {
+  feature_a: string;
+  feature_b: string;
+  indicator_a: string;
+  indicator_b: string;
+  op_a: string;
+  op_b: string;
+  threshold_a: number;
+  threshold_b: number;
+  wr_a: number;
+  wr_b: number;
+  wr_combined: number;
+  base_wr: number;
+  synergy: number;
+  lift: number;
+  n_trades: number;
+  n_wins: number;
+  p_value: number;
+  significant: boolean;
+}
+
 interface DiscoveryData {
   strategy_name: string;
   total_trades: number;
@@ -38,6 +59,7 @@ interface DiscoveryData {
     long: DirectionFeature[];
     short: DirectionFeature[];
   };
+  combinations: CombinationResult[];
 }
 
 interface RuleForm {
@@ -213,11 +235,25 @@ const significantCount = computed(() => {
   return data.value.results.filter((r) => r.significant).length;
 });
 
-const tabItems = [
-  { label: "Gesamt", value: "all" },
-  { label: "Long", value: "long" },
-  { label: "Short", value: "short" },
-];
+const tabItems = computed(() => {
+  const items = [
+    { label: "Gesamt", value: "all" },
+    { label: "Long", value: "long" },
+    { label: "Short", value: "short" },
+  ];
+  if (data.value?.combinations?.length) {
+    items.push({ label: `Kombinationen (${data.value.combinations.length})`, value: "combos" });
+  }
+  return items;
+});
+
+const filteredCombinations = computed(() => {
+  if (!data.value?.combinations) return [];
+  if (showOnlySignificant.value) {
+    return data.value.combinations.filter((c) => c.significant);
+  }
+  return data.value.combinations;
+});
 
 const resolvedStrategyName = computed(() => {
   return props.strategyName || data.value?.strategy_name || "";
@@ -311,6 +347,56 @@ async function saveRule() {
   } catch (e: any) {
     saveError.value = e?.data?.message || e?.message || "Fehler beim Speichern";
     toast.add({ title: "Fehler", description: saveError.value!, color: "error" });
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function addComboToStrategy(combo: CombinationResult) {
+  if (!resolvedStrategyName.value) {
+    toast.add({ title: "Kein Strategie-Name verfügbar", color: "error" });
+    return;
+  }
+
+  saving.value = true;
+  try {
+    const strategy = await $fetch<Record<string, any>>(
+      `/api/strategy/strategies/${resolvedStrategyName.value}`,
+    );
+
+    if (!strategy.signal_rules) strategy.signal_rules = {};
+
+    const conditions = [
+      { type: "value_check", column: combo.feature_a, op: combo.op_a, value: combo.threshold_a },
+      { type: "value_check", column: combo.feature_b, op: combo.op_b, value: combo.threshold_b },
+    ];
+
+    for (const dir of ["long", "short"] as const) {
+      if (!strategy.signal_rules[dir]) {
+        strategy.signal_rules[dir] = { operator: "AND", conditions: [] };
+      }
+      for (const cond of conditions) {
+        const exists = strategy.signal_rules[dir].conditions?.some(
+          (c: any) => c.column === cond.column && c.op === cond.op,
+        );
+        if (!exists) {
+          strategy.signal_rules[dir].conditions.push(cond);
+        }
+      }
+    }
+
+    await $fetch(`/api/strategy/strategies/${resolvedStrategyName.value}`, {
+      method: "PUT",
+      body: strategy,
+    });
+
+    toast.add({
+      title: "Kombination hinzugefügt",
+      description: `${combo.feature_a} ${combo.op_a} ${combo.threshold_a} AND ${combo.feature_b} ${combo.op_b} ${combo.threshold_b}`,
+      color: "success",
+    });
+  } catch (e: any) {
+    toast.add({ title: "Fehler", description: e?.message || "Speichern fehlgeschlagen", color: "error" });
   } finally {
     saving.value = false;
   }
@@ -529,6 +615,82 @@ const opOptions = [
         </table>
         <p v-if="!filteredResults.length" class="py-4 text-center text-gray-500">
           Keine {{ showOnlySignificant ? 'signifikanten ' : '' }}Ergebnisse.
+        </p>
+      </div>
+
+      <!-- Combinations tab -->
+      <div v-else-if="activeTab === 'combos'" class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-700 text-gray-400">
+              <th class="px-3 py-2 text-left">#</th>
+              <th class="px-3 py-2 text-left">Feature A</th>
+              <th class="px-3 py-2 text-left">Feature B</th>
+              <th class="px-3 py-2 text-right">WR Kombi</th>
+              <th class="px-3 py-2 text-right">WR A</th>
+              <th class="px-3 py-2 text-right">WR B</th>
+              <th class="px-3 py-2 text-right">Basis WR</th>
+              <th class="px-3 py-2 text-right">Synergie</th>
+              <th class="px-3 py-2 text-right">Trades</th>
+              <th class="px-3 py-2 text-right">p-Wert</th>
+              <th class="w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(c, idx) in filteredCombinations"
+              :key="`${c.feature_a}-${c.feature_b}`"
+              class="border-b border-gray-800 group"
+              :class="{ 'bg-green-900/10': c.significant }"
+            >
+              <td class="px-3 py-1.5 text-gray-500">{{ idx + 1 }}</td>
+              <td class="px-3 py-1.5 font-mono text-xs text-white">
+                {{ c.feature_a }} {{ c.op_a }} {{ c.threshold_a }}
+                <span v-if="c.indicator_a" class="text-gray-600 ml-1">({{ c.indicator_a }})</span>
+              </td>
+              <td class="px-3 py-1.5 font-mono text-xs text-white">
+                {{ c.feature_b }} {{ c.op_b }} {{ c.threshold_b }}
+                <span v-if="c.indicator_b" class="text-gray-600 ml-1">({{ c.indicator_b }})</span>
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono font-bold" :class="c.wr_combined > c.base_wr ? 'text-green-400' : 'text-red-400'">
+                {{ (c.wr_combined * 100).toFixed(1) }}%
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono text-gray-400">
+                {{ (c.wr_a * 100).toFixed(1) }}%
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono text-gray-400">
+                {{ (c.wr_b * 100).toFixed(1) }}%
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono text-gray-500">
+                {{ (c.base_wr * 100).toFixed(1) }}%
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono" :class="c.synergy > 0 ? 'text-green-400' : 'text-orange-400'">
+                {{ c.synergy > 0 ? '+' : '' }}{{ (c.synergy * 100).toFixed(1) }}pp
+              </td>
+              <td class="px-3 py-1.5 text-right font-mono text-gray-300">
+                {{ c.n_trades }}
+              </td>
+              <td :class="['px-3 py-1.5 text-right font-mono', c.significant ? 'text-green-400' : 'text-gray-500']">
+                {{ c.p_value < 0.001 ? '<0.001' : c.p_value.toFixed(4) }}
+              </td>
+              <td class="px-1 py-1.5">
+                <UButton
+                  v-if="resolvedStrategyName"
+                  icon="i-heroicons-plus"
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  class="opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Beide Bedingungen zur Strategie hinzufügen"
+                  :loading="saving"
+                  @click="addComboToStrategy(c)"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="!filteredCombinations.length" class="py-4 text-center text-gray-500">
+          Keine {{ showOnlySignificant ? 'signifikanten ' : '' }}Kombinationen gefunden.
         </p>
       </div>
 
