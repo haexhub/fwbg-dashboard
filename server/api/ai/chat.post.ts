@@ -1,10 +1,10 @@
 /**
  * POST /api/ai/chat
  *
- * SSE streaming endpoint. Accepts a messages array, runs the Claude
- * agentic loop with FWBG tools, and streams events to the client.
+ * SSE streaming endpoint. Accepts messages + model/provider selection,
+ * runs the agentic loop with FWBG tools, and streams events to the client.
  *
- * Request body: { messages: Anthropic.MessageParam[] }
+ * Request body: { messages, model, provider, apiKey? }
  *
  * Stream events (JSON lines prefixed with "data: "):
  *   { type: "text",       content: string }
@@ -15,163 +15,45 @@
  *   { type: "error",      message: string }
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { streamText, tool, type CoreMessage } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
-// Tool definitions
+// Provider factory
 // ---------------------------------------------------------------------------
 
-const FWBG_TOOLS: Anthropic.Tool[] = [
-  {
-    name: "list_strategies",
-    description: "List all available strategy configs. Returns filename, name, description, tags.",
-    input_schema: { type: "object" as const, properties: {} },
-  },
-  {
-    name: "get_strategy",
-    description:
-      "Load a strategy config by filename (without .json). Returns full config with resolved preset references and a _refs key preserving original preset names.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string", description: "Strategy filename without .json extension" },
-      },
-      required: ["name"],
-    },
-  },
-  {
-    name: "save_strategy",
-    description:
-      "Create or update a strategy config. Call this to persist changes before starting a run. " +
-      "Important: always include signal_rules when creating ML strategy configs – " +
-      "without them the model sees all bars and produces 0 OOS trades.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string", description: "Strategy filename without .json" },
-        config: { type: "object", description: "Full strategy configuration" },
-      },
-      required: ["name", "config"],
-    },
-  },
-  {
-    name: "start_run",
-    description:
-      "Start a strategy optimization run in the background. Returns run_id immediately. " +
-      "Use get_run_status to track progress.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        strategy_name: { type: "string" },
-        assets: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional asset filter override, e.g. ['NAS100', 'DAX']",
-        },
-        description: { type: "string", description: "Optional note for this run" },
-      },
-      required: ["strategy_name"],
-    },
-  },
-  {
-    name: "get_run_status",
-    description:
-      "Get current status and progress of a run. Returns status (running/completed/failed), " +
-      "progress_fraction, current_stage.",
-    input_schema: {
-      type: "object" as const,
-      properties: { run_id: { type: "string" } },
-      required: ["run_id"],
-    },
-  },
-  {
-    name: "get_run_results",
-    description:
-      "Get full results for a completed run: summary KPIs, per-asset PF/WR/CAGR/max_drawdown, " +
-      "fold stability, walk-forward breakdown. Only call for completed runs.",
-    input_schema: {
-      type: "object" as const,
-      properties: { run_id: { type: "string" } },
-      required: ["run_id"],
-    },
-  },
-  {
-    name: "get_run_logs",
-    description:
-      "Get structured logs for a run. Use level='error' or level='info' to filter noise.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        run_id: { type: "string" },
-        level: {
-          type: "string",
-          enum: ["info", "debug", "warning", "error"],
-          description: "Optional level filter",
-        },
-        limit: { type: "integer", description: "Max entries (default 100)" },
-      },
-      required: ["run_id"],
-    },
-  },
-  {
-    name: "list_recent_runs",
-    description: "List recent runs with their status and outcome summary.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        limit: { type: "integer", description: "Number of runs (default 10)" },
-        strategy: { type: "string", description: "Optional strategy name filter (substring)" },
-      },
-    },
-  },
-  {
-    name: "list_indicators",
-    description:
-      "List all available indicator plugins with signal_columns (use these in signal_rules) " +
-      "and feature_columns.",
-    input_schema: { type: "object" as const, properties: {} },
-  },
-  {
-    name: "get_indicator_schema",
-    description:
-      "Get full param schema for an indicator: types, defaults, signal/feature columns. " +
-      "Use the signal_columns in signal_rules to pre-filter bars for the ML model.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        name: {
-          type: "string",
-          description: "Short name like 'opening_range' or fqn like 'fwbg-core:opening_range'",
-        },
-      },
-      required: ["name"],
-    },
-  },
-  {
-    name: "list_exit_strategies",
-    description:
-      "List all available exit strategy plugins with param schema. " +
-      "Key params: tp_mult (TP as ATR multiple), sl_mult (SL as ATR multiple), timeout_bars.",
-    input_schema: { type: "object" as const, properties: {} },
-  },
-];
+function getModel(provider: string, modelId: string, apiKey: string) {
+  switch (provider) {
+    case "anthropic":
+      return createAnthropic({ apiKey })(modelId);
+    case "openai":
+      return createOpenAI({ apiKey })(modelId);
+    case "google":
+      return createGoogleGenerativeAI({ apiKey })(modelId);
+    case "deepseek":
+      return createOpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" })(modelId);
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Tool executor
+// FWBG tool definitions (Vercel AI SDK / Zod format)
 // ---------------------------------------------------------------------------
 
-async function executeTool(
-  name: string,
-  input: Record<string, unknown>,
-  fwbgApiUrl: string
-): Promise<string> {
+function makeFwbgTools(fwbgApiUrl: string) {
+  const base = fwbgApiUrl.replace(/\/?$/, "");
+
   const apiFetch = async (path: string) => {
-    const res = await fetch(`${fwbgApiUrl}${path}`, { signal: AbortSignal.timeout(30_000) });
+    const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     return res.json();
   };
   const apiPut = async (path: string, body: unknown) => {
-    const res = await fetch(`${fwbgApiUrl}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -181,7 +63,7 @@ async function executeTool(
     return res.json();
   };
   const apiPost = async (path: string, body: unknown) => {
-    const res = await fetch(`${fwbgApiUrl}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -191,132 +73,237 @@ async function executeTool(
     return res.json();
   };
 
-  switch (name) {
-    case "list_strategies":
-      return JSON.stringify(await apiFetch("/api/strategies"));
+  return {
+    list_strategies: tool({
+      description: "List all available strategy configs. Returns filename, name, description, tags.",
+      parameters: z.object({}),
+      execute: async () => JSON.stringify(await apiFetch("/api/strategies")),
+    }),
 
-    case "get_strategy":
-      return JSON.stringify(await apiFetch(`/api/strategies/${input.name}`));
+    get_strategy: tool({
+      description:
+        "Load a strategy config by filename (without .json). Returns full config with resolved preset references.",
+      parameters: z.object({
+        name: z.string().describe("Strategy filename without .json extension"),
+      }),
+      execute: async ({ name }) => JSON.stringify(await apiFetch(`/api/strategies/${name}`)),
+    }),
 
-    case "save_strategy":
-      return JSON.stringify(await apiPut(`/api/strategies/${input.name}`, input.config));
+    save_strategy: tool({
+      description:
+        "Create or update a strategy config. Always include signal_rules for ML strategies – " +
+        "without them the model sees all bars and produces 0 OOS trades.",
+      parameters: z.object({
+        name: z.string().describe("Strategy filename without .json"),
+        config: z.record(z.unknown()).describe("Full strategy configuration"),
+      }),
+      execute: async ({ name, config }) =>
+        JSON.stringify(await apiPut(`/api/strategies/${name}`, config)),
+    }),
 
-    case "start_run": {
-      const body: Record<string, unknown> = { strategy_name: input.strategy_name };
-      if (input.assets) body.assets = input.assets;
-      if (input.description) body.description = input.description;
-      return JSON.stringify(await apiPost("/api/runs/start", body));
-    }
+    start_run: tool({
+      description:
+        "Start a strategy optimization run in the background. Returns run_id immediately. " +
+        "Use get_run_status to track progress.",
+      parameters: z.object({
+        strategy_name: z.string(),
+        assets: z
+          .array(z.string())
+          .optional()
+          .describe("Optional asset filter override, e.g. ['NAS100', 'DAX']"),
+        description: z.string().optional().describe("Optional note for this run"),
+      }),
+      execute: async ({ strategy_name, assets, description }) => {
+        const body: Record<string, unknown> = { strategy_name };
+        if (assets) body.assets = assets;
+        if (description) body.description = description;
+        return JSON.stringify(await apiPost("/api/runs/start", body));
+      },
+    }),
 
-    case "get_run_status":
-      return JSON.stringify(await apiFetch(`/api/runs/${input.run_id}/progress`));
+    get_run_status: tool({
+      description:
+        "Get current status and progress of a run. Returns status (running/completed/failed), " +
+        "progress_fraction, current_stage.",
+      parameters: z.object({ run_id: z.string() }),
+      execute: async ({ run_id }) =>
+        JSON.stringify(await apiFetch(`/api/runs/${run_id}/progress`)),
+    }),
 
-    case "get_run_results": {
-      const run = await apiFetch(`/api/runs/${input.run_id}`);
-      try {
-        const assets = (await apiFetch(`/api/runs/${input.run_id}/grid_details`)) as string[];
-        const details: Record<string, unknown> = {};
-        for (const asset of assets) {
-          details[asset] = await apiFetch(`/api/runs/${input.run_id}/grid_details/${asset}`);
-        }
-        (run as Record<string, unknown>).grid_details = details;
-      } catch {
-        // grid_details may not exist for running runs
-      }
-      return JSON.stringify(run);
-    }
-
-    case "get_run_logs": {
-      const params = new URLSearchParams();
-      if (input.level) params.set("level", String(input.level));
-      params.set("limit", String(input.limit ?? 100));
-      return JSON.stringify(await apiFetch(`/api/runs/${input.run_id}/logs?${params}`));
-    }
-
-    case "list_recent_runs": {
-      const params = new URLSearchParams();
-      params.set("limit", String(input.limit ?? 10));
-      const result = (await apiFetch(`/api/runs?${params}`)) as {
-        items?: unknown[];
-        [k: string]: unknown;
-      };
-      let items: unknown[] = Array.isArray(result) ? result : (result.items ?? []);
-      if (input.strategy) {
-        items = items.filter(
-          (r) =>
-            typeof r === "object" &&
-            r !== null &&
-            String((r as Record<string, unknown>).strategy_name ?? "")
-              .toLowerCase()
-              .includes(String(input.strategy).toLowerCase())
-        );
-      }
-      return JSON.stringify(items);
-    }
-
-    case "list_indicators": {
-      const plugins = (await apiFetch("/api/plugins?phase=indicator")) as Array<
-        Record<string, unknown>
-      >;
-      return JSON.stringify(
-        plugins.map((p) => ({
-          name: p.name,
-          fqn: p.fqn,
-          description: p.description,
-          signal_columns: p.signal_columns,
-          feature_columns: (p.feature_columns as string[])?.slice(0, 10),
-        }))
-      );
-    }
-
-    case "get_indicator_schema": {
-      const n = String(input.name);
-      for (const fqn of [`fwbg-core:${n}`, `fwbg-premium:${n}`, n]) {
+    get_run_results: tool({
+      description:
+        "Get full results for a completed run: summary KPIs, per-asset PF/WR/CAGR/max_drawdown, " +
+        "fold stability, walk-forward breakdown. Only call for completed runs.",
+      parameters: z.object({ run_id: z.string() }),
+      execute: async ({ run_id }) => {
+        const run = await apiFetch(`/api/runs/${run_id}`);
         try {
-          return JSON.stringify(await apiFetch(`/api/plugins/${encodeURIComponent(fqn)}`));
+          const assets = (await apiFetch(`/api/runs/${run_id}/grid_details`)) as string[];
+          const details: Record<string, unknown> = {};
+          for (const asset of assets) {
+            details[asset] = await apiFetch(`/api/runs/${run_id}/grid_details/${asset}`);
+          }
+          (run as Record<string, unknown>).grid_details = details;
         } catch {
-          continue;
+          // grid_details may not exist
         }
-      }
-      throw new Error(`Indicator not found: ${n}`);
-    }
+        return JSON.stringify(run);
+      },
+    }),
 
-    case "list_exit_strategies": {
-      const plugins = (await apiFetch("/api/plugins?phase=exit_strategy")) as Array<
-        Record<string, unknown>
-      >;
-      return JSON.stringify(
-        plugins.map((p) => ({
-          name: p.name,
-          fqn: p.fqn,
-          description: p.description,
-          param_schema: p.param_schema,
-          defaults: p.defaults,
-        }))
-      );
-    }
+    get_run_logs: tool({
+      description: "Get structured logs for a run. Use level='error' or level='info' to filter noise.",
+      parameters: z.object({
+        run_id: z.string(),
+        level: z
+          .enum(["info", "debug", "warning", "error"])
+          .optional()
+          .describe("Optional level filter"),
+        limit: z.number().int().optional().describe("Max entries (default 100)"),
+      }),
+      execute: async ({ run_id, level, limit }) => {
+        const params = new URLSearchParams();
+        if (level) params.set("level", level);
+        params.set("limit", String(limit ?? 100));
+        return JSON.stringify(await apiFetch(`/api/runs/${run_id}/logs?${params}`));
+      },
+    }),
 
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
+    list_recent_runs: tool({
+      description: "List recent runs with their status and outcome summary.",
+      parameters: z.object({
+        limit: z.number().int().optional().describe("Number of runs (default 10)"),
+        strategy: z.string().optional().describe("Optional strategy name filter (substring)"),
+      }),
+      execute: async ({ limit, strategy }) => {
+        const params = new URLSearchParams();
+        params.set("limit", String(limit ?? 10));
+        const result = (await apiFetch(`/api/runs?${params}`)) as {
+          items?: unknown[];
+          [k: string]: unknown;
+        };
+        let items: unknown[] = Array.isArray(result) ? result : (result.items ?? []);
+        if (strategy) {
+          items = items.filter(
+            (r) =>
+              typeof r === "object" &&
+              r !== null &&
+              String((r as Record<string, unknown>).strategy_name ?? "")
+                .toLowerCase()
+                .includes(String(strategy).toLowerCase())
+          );
+        }
+        return JSON.stringify(items);
+      },
+    }),
+
+    list_indicators: tool({
+      description:
+        "List all available indicator plugins with signal_columns (use in signal_rules) and feature_columns.",
+      parameters: z.object({}),
+      execute: async () => {
+        const plugins = (await apiFetch("/api/plugins?phase=indicator")) as Array<
+          Record<string, unknown>
+        >;
+        return JSON.stringify(
+          plugins.map((p) => ({
+            name: p.name,
+            fqn: p.fqn,
+            description: p.description,
+            signal_columns: p.signal_columns,
+            feature_columns: (p.feature_columns as string[])?.slice(0, 10),
+          }))
+        );
+      },
+    }),
+
+    get_indicator_schema: tool({
+      description:
+        "Get full param schema for an indicator: types, defaults, signal/feature columns. " +
+        "Use the signal_columns in signal_rules to pre-filter bars for the ML model.",
+      parameters: z.object({
+        name: z
+          .string()
+          .describe("Short name like 'opening_range' or fqn like 'fwbg-core:opening_range'"),
+      }),
+      execute: async ({ name }) => {
+        for (const fqn of [`fwbg-core:${name}`, `fwbg-premium:${name}`, name]) {
+          try {
+            return JSON.stringify(await apiFetch(`/api/plugins/${encodeURIComponent(fqn)}`));
+          } catch {
+            continue;
+          }
+        }
+        throw new Error(`Indicator not found: ${name}`);
+      },
+    }),
+
+    list_exit_strategies: tool({
+      description:
+        "List all available exit strategy plugins with param schema. " +
+        "Key params: tp_mult (TP as ATR multiple), sl_mult (SL as ATR multiple), timeout_bars.",
+      parameters: z.object({}),
+      execute: async () => {
+        const plugins = (await apiFetch("/api/plugins?phase=exit_strategy")) as Array<
+          Record<string, unknown>
+        >;
+        return JSON.stringify(
+          plugins.map((p) => ({
+            name: p.name,
+            fqn: p.fqn,
+            description: p.description,
+            param_schema: p.param_schema,
+            defaults: p.defaults,
+          }))
+        );
+      },
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // SSE endpoint
 // ---------------------------------------------------------------------------
 
-export default defineEventHandler(async (event) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw createError({ statusCode: 500, statusMessage: "ANTHROPIC_API_KEY not set" });
-  }
+const SYSTEM_PROMPT = `Du bist ein KI-Assistent, der direkt im FWBG-Dashboard läuft und Zugriff auf den FWBG Trading Strategy Optimizer hat.
 
+Du kannst Strategien konfigurieren, Runs starten, Ergebnisse auswerten und Konfigurationen anpassen.
+
+Wichtige Regeln für Strategiekonfigurationen:
+- Immer signal_rules hinzufügen bei ML-Configs (ohne signal_rules → 0 OOS-Trades, da das Modell alle Bars sieht)
+- CT (Confidence Threshold) bei neuen Strategien mit [0.35, 0.4, 0.45] starten
+- Kombinations-Limit: exit × CT × regime × indicator_grid ≤ 50 (gegen Overfitting)
+- datasource: "dukascopy" für Index-Strategien
+- Wenn ein Run gestartet wird: dem User mitteilen dass er je nach Strategie 15-90 Minuten dauern kann
+
+Wenn der User fragt ob ein Run noch läuft: get_run_status aufrufen.
+Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).`;
+
+export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const messages: Anthropic.MessageParam[] = body.messages ?? [];
+  const messages: CoreMessage[] = body.messages ?? [];
+  const provider: string = body.provider ?? "anthropic";
+  const modelId: string = body.model ?? "claude-opus-4-6";
+
+  // API key: from env (server-side) or from request body (user-provided via UI)
+  const envKey =
+    provider === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY
+      : provider === "openai"
+        ? process.env.OPENAI_API_KEY
+        : provider === "google"
+          ? process.env.GOOGLE_API_KEY
+          : provider === "deepseek"
+            ? process.env.DEEPSEEK_API_KEY
+            : undefined;
+
+  const apiKey = envKey || (body.apiKey as string | undefined);
+  if (!apiKey) {
+    throw createError({ statusCode: 401, statusMessage: "API_KEY_MISSING" });
+  }
 
   const config = useRuntimeConfig();
   const fwbgApiUrl = (config.fwbgApiUrl as string) || "http://localhost:8420";
-  const client = new Anthropic({ apiKey });
 
   setResponseHeaders(event, {
     "Content-Type": "text/event-stream",
@@ -330,68 +317,37 @@ export default defineEventHandler(async (event) => {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const history: Anthropic.MessageParam[] = [...messages];
+        const model = getModel(provider, modelId, apiKey);
+        const tools = makeFwbgTools(fwbgApiUrl);
 
-        while (true) {
-          const response = await client.messages.create({
-            model: "claude-opus-4-6",
-            max_tokens: 8096,
-            system: `Du bist ein KI-Assistent, der direkt im FWBG-Dashboard läuft und Zugriff auf den FWBG Trading Strategy Optimizer hat.
+        const result = streamText({
+          model,
+          system: SYSTEM_PROMPT,
+          tools,
+          messages,
+          maxSteps: 15,
+        });
 
-Du kannst Strategien konfigurieren, Runs starten, Ergebnisse auswerten und Konfigurationen anpassen.
-
-Wichtige Regeln für Strategiekonfigurationen:
-- Immer signal_rules hinzufügen bei ML-Configs (ohne signal_rules → 0 OOS-Trades, da das Modell alle Bars sieht)
-- CT (Confidence Threshold) bei neuen Strategien mit [0.35, 0.4, 0.45] starten
-- Kombinations-Limit: exit × CT × regime × indicator_grid ≤ 50 (gegen Overfitting)
-- datasource: "dukascopy" für Index-Strategien
-- Wenn ein Run gestartet wird: dem User mitteilen dass er je nach Strategie 15-90 Minuten dauern kann
-
-Wenn der User fragt ob ein Run noch läuft: get_run_status aufrufen.
-Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).`,
-            tools: FWBG_TOOLS,
-            messages: history,
-          });
-
-          // Stream text
-          for (const block of response.content) {
-            if (block.type === "text" && block.text) {
-              controller.enqueue(sse({ type: "text", content: block.text }));
-            }
-          }
-
-          if (response.stop_reason === "end_turn") break;
-
-          if (response.stop_reason === "tool_use") {
-            const toolCalls = response.content.filter(
-              (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+        for await (const chunk of result.fullStream) {
+          if (chunk.type === "text-delta") {
+            controller.enqueue(sse({ type: "text", content: chunk.textDelta }));
+          } else if (chunk.type === "tool-call") {
+            controller.enqueue(
+              sse({ type: "tool_start", name: chunk.toolName, input: chunk.args })
             );
-
-            history.push({ role: "assistant", content: response.content });
-
-            const toolResults: Anthropic.ToolResultBlockParam[] = [];
-            for (const call of toolCalls) {
-              controller.enqueue(sse({ type: "tool_start", name: call.name, input: call.input }));
-              let result: string;
-              try {
-                result = await executeTool(
-                  call.name,
-                  call.input as Record<string, unknown>,
-                  fwbgApiUrl
-                );
-                controller.enqueue(sse({ type: "tool_done", name: call.name }));
-              } catch (err) {
-                result = `Error: ${err instanceof Error ? err.message : String(err)}`;
-                controller.enqueue(sse({ type: "tool_error", name: call.name, error: result }));
-              }
-              toolResults.push({ type: "tool_result", tool_use_id: call.id, content: result });
+          } else if (chunk.type === "tool-result") {
+            if (chunk.isError) {
+              controller.enqueue(
+                sse({ type: "tool_error", name: chunk.toolName, error: String(chunk.result) })
+              );
+            } else {
+              controller.enqueue(sse({ type: "tool_done", name: chunk.toolName }));
             }
-
-            history.push({ role: "user", content: toolResults });
-            continue;
+          } else if (chunk.type === "error") {
+            controller.enqueue(
+              sse({ type: "error", message: chunk.error instanceof Error ? chunk.error.message : String(chunk.error) })
+            );
           }
-
-          break;
         }
 
         controller.enqueue(sse({ type: "done" }));

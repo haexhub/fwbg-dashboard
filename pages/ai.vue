@@ -13,7 +13,7 @@ useSeoMeta({ title: "AI Assistent – FWBG" });
       </div>
       <div class="flex items-center gap-2 text-xs text-gray-600">
         <UIcon name="i-heroicons-cpu-chip" class="w-3.5 h-3.5" />
-        <span>claude-opus-4-6</span>
+        <span>Claude · OpenAI · Gemini · DeepSeek</span>
       </div>
     </div>
 
