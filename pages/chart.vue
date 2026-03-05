@@ -585,40 +585,11 @@ watch(
         :sources="sources ?? []"
         :available-symbols="availableSymbols"
         :available-timeframes="availableTimeframes"
-        :active-indicators="activeIndicators"
-        :active-drawing-tool="activeDrawingTool"
-        :range-interval="rangeInterval"
-        :range-start-time="rangeStartTime"
-        :range-end-time="rangeEndTime"
-        :range-weekdays="rangeWeekdays"
-        :range-use-open-close="rangeUseOpenClose"
-        :session-enabled-ids="sessionEnabledIds"
         :is-fullscreen="isFullscreen"
         @update:source="setSource"
         @update:symbol="setSymbol"
         @update:timeframe="setTimeframe"
         @update:chart-type="setChartType"
-        @update:drawing-tool="setDrawingTool"
-        @update:range-interval="handleRangeIntervalChange"
-        @update:range-start-time="
-          (v: string) => {
-            rangeStartTime = v;
-            handleRangeTimeChange();
-          }
-        "
-        @update:range-end-time="
-          (v: string) => {
-            rangeEndTime = v;
-            handleRangeTimeChange();
-          }
-        "
-        @update:range-weekdays="handleRangeWeekdaysChange"
-        @update:range-use-open-close="handleRangeUseOpenCloseChange"
-        @update:session-enabled-ids="handleSessionEnabledIdsChange"
-        :has-active-indicators="activeIndicators.length > 0"
-        @open-indicators="indicatorPanelOpen = true"
-        @create-signal="signalConfigOpen = true"
-        @save-strategy="strategySaveOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
         @zoom-in="chartCanvas?.zoomIn()"
@@ -678,58 +649,87 @@ watch(
         </div>
       </div>
 
-      <!-- Active Indicators Strip -->
-      <ChartIndicatorStrip
-        :indicators="activeIndicators"
-        :collapsed-ids="collapsedPanes"
-        :signal-timestamps="navSignalTimestamps"
-        :current-signal-index="currentSignalIndex"
-        :selected-signal-ids="selectedSignalIds"
-        @toggle-collapse="togglePaneCollapse"
-        @collapse-all="collapseAllPanes"
-        @expand-all="expandAllPanes"
-        @edit="handleEditIndicator"
-        @toggle-overlay="toggleOverlay"
-        @remove="handleRemoveIndicator"
-        @signal-prev="goToPrevSignal"
-        @signal-next="goToNextSignal"
-        @signal-goto="goToSignal"
-        @update:selected-signals="selectedSignalIds = $event"
-      />
-
-      <!-- Crosshair Data Legend -->
-      <ChartDataLegend
-        :data="crosshairData"
-        :price-precision="pricePrecision"
-      />
-
-      <!-- Chart Canvas -->
-      <div ref="chartWrapperRef" class="flex-1 min-h-0 relative">
-        <ChartCanvas
-          ref="chartCanvas"
-          :source="source"
-          :symbol="symbol"
-          :timeframe="timeframe"
-          :chart-type="chartType"
-          :price-precision="pricePrecision"
+      <!-- Main content: drawing sidebar + chart -->
+      <div class="flex flex-1 min-h-0">
+        <!-- Drawing Tools Sidebar -->
+        <ChartDrawingSidebar
           :active-drawing-tool="activeDrawingTool"
-          :load-all="!!queryRunId"
-          @crosshair-change="crosshairData = $event"
-          @drawing-cancelled="setDrawingTool(null)"
-          @data-loaded="handleDataLoaded"
+          :active-indicators="activeIndicators"
+          :has-active-indicators="activeIndicators.length > 0"
+          :range-interval="rangeInterval"
+          :range-start-time="rangeStartTime"
+          :range-end-time="rangeEndTime"
+          :range-weekdays="rangeWeekdays"
+          :range-use-open-close="rangeUseOpenClose"
+          :session-enabled-ids="sessionEnabledIds"
+          @update:drawing-tool="setDrawingTool"
+          @open-indicators="indicatorPanelOpen = true"
+          @create-signal="signalConfigOpen = true"
+          @save-strategy="strategySaveOpen = true"
+          @update:range-interval="handleRangeIntervalChange"
+          @update:range-start-time="(v: string) => { rangeStartTime = v; handleRangeTimeChange(); }"
+          @update:range-end-time="(v: string) => { rangeEndTime = v; handleRangeTimeChange(); }"
+          @update:range-weekdays="handleRangeWeekdaysChange"
+          @update:range-use-open-close="handleRangeUseOpenCloseChange"
+          @update:session-enabled-ids="handleSessionEnabledIdsChange"
         />
-        <!-- Indicator loading overlay -->
-        <Transition name="fade">
-          <div
-            v-if="indicatorLoading"
-            class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none"
-          >
-            <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900/90 text-sm text-gray-300">
-              <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
-              Indikatoren werden geladen...
-            </div>
+
+        <!-- Chart content -->
+        <div class="flex flex-col flex-1 min-w-0">
+          <!-- Active Indicators Strip -->
+          <ChartIndicatorStrip
+            :indicators="activeIndicators"
+            :collapsed-ids="collapsedPanes"
+            :signal-timestamps="navSignalTimestamps"
+            :current-signal-index="currentSignalIndex"
+            :selected-signal-ids="selectedSignalIds"
+            @toggle-collapse="togglePaneCollapse"
+            @collapse-all="collapseAllPanes"
+            @expand-all="expandAllPanes"
+            @edit="handleEditIndicator"
+            @toggle-overlay="toggleOverlay"
+            @remove="handleRemoveIndicator"
+            @signal-prev="goToPrevSignal"
+            @signal-next="goToNextSignal"
+            @signal-goto="goToSignal"
+            @update:selected-signals="selectedSignalIds = $event"
+          />
+
+          <!-- Crosshair Data Legend -->
+          <ChartDataLegend
+            :data="crosshairData"
+            :price-precision="pricePrecision"
+          />
+
+          <!-- Chart Canvas -->
+          <div ref="chartWrapperRef" class="flex-1 min-h-0 relative">
+            <ChartCanvas
+              ref="chartCanvas"
+              :source="source"
+              :symbol="symbol"
+              :timeframe="timeframe"
+              :chart-type="chartType"
+              :price-precision="pricePrecision"
+              :active-drawing-tool="activeDrawingTool"
+              :load-all="!!queryRunId"
+              @crosshair-change="crosshairData = $event"
+              @drawing-cancelled="setDrawingTool(null)"
+              @data-loaded="handleDataLoaded"
+            />
+            <!-- Indicator loading overlay -->
+            <Transition name="fade">
+              <div
+                v-if="indicatorLoading"
+                class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none"
+              >
+                <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900/90 text-sm text-gray-300">
+                  <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
+                  Indikatoren werden geladen...
+                </div>
+              </div>
+            </Transition>
           </div>
-        </Transition>
+        </div>
       </div>
 
       <!-- Indicator Panel -->
