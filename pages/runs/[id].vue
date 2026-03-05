@@ -201,7 +201,7 @@ const isSingleAsset = computed(() => selectedTab.value !== "all");
         <PerformanceTradeTable :trades="activePerformance.trades" />
 
         <!-- Asset Table -->
-        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" />
+        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" :run-detail="detail" />
       </template>
     </template>
   </div>

@@ -352,7 +352,7 @@ export function useChartIndicatorActions() {
       }> = JSON.parse(indJson);
 
       for (const entry of entries) {
-        if (ctx.activeIndicators.value.some((a) => a.fqn === entry.fqn)) continue;
+        if (ctx.activeIndicators.value.some((a) => a.fqn === entry.fqn && !!a.isSignal === !!entry.isSignal)) continue;
         const plugin = ctx.indicatorPlugins.value.find((p) => p.fqn === entry.fqn);
         if (!plugin) continue;
 

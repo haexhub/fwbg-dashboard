@@ -510,13 +510,8 @@ watch(indicatorPlugins, () => {
   }
 });
 
-// Load run indicators once plugins become available
-watch(indicatorPlugins, (list: PluginInfo[]) => {
-  if (list.length === 0) return;
-  if (queryRunId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
-    tradeOverlay.loadRunIndicators(queryRunId.value, tradeCtx);
-  }
-});
+// Run indicators are loaded only via explicit URL `indicators` param.
+// No automatic loading from run config — avoids duplicates.
 
 // Reset trade-overlay flags when the run id changes
 watch(queryRunId, () => {

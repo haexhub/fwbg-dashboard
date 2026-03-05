@@ -165,10 +165,7 @@ export function useChartTradeOverlay() {
 
   async function loadTradeOverlay(runId: string, sym: string, ctx: TradeOverlayContext) {
     try {
-      const [resp] = await Promise.all([
-        $fetch<RunTradesResponse>(`/api/runs/${runId}/trades/${sym}`),
-        loadRunIndicators(runId, ctx),
-      ]);
+      const resp = await $fetch<RunTradesResponse>(`/api/runs/${runId}/trades/${sym}`);
 
       const markers: RunTradeMarker[] = resp.trades
         .filter((t) => t.entry_time && t.entry_price != null)
