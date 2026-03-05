@@ -530,6 +530,23 @@ function handleScreenshot() {
 }
 
 // ── Sync chart state to URL ──
+// When URL indicators haven't been restored yet, preserve the original query
+// param so syncToUrl doesn't overwrite it with an empty list.
+function buildSyncIndicators(): Array<{ fqn: string; params: Record<string, unknown>; columns: string[]; isSignal: boolean; indicatorTimeframe?: string }> {
+  if (!_indicatorsRestored && queryIndicators.value && activeIndicators.value.length === 0) {
+    try {
+      return JSON.parse(queryIndicators.value);
+    } catch { /* fall through */ }
+  }
+  return activeIndicators.value.map((i) => ({
+    fqn: i.fqn,
+    params: i.params,
+    columns: i.columns,
+    isSignal: i.isSignal || false,
+    ...(i.indicatorTimeframe ? { indicatorTimeframe: i.indicatorTimeframe } : {}),
+  }));
+}
+
 watch(
   [
     source,
@@ -556,13 +573,7 @@ watch(
       rangeWeekdays: rangeWeekdays.value,
       rangeUseOpenClose: rangeUseOpenClose.value,
       sessionIds: sessionEnabledIds.value,
-      indicators: activeIndicators.value.map((i) => ({
-        fqn: i.fqn,
-        params: i.params,
-        columns: i.columns,
-        isSignal: i.isSignal || false,
-        ...(i.indicatorTimeframe ? { indicatorTimeframe: i.indicatorTimeframe } : {}),
-      })),
+      indicators: buildSyncIndicators(),
     }),
   { deep: true },
 );
