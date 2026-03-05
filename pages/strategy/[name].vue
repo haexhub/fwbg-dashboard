@@ -94,6 +94,7 @@ function openInChart(sym: string) {
       ...(indicators.length > 0
         ? { indicators: JSON.stringify(indicators) }
         : {}),
+      ...(config.value?.assets?.drop_flat_bars ? { dropFlatBars: "1" } : {}),
     },
   });
 }

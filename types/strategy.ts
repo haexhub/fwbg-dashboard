@@ -10,7 +10,9 @@ export type ParamType =
   | "list[int]"
   | "list[float]"
   | "list[string]"
-  | "choice";
+  | "choice"
+  | "session_ranges"
+  | "dict";
 
 export interface ParamSchema {
   type: ParamType;

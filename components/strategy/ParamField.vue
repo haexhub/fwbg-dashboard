@@ -85,6 +85,48 @@ const selectedCount = computed(() => ((value.value as number[]) ?? []).length);
 function optionLabel(strVal: string): string {
   return props.schema.choice_labels?.[strVal] ?? strVal;
 }
+
+// ── Session ranges editor ──
+type SessionEntry = { name: string; start: number; end: number };
+
+const sessionEntries = computed<SessionEntry[]>(() => {
+  const raw = value.value;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  return Object.entries(raw as Record<string, number[]>).map(([name, range]) => ({
+    name,
+    start: range[0] ?? 0,
+    end: range[1] ?? 0,
+  }));
+});
+
+function emitSessions(entries: SessionEntry[]) {
+  const obj: Record<string, number[]> = {};
+  for (const e of entries) {
+    const key = e.name.trim().toLowerCase().replace(/\s+/g, "_");
+    if (key) obj[key] = [e.start, e.end];
+  }
+  emit("update:modelValue", obj);
+}
+
+function updateSession(idx: number, field: keyof SessionEntry, val: string | number) {
+  const entries = [...sessionEntries.value];
+  const updated = { ...entries[idx], [field]: field === "name" ? val : Number(val) } as SessionEntry;
+  entries[idx] = updated;
+  emitSessions(entries);
+}
+
+function removeSession(idx: number) {
+  emitSessions(sessionEntries.value.filter((_, i) => i !== idx));
+}
+
+function addSession() {
+  emitSessions([...sessionEntries.value, { name: "new_session", start: 0, end: 8 }]);
+}
+
+const hourOptions = Array.from({ length: 24 }, (_, i) => ({
+  label: `${String(i).padStart(2, "0")}:00`,
+  value: String(i),
+}));
 </script>
 
 <template>
@@ -184,7 +226,7 @@ function optionLabel(strVal: string): string {
 
       <!-- String (default) -->
       <UInput
-        v-else
+        v-else-if="schema.type !== 'session_ranges' && schema.type !== 'dict'"
         :model-value="String(value ?? '')"
         @update:model-value="emit('update:modelValue', $event)"
       />
@@ -194,6 +236,53 @@ function optionLabel(strVal: string): string {
         {{ schema.min ?? '…' }}–{{ schema.max ?? '…' }}
         <template v-if="schema.step">({{ schema.step }})</template>
       </span>
+    </div>
+
+    <!-- Session ranges editor -->
+    <div v-if="schema.type === 'session_ranges' || schema.type === 'dict'" class="space-y-2 pt-1">
+      <div
+        v-for="(entry, idx) in sessionEntries"
+        :key="idx"
+        class="flex items-center gap-2 rounded-lg bg-gray-800/50 px-3 py-2"
+      >
+        <UInput
+          :model-value="entry.name"
+          size="sm"
+          class="w-32"
+          placeholder="Name"
+          @update:model-value="updateSession(idx, 'name', String($event))"
+        />
+        <USelect
+          :model-value="String(entry.start)"
+          :items="hourOptions"
+          value-key="value"
+          size="sm"
+          class="w-24"
+          @update:model-value="updateSession(idx, 'start', $event)"
+        />
+        <span class="text-xs text-gray-500">–</span>
+        <USelect
+          :model-value="String(entry.end)"
+          :items="hourOptions"
+          value-key="value"
+          size="sm"
+          class="w-24"
+          @update:model-value="updateSession(idx, 'end', $event)"
+        />
+        <span class="text-[10px] text-gray-600 whitespace-nowrap">
+          {{ entry.start < entry.end ? `${entry.end - entry.start}h` : `${24 - entry.start + entry.end}h ↻` }}
+        </span>
+        <UButton
+          icon="i-heroicons-x-mark"
+          size="xs"
+          variant="ghost"
+          color="error"
+          @click="removeSession(idx)"
+        />
+      </div>
+      <UButton size="xs" variant="outline" icon="i-heroicons-plus" @click="addSession">
+        Session
+      </UButton>
     </div>
   </div>
 </template>

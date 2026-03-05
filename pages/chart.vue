@@ -30,6 +30,7 @@ const {
   addIndicator,
   removeIndicator,
   setDrawingTool,
+  setSyncIndicators,
 } = useChart();
 
 const pluginStore = usePluginStore();
@@ -53,8 +54,13 @@ const {
   queryRunId,
   queryIndicators,
   queryStrategy,
+  queryDropFlatBars,
   syncToUrl,
+  syncIndicatorsToUrl,
 } = useChartQuery();
+
+// Wire indicator URL sync: add/remove indicator updates URL immediately
+setSyncIndicators(syncIndicatorsToUrl);
 
 // Sync timeframe and chart type from URL
 watch(queryTimeframe, (tf: string | undefined) => {
@@ -529,24 +535,7 @@ function handleScreenshot() {
   a.click();
 }
 
-// ── Sync chart state to URL ──
-// When URL indicators haven't been restored yet, preserve the original query
-// param so syncToUrl doesn't overwrite it with an empty list.
-function buildSyncIndicators(): Array<{ fqn: string; params: Record<string, unknown>; columns: string[]; isSignal: boolean; indicatorTimeframe?: string }> {
-  if (!_indicatorsRestored && queryIndicators.value && activeIndicators.value.length === 0) {
-    try {
-      return JSON.parse(queryIndicators.value);
-    } catch { /* fall through */ }
-  }
-  return activeIndicators.value.map((i) => ({
-    fqn: i.fqn,
-    params: i.params,
-    columns: i.columns,
-    isSignal: i.isSignal || false,
-    ...(i.indicatorTimeframe ? { indicatorTimeframe: i.indicatorTimeframe } : {}),
-  }));
-}
-
+// ── Sync chart state to URL (indicators synced separately via setSyncIndicators) ──
 watch(
   [
     source,
@@ -559,7 +548,6 @@ watch(
     rangeWeekdays,
     rangeUseOpenClose,
     sessionEnabledIds,
-    activeIndicators,
   ],
   () =>
     syncToUrl({
@@ -573,7 +561,6 @@ watch(
       rangeWeekdays: rangeWeekdays.value,
       rangeUseOpenClose: rangeUseOpenClose.value,
       sessionIds: sessionEnabledIds.value,
-      indicators: buildSyncIndicators(),
     }),
   { deep: true },
 );
@@ -718,6 +705,7 @@ watch(
               :price-precision="pricePrecision"
               :active-drawing-tool="activeDrawingTool"
               :load-all="!!queryRunId"
+              :drop-flat-bars="queryDropFlatBars"
               @crosshair-change="crosshairData = $event"
               @drawing-cancelled="setDrawingTool(null)"
               @data-loaded="handleDataLoaded"

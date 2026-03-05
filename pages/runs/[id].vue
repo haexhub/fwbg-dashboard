@@ -80,6 +80,11 @@ const activePerformance = computed(() => {
 });
 
 const isSingleAsset = computed(() => selectedTab.value !== "all");
+
+const analysisSymbol = computed(() => {
+  if (selectedTab.value !== "all") return selectedTab.value;
+  return gridDetails.value[0]?.symbol ?? "";
+});
 </script>
 
 <template>
@@ -202,6 +207,21 @@ const isSingleAsset = computed(() => selectedTab.value !== "all");
 
         <!-- Asset Table -->
         <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" :run-detail="detail" />
+
+        <!-- Statistical Analysis -->
+        <PerformanceStatisticalAnalysis
+          v-if="analysisSymbol"
+          :run-id="runId"
+          :symbol="analysisSymbol"
+        />
+
+        <!-- Feature Discovery -->
+        <PerformanceFeatureDiscovery
+          v-if="analysisSymbol"
+          :run-id="runId"
+          :symbol="analysisSymbol"
+          :strategy-name="strategyName"
+        />
       </template>
     </template>
   </div>

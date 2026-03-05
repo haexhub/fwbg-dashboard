@@ -32,6 +32,7 @@ const props = defineProps<{
   activeDrawingTool: string | null;
   chartType: "candle_solid" | "ohlc" | "area";
   loadAll?: boolean;
+  dropFlatBars?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -147,7 +148,11 @@ async function fetchOhlcvData(
     });
   } else {
     response = await $fetch<OhlcvResponse>("/api/chart/ohlcv", {
-      params: { symbol, timeframe, source, limit, ...(before ? { before } : {}) },
+      params: {
+        symbol, timeframe, source, limit,
+        ...(before ? { before } : {}),
+        ...(props.dropFlatBars ? { drop_flat_bars: "true" } : {}),
+      },
     });
   }
 

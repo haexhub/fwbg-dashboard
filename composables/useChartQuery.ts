@@ -40,7 +40,6 @@ export interface ChartUrlState {
   rangeWeekdays: number[];
   rangeUseOpenClose: boolean;
   sessionIds: string[];
-  indicators: ChartUrlIndicator[];
 }
 
 export function useChartQuery() {
@@ -62,6 +61,7 @@ export function useChartQuery() {
   const queryRunId             = computed(() => route.query.run               as string | undefined);
   const queryIndicators        = computed(() => route.query.indicators        as string | undefined);
   const queryStrategy          = computed(() => route.query.strategy          as string | undefined);
+  const queryDropFlatBars      = computed(() => route.query.dropFlatBars === "1");
 
   // ── Debounced URL sync ──
   const syncToUrl = useDebounceFn((state: ChartUrlState) => {
@@ -73,6 +73,8 @@ export function useChartQuery() {
     if (queryRunId.value) query.run = queryRunId.value;
     // Preserve strategy reference
     if (queryStrategy.value) query.strategy = queryStrategy.value;
+    // Preserve drop-flat-bars flag
+    if (queryDropFlatBars.value) query.dropFlatBars = "1";
 
     query.source    = state.source;
     query.symbol    = state.symbol;
@@ -91,13 +93,27 @@ export function useChartQuery() {
 
     if (state.sessionIds.length) query.sessionIds = state.sessionIds.join(",");
 
-    const validIndicators = state.indicators.filter((ind) =>
-      plugins.value.some((p) => p.fqn === ind.fqn),
-    );
-    if (validIndicators.length) query.indicators = JSON.stringify(validIndicators);
+    // Preserve indicators param — managed separately by syncIndicatorsToUrl
+    const existingIndicators = route.query.indicators as string | undefined;
+    if (existingIndicators) query.indicators = existingIndicators;
 
     router.replace({ query });
   }, 500);
+
+  // ── Immediate indicator URL sync ──
+  // Updates only the `indicators` query param, preserving everything else.
+  function syncIndicatorsToUrl(indicators: ChartUrlIndicator[]) {
+    const query = { ...route.query } as Record<string, string>;
+    const valid = indicators.filter((ind) =>
+      plugins.value.some((p) => p.fqn === ind.fqn),
+    );
+    if (valid.length > 0) {
+      query.indicators = JSON.stringify(valid);
+    } else {
+      delete query.indicators;
+    }
+    router.replace({ query });
+  }
 
   return {
     querySource,
@@ -113,6 +129,8 @@ export function useChartQuery() {
     queryRunId,
     queryIndicators,
     queryStrategy,
+    queryDropFlatBars,
     syncToUrl,
+    syncIndicatorsToUrl,
   };
 }

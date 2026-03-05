@@ -33,10 +33,14 @@ export default defineEventHandler(async (event) => {
   const timeframe = String(query.timeframe || "");
   const before = query.before ? Number(query.before) : null;
   const limit = query.limit ? Number(query.limit) : null;
+  const dropFlatBars = query.drop_flat_bars === "true";
+
+  // Use a distinct cache key when flat bars are filtered
+  const cacheTimeframe = dropFlatBars ? `${timeframe}:noflat` : timeframe;
 
   // ── Cache check ──
   if (source && symbol && timeframe) {
-    const cached = getCachedOhlcv(source, symbol, timeframe);
+    const cached = getCachedOhlcv(source, symbol, cacheTimeframe);
     if (cached) {
       const sliced = sliceBars(cached, before, limit);
       return {
@@ -56,12 +60,13 @@ export default defineEventHandler(async (event) => {
   if (query.timeframe) params.set("timeframe", String(query.timeframe));
   if (query.source) params.set("source", String(query.source));
   params.set("limit", "50000");
+  if (dropFlatBars) params.set("drop_flat_bars", "true");
 
   const result = await fwbgFetch<FwbgOhlcvResponse>(`/api/chart/ohlcv?${params.toString()}`);
 
   // Store full dataset in cache
   if (source && symbol && timeframe && result.data?.length > 0) {
-    setCachedOhlcv(source, symbol, timeframe, result.data);
+    setCachedOhlcv(source, symbol, cacheTimeframe, result.data);
   }
 
   // Return paginated slice

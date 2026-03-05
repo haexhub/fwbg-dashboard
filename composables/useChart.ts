@@ -3,6 +3,7 @@ import type {
   ChartSymbol,
   ActiveIndicator,
 } from "~/types/chart";
+import type { ChartUrlIndicator } from "~/composables/useChartQuery";
 
 export function useChart() {
   // ── Source, Symbol & Timeframe ──
@@ -43,13 +44,31 @@ export function useChart() {
 
   // ── Active Indicators ──
   const activeIndicators = ref<ActiveIndicator[]>([]);
+  let _syncIndicators: ((indicators: ChartUrlIndicator[]) => void) | null = null;
+
+  function setSyncIndicators(fn: (indicators: ChartUrlIndicator[]) => void) {
+    _syncIndicators = fn;
+  }
+
+  function _syncToUrl() {
+    if (!_syncIndicators) return;
+    _syncIndicators(activeIndicators.value.map((i) => ({
+      fqn: i.fqn,
+      params: i.params,
+      columns: i.columns,
+      isSignal: i.isSignal || false,
+      ...(i.indicatorTimeframe ? { indicatorTimeframe: i.indicatorTimeframe } : {}),
+    })));
+  }
 
   function addIndicator(indicator: ActiveIndicator) {
     activeIndicators.value.push(indicator);
+    _syncToUrl();
   }
 
   function removeIndicator(id: string) {
     activeIndicators.value = activeIndicators.value.filter((i) => i.id !== id);
+    _syncToUrl();
   }
 
   // ── Chart Type ──
@@ -104,6 +123,7 @@ export function useChart() {
     setChartType,
     addIndicator,
     removeIndicator,
+    setSyncIndicators,
     setDrawingTool,
   };
 }
