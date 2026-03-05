@@ -116,7 +116,10 @@ const MODELS: ModelConfig[] = [
   },
 ];
 
-const MODEL_OPTIONS = MODELS.map((m) => ({ label: m.label, value: m.id }));
+const MODEL_OPTIONS = MODELS.map((m) => ({
+  label: `${m.label}  ·  ${m.keyLabel}`,
+  value: m.id,
+}));
 
 const messages = ref<Message[]>([]);
 const input = ref("");
@@ -361,7 +364,8 @@ function clearChat() {
           <span class="text-xs text-gray-500 shrink-0">Modell:</span>
           <USelect
             v-model="selectedModelId"
-            :options="MODEL_OPTIONS"
+            :items="MODEL_OPTIONS"
+          value-key="value"
             size="sm"
             class="flex-1"
           />
@@ -460,7 +464,8 @@ function clearChat() {
       <div class="border-t border-gray-800 p-3 flex gap-2 items-end">
         <USelect
           v-model="selectedModelId"
-          :options="MODEL_OPTIONS"
+          :items="MODEL_OPTIONS"
+          value-key="value"
           size="sm"
           class="w-44 shrink-0"
         />
