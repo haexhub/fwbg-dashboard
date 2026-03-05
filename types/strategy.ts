@@ -195,6 +195,7 @@ export interface StrategyConfig {
   assets?: {
     filter?: string[];
     exclude?: string[];
+    drop_flat_bars?: boolean;
   };
   validation: Record<string, unknown>;
   filters: Record<string, unknown>;
