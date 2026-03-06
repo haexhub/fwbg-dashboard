@@ -206,7 +206,7 @@ const analysisSymbol = computed(() => {
         <PerformanceTradeTable :trades="activePerformance.trades" />
 
         <!-- Asset Table -->
-        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" :run-detail="detail" />
+        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" :run-detail="detail ?? undefined" />
 
         <!-- Statistical Analysis -->
         <PerformanceStatisticalAnalysis

@@ -128,8 +128,8 @@ const scrollEl = ref<HTMLElement>();
 const apiHistory = ref<ApiMessage[]>([]);
 
 // Model selection
-const selectedModelId = ref(MODELS[0].id);
-const selectedModel = computed(() => MODELS.find((m) => m.id === selectedModelId.value) ?? MODELS[0]);
+const selectedModelId = ref(MODELS[0]!.id);
+const selectedModel = computed(() => MODELS.find((m) => m.id === selectedModelId.value) ?? MODELS[0]!);
 
 // API key state
 const apiKeys = ref<Record<string, string>>({});
@@ -268,7 +268,7 @@ async function submit() {
           assistantText += event.content as string;
           const textParts = assistantMsg.parts.filter((p) => p.type === "text") as TextPart[];
           if (textParts.length > 0) {
-            textParts[textParts.length - 1].content = assistantText;
+            textParts[textParts.length - 1]!.content = assistantText;
           } else {
             assistantMsg.parts.push({ type: "text", content: assistantText });
           }

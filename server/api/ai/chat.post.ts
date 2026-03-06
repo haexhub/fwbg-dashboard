@@ -95,7 +95,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
         "without them the model sees all bars and produces 0 OOS trades.",
       inputSchema: z.object({
         name: z.string().describe("Strategy filename without .json"),
-        config: z.record(z.unknown()).describe("Full strategy configuration"),
+        config: z.record(z.string(), z.unknown()).describe("Full strategy configuration"),
       }),
       execute: async ({ name, config }) =>
         JSON.stringify(await apiPut(`/api/strategies/${name}`, config)),
@@ -343,7 +343,7 @@ export default defineEventHandler(async (event) => {
             );
           } else if (chunk.type === "error") {
             controller.enqueue(
-              sse({ type: "error", message: String(chunk.errorText) })
+              sse({ type: "error", message: String((chunk as { type: "error"; error: unknown }).error) })
             );
           }
         }

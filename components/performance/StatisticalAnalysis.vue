@@ -114,8 +114,8 @@ watch(
       setEquityOption({
         tooltip: {
           trigger: "axis",
-          formatter: (params: { seriesName: string; value: number }[]) =>
-            params
+          formatter: (params: unknown) =>
+            (params as { seriesName: string; value: number }[])
               .map((p) => `${p.seriesName}: ${fmt(p.value, 1)}`)
               .join("<br/>"),
         },
@@ -178,10 +178,11 @@ watch(
       setHourlyOption({
         tooltip: {
           trigger: "axis",
-          formatter: (params: { seriesName: string; value: number; name: string }[]) => {
-            const h = Number(params[0].name);
+          formatter: (params: unknown) => {
+            const ps = params as { seriesName: string; value: number; name: string }[];
+            const h = Number(ps[0]!.name);
             let html = `<b>${String(h).padStart(2, "0")}:00</b>`;
-            for (const p of params) {
+            for (const p of ps) {
               const color = p.seriesName === "Long" ? "#22c55e" : "#ef4444";
               html += `<br/><span style="color:${color}">${p.seriesName}:</span> ${fmt(p.value, 1)}`;
             }
@@ -231,8 +232,8 @@ watch(
       setFoldOption({
         tooltip: {
           trigger: "axis",
-          formatter: (params: { name: string; value: number; seriesName: string }[]) => {
-            const fold = data.fold_stability[Number(params[0].name.replace("F", ""))];
+          formatter: (params: unknown) => {
+            const fold = data.fold_stability[Number((params as { name: string }[])[0]!.name.replace("F", ""))];
             if (!fold) return "";
             return `<b>Fold ${fold.fold_id}</b><br/>Trades: ${fold.count}<br/>Win Rate: ${fold.win_rate}%<br/>PF: ${fold.profit_factor}<br/>Total PnL: ${fmt(fold.total_pnl, 2)}`;
           },
