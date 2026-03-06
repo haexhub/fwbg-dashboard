@@ -381,6 +381,7 @@ onKeyStroke("y", (e) => {
 
     <!-- Run Start Modal -->
     <RunsRunStartModal
+      v-if="strategyName"
       :open="runModalOpen"
       :strategy-name="strategyName"
       @update:open="runModalOpen = $event"
@@ -389,6 +390,7 @@ onKeyStroke("y", (e) => {
 
     <!-- Version History Panel -->
     <StrategyVersionHistoryPanel
+      v-if="strategyName"
       v-model:open="historyOpen"
       :strategy-name="strategyName"
       @restore="(c) => { store.config = c as any; }"
