@@ -86,9 +86,7 @@ const showOnlySignificant = ref(false);
 const progressStep = ref(0);
 const progressTotal = ref(0);
 const progressIndicator = ref("");
-const liveFeatures = ref<FeatureResult[]>([]);
 const completedIndicators = ref<string[]>([]);
-const totalSignificant = ref(0);
 const initInfo = ref<{ total_trades: number; wins: number; losses: number; bars: number } | null>(null);
 
 // Add-to-strategy state
@@ -116,9 +114,7 @@ function runDiscovery() {
   progressStep.value = 0;
   progressTotal.value = 0;
   progressIndicator.value = "";
-  liveFeatures.value = [];
   completedIndicators.value = [];
-  totalSignificant.value = 0;
   initInfo.value = null;
 
   const es = new EventSource(`/api/runs/${props.runId}/discovery/${props.symbol}`);
@@ -140,16 +136,16 @@ function runDiscovery() {
   es.addEventListener("indicator_done", (e) => {
     const d = JSON.parse(e.data);
     completedIndicators.value.push(d.indicator);
-    totalSignificant.value += d.significant_count;
-
-    if (d.top_features?.length) {
-      const merged = [...liveFeatures.value, ...d.top_features];
-      merged.sort((a: FeatureResult, b: FeatureResult) => b.abs_effect_size - a.abs_effect_size);
-      liveFeatures.value = merged.slice(0, 20);
-    }
+    progressStep.value = d.step;
+    progressTotal.value = d.total;
+    progressIndicator.value = d.indicator;
   });
 
-  es.addEventListener("indicator_skip", (_e) => {});
+  es.addEventListener("indicator_skip", (e) => {
+    const d = JSON.parse(e.data);
+    progressStep.value = d.step;
+    progressTotal.value = d.total;
+  });
 
   es.addEventListener("done", (e) => {
     const d = JSON.parse(e.data);
@@ -461,10 +457,8 @@ const opOptions = [
           <p class="text-xs text-gray-500">von {{ progressTotal }}</p>
         </div>
         <div class="rounded-lg bg-gray-800 p-3 text-center">
-          <p class="text-xs text-gray-400">Signifikant</p>
-          <p class="text-lg font-bold" :class="totalSignificant > 0 ? 'text-green-400' : 'text-gray-400'">
-            {{ totalSignificant }}
-          </p>
+          <p class="text-xs text-gray-400">Aktuell</p>
+          <p class="text-sm font-mono text-white truncate">{{ progressIndicator || '...' }}</p>
         </div>
         <div class="rounded-lg bg-gray-800 p-3 text-center">
           <p class="text-xs text-gray-400">Bars</p>
@@ -472,44 +466,11 @@ const opOptions = [
         </div>
       </div>
 
-      <!-- Live top features -->
-      <div v-if="liveFeatures.length" class="overflow-x-auto">
-        <p class="text-xs text-gray-500 mb-2">Top Features (live):</p>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-gray-700 text-gray-400">
-              <th class="px-3 py-1.5 text-left">#</th>
-              <th class="px-3 py-1.5 text-left">Feature</th>
-              <th class="px-3 py-1.5 text-right">Effect Size</th>
-              <th class="px-3 py-1.5 text-right">Stärke</th>
-              <th class="px-3 py-1.5 text-right">p-Wert</th>
-              <th class="px-3 py-1.5 text-right">AUC</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(r, idx) in liveFeatures"
-              :key="r.feature"
-              class="border-b border-gray-800"
-              :class="{ 'bg-green-900/10': r.significant }"
-            >
-              <td class="px-3 py-1 text-gray-500">{{ idx + 1 }}</td>
-              <td class="px-3 py-1 font-mono text-xs text-white">{{ r.feature }}</td>
-              <td :class="['px-3 py-1 text-right font-mono', effectColor(r.effect_size)]">
-                {{ fmt(r.effect_size) }}
-              </td>
-              <td :class="['px-3 py-1 text-right text-xs', effectColor(r.effect_size)]">
-                {{ effectLabel(r.effect_size) }}
-              </td>
-              <td :class="['px-3 py-1 text-right font-mono', r.significant ? 'text-green-400' : 'text-gray-500']">
-                {{ r.p_value < 0.001 ? '<0.001' : fmt(r.p_value, 4) }}
-              </td>
-              <td :class="['px-3 py-1 text-right font-mono', aucColor(r.auc)]">
-                {{ fmt(r.auc, 3) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Completed indicators list -->
+      <div v-if="completedIndicators.length" class="flex flex-wrap gap-1">
+        <UBadge v-for="name in completedIndicators" :key="name" color="neutral" variant="subtle" size="xs">
+          {{ name }}
+        </UBadge>
       </div>
     </div>
 

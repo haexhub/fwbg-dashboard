@@ -15,7 +15,7 @@
  *   { type: "error",      message: string }
  */
 
-import { streamText, tool, type CoreMessage } from "ai";
+import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -76,14 +76,14 @@ function makeFwbgTools(fwbgApiUrl: string) {
   return {
     list_strategies: tool({
       description: "List all available strategy configs. Returns filename, name, description, tags.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => JSON.stringify(await apiFetch("/api/strategies")),
     }),
 
     get_strategy: tool({
       description:
         "Load a strategy config by filename (without .json). Returns full config with resolved preset references.",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z.string().describe("Strategy filename without .json extension"),
       }),
       execute: async ({ name }) => JSON.stringify(await apiFetch(`/api/strategies/${name}`)),
@@ -93,7 +93,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "Create or update a strategy config. Always include signal_rules for ML strategies â€“ " +
         "without them the model sees all bars and produces 0 OOS trades.",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z.string().describe("Strategy filename without .json"),
         config: z.record(z.unknown()).describe("Full strategy configuration"),
       }),
@@ -105,7 +105,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "Start a strategy optimization run in the background. Returns run_id immediately. " +
         "Use get_run_status to track progress.",
-      parameters: z.object({
+      inputSchema: z.object({
         strategy_name: z.string(),
         assets: z
           .array(z.string())
@@ -125,7 +125,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "Get current status and progress of a run. Returns status (running/completed/failed), " +
         "progress_fraction, current_stage.",
-      parameters: z.object({ run_id: z.string() }),
+      inputSchema: z.object({ run_id: z.string() }),
       execute: async ({ run_id }) =>
         JSON.stringify(await apiFetch(`/api/runs/${run_id}/progress`)),
     }),
@@ -134,7 +134,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "Get full results for a completed run: summary KPIs, per-asset PF/WR/CAGR/max_drawdown, " +
         "fold stability, walk-forward breakdown. Only call for completed runs.",
-      parameters: z.object({ run_id: z.string() }),
+      inputSchema: z.object({ run_id: z.string() }),
       execute: async ({ run_id }) => {
         const run = await apiFetch(`/api/runs/${run_id}`);
         try {
@@ -153,7 +153,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
     get_run_logs: tool({
       description: "Get structured logs for a run. Use level='error' or level='info' to filter noise.",
-      parameters: z.object({
+      inputSchema: z.object({
         run_id: z.string(),
         level: z
           .enum(["info", "debug", "warning", "error"])
@@ -171,7 +171,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
     list_recent_runs: tool({
       description: "List recent runs with their status and outcome summary.",
-      parameters: z.object({
+      inputSchema: z.object({
         limit: z.number().int().optional().describe("Number of runs (default 10)"),
         strategy: z.string().optional().describe("Optional strategy name filter (substring)"),
       }),
@@ -200,7 +200,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
     list_indicators: tool({
       description:
         "List all available indicator plugins with signal_columns (use in signal_rules) and feature_columns.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const plugins = (await apiFetch("/api/plugins?phase=indicator")) as Array<
           Record<string, unknown>
@@ -221,7 +221,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "Get full param schema for an indicator: types, defaults, signal/feature columns. " +
         "Use the signal_columns in signal_rules to pre-filter bars for the ML model.",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z
           .string()
           .describe("Short name like 'opening_range' or fqn like 'fwbg-core:opening_range'"),
@@ -242,7 +242,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       description:
         "List all available exit strategy plugins with param schema. " +
         "Key params: tp_mult (TP as ATR multiple), sl_mult (SL as ATR multiple), timeout_bars.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const plugins = (await apiFetch("/api/plugins?phase=exit_strategy")) as Array<
           Record<string, unknown>
@@ -281,7 +281,7 @@ Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklÃ
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const messages: CoreMessage[] = body.messages ?? [];
+  const messages: ModelMessage[] = body.messages ?? [];
   const provider: string = body.provider ?? "anthropic";
   const modelId: string = body.model ?? "claude-opus-4-6";
 
@@ -325,27 +325,25 @@ export default defineEventHandler(async (event) => {
           system: SYSTEM_PROMPT,
           tools,
           messages,
-          maxSteps: 15,
+          stopWhen: stepCountIs(15),
         });
 
         for await (const chunk of result.fullStream) {
           if (chunk.type === "text-delta") {
-            controller.enqueue(sse({ type: "text", content: chunk.textDelta }));
+            controller.enqueue(sse({ type: "text", content: chunk.text }));
           } else if (chunk.type === "tool-call") {
             controller.enqueue(
-              sse({ type: "tool_start", name: chunk.toolName, input: chunk.args })
+              sse({ type: "tool_start", name: chunk.toolName, input: chunk.input })
             );
           } else if (chunk.type === "tool-result") {
-            if (chunk.isError) {
-              controller.enqueue(
-                sse({ type: "tool_error", name: chunk.toolName, error: String(chunk.result) })
-              );
-            } else {
-              controller.enqueue(sse({ type: "tool_done", name: chunk.toolName }));
-            }
+            controller.enqueue(sse({ type: "tool_done", name: chunk.toolName }));
+          } else if (chunk.type === "tool-error") {
+            controller.enqueue(
+              sse({ type: "tool_error", name: chunk.toolName, error: String(chunk.error) })
+            );
           } else if (chunk.type === "error") {
             controller.enqueue(
-              sse({ type: "error", message: chunk.error instanceof Error ? chunk.error.message : String(chunk.error) })
+              sse({ type: "error", message: String(chunk.errorText) })
             );
           }
         }
