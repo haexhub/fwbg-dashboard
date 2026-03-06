@@ -2,6 +2,8 @@
 import { statusColor } from "~/types/strategy";
 import { aggregatePerformance } from "~/composables/useRunPerformance";
 
+definePageMeta({ ssr: false });
+
 const route = useRoute();
 const runId = computed(() => route.params.id as string);
 
