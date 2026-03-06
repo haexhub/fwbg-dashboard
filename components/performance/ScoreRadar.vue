@@ -51,7 +51,7 @@ watch(
           { name: "Consistency", max: 100 },
         ],
         shape: "polygon",
-        splitNumber: 4,
+        splitNumber: 5,
         axisName: {
           color: "#9ca3af",
           fontSize: 11,

@@ -18,6 +18,7 @@ const navItems = [
   { label: "Plugins", to: "/plugins", icon: "i-heroicons-cube" },
   { label: "Datenquellen", to: "/datasources", icon: "i-heroicons-circle-stack" },
   { label: "Presets", to: "/presets", icon: "i-heroicons-bookmark-square" },
+  { label: "AI", to: "/ai", icon: "i-heroicons-sparkles" },
 ];
 
 function isActive(to: string): boolean {

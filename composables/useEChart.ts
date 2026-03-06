@@ -22,13 +22,12 @@ export function useEChart(containerRef: Ref<HTMLElement | null>) {
     chart.setOption(option, { notMerge: true });
   }
 
-  onMounted(() => {
-    if (!containerRef.value) return;
+  function tryInit() {
+    if (chart || !containerRef.value) return;
 
     chart = init(containerRef.value, "dark", { renderer: "canvas" });
     chart.setOption({ backgroundColor: "transparent" });
 
-    // Apply any buffered option
     if (pendingOption) {
       chart.setOption(pendingOption, { notMerge: true });
       pendingOption = null;
@@ -38,6 +37,13 @@ export function useEChart(containerRef: Ref<HTMLElement | null>) {
       chart?.resize();
     });
     observer.observe(containerRef.value);
+  }
+
+  onMounted(tryInit);
+
+  // Re-try init when ref appears (e.g. inside v-if that flips after mount)
+  watch(containerRef, (el) => {
+    if (el && !chart) tryInit();
   });
 
   onBeforeUnmount(() => {

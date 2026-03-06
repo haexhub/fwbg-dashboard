@@ -10,7 +10,7 @@ import {
 
 definePageMeta({ layout: "builder" });
 
-const INDICATOR_LIMIT = 10000;
+const INDICATOR_LIMIT = 999_999;
 
 const {
   source,
@@ -30,6 +30,7 @@ const {
   addIndicator,
   removeIndicator,
   setDrawingTool,
+  setSyncIndicators,
 } = useChart();
 
 const pluginStore = usePluginStore();
@@ -53,8 +54,13 @@ const {
   queryRunId,
   queryIndicators,
   queryStrategy,
+  queryDropFlatBars,
   syncToUrl,
+  syncIndicatorsToUrl,
 } = useChartQuery();
+
+// Wire indicator URL sync: add/remove indicator updates URL immediately
+setSyncIndicators(syncIndicatorsToUrl);
 
 // Sync timeframe and chart type from URL
 watch(queryTimeframe, (tf: string | undefined) => {
@@ -88,7 +94,24 @@ const chartWrapperRef = useTemplateRef<HTMLElement>("chartWrapperRef");
 const indicatorPanelOpen = ref(false);
 const editIndicator = ref<import("~/types/chart").ActiveIndicator | null>(null);
 const strategySaveOpen = ref(false);
-const signalBuilderOpen = ref(false);
+const signalConfigOpen = ref(false);
+const signalRules = ref<import("~/types/strategy").SignalRules>({});
+
+// Load signal rules from strategy when viewing one
+const { loadStrategy } = useStrategies();
+watch(
+  () => queryStrategy.value,
+  async (strategyFilename) => {
+    if (!strategyFilename) return;
+    try {
+      const config = await loadStrategy(strategyFilename);
+      if (config.signal_rules) {
+        signalRules.value = config.signal_rules;
+      }
+    } catch { /* strategy not found */ }
+  },
+  { immediate: true },
+);
 
 const pricePrecision = computed(() =>
   currentSymbol.value?.point
@@ -327,6 +350,7 @@ function handleAddIndicator(
   cols: string[],
   colors: Record<string, string>,
   isMainOverlay: boolean = false,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleAddIndicator(
     p,
@@ -335,6 +359,7 @@ function handleAddIndicator(
     colors,
     isMainOverlay,
     indicatorCtx,
+    indicatorTimeframe,
   );
 }
 function handleAddSignalIndicator(
@@ -342,8 +367,9 @@ function handleAddSignalIndicator(
   params: Record<string, unknown>,
   cols: string[],
   colors: Record<string, string>,
+  indicatorTimeframe?: string,
 ) {
-  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx);
+  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx, indicatorTimeframe);
 }
 function handleAddAllDeps(p: PluginInfo) {
   indActions.handleAddAllDeps(p, indicatorCtx);
@@ -361,9 +387,10 @@ function handleUpdateIndicator(
   cols: string[],
   colors: Record<string, string>,
   isMainOverlay: boolean = false,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
-  indActions.handleAddIndicator(p, params, cols, colors, isMainOverlay, indicatorCtx);
+  indActions.handleAddIndicator(p, params, cols, colors, isMainOverlay, indicatorCtx, indicatorTimeframe);
   editIndicator.value = null;
 }
 function handleUpdateSignalIndicator(
@@ -372,9 +399,10 @@ function handleUpdateSignalIndicator(
   params: Record<string, unknown>,
   cols: string[],
   colors: Record<string, string>,
+  indicatorTimeframe?: string,
 ) {
   indActions.handleRemoveIndicator(indicatorId, indicatorCtx);
-  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx);
+  indActions.handleAddSignalIndicator(p, params, cols, colors, indicatorCtx, indicatorTimeframe);
   editIndicator.value = null;
 }
 function handleRemoveIndicator(id: string) {
@@ -488,13 +516,8 @@ watch(indicatorPlugins, () => {
   }
 });
 
-// Load run indicators once plugins become available
-watch(indicatorPlugins, (list: PluginInfo[]) => {
-  if (list.length === 0) return;
-  if (queryRunId.value && !runIndicatorsLoaded.value && _overlayLoaded) {
-    tradeOverlay.loadRunIndicators(queryRunId.value, tradeCtx);
-  }
-});
+// Run indicators are loaded only via explicit URL `indicators` param.
+// No automatic loading from run config — avoids duplicates.
 
 // Reset trade-overlay flags when the run id changes
 watch(queryRunId, () => {
@@ -512,7 +535,7 @@ function handleScreenshot() {
   a.click();
 }
 
-// ── Sync chart state to URL ──
+// ── Sync chart state to URL (indicators synced separately via setSyncIndicators) ──
 watch(
   [
     source,
@@ -525,7 +548,6 @@ watch(
     rangeWeekdays,
     rangeUseOpenClose,
     sessionEnabledIds,
-    activeIndicators,
   ],
   () =>
     syncToUrl({
@@ -539,12 +561,6 @@ watch(
       rangeWeekdays: rangeWeekdays.value,
       rangeUseOpenClose: rangeUseOpenClose.value,
       sessionIds: sessionEnabledIds.value,
-      indicators: activeIndicators.value.map((i) => ({
-        fqn: i.fqn,
-        params: i.params,
-        columns: i.columns,
-        isSignal: i.isSignal || false,
-      })),
     }),
   { deep: true },
 );
@@ -562,40 +578,11 @@ watch(
         :sources="sources ?? []"
         :available-symbols="availableSymbols"
         :available-timeframes="availableTimeframes"
-        :active-indicators="activeIndicators"
-        :active-drawing-tool="activeDrawingTool"
-        :range-interval="rangeInterval"
-        :range-start-time="rangeStartTime"
-        :range-end-time="rangeEndTime"
-        :range-weekdays="rangeWeekdays"
-        :range-use-open-close="rangeUseOpenClose"
-        :session-enabled-ids="sessionEnabledIds"
         :is-fullscreen="isFullscreen"
         @update:source="setSource"
         @update:symbol="setSymbol"
         @update:timeframe="setTimeframe"
         @update:chart-type="setChartType"
-        @update:drawing-tool="setDrawingTool"
-        @update:range-interval="handleRangeIntervalChange"
-        @update:range-start-time="
-          (v: string) => {
-            rangeStartTime = v;
-            handleRangeTimeChange();
-          }
-        "
-        @update:range-end-time="
-          (v: string) => {
-            rangeEndTime = v;
-            handleRangeTimeChange();
-          }
-        "
-        @update:range-weekdays="handleRangeWeekdaysChange"
-        @update:range-use-open-close="handleRangeUseOpenCloseChange"
-        @update:session-enabled-ids="handleSessionEnabledIdsChange"
-        :has-active-indicators="activeIndicators.length > 0"
-        @open-indicators="indicatorPanelOpen = true"
-        @create-signal="signalBuilderOpen = true"
-        @save-strategy="strategySaveOpen = true"
         @screenshot="handleScreenshot"
         @toggle-fullscreen="toggleFullscreen"
         @zoom-in="chartCanvas?.zoomIn()"
@@ -655,58 +642,88 @@ watch(
         </div>
       </div>
 
-      <!-- Active Indicators Strip -->
-      <ChartIndicatorStrip
-        :indicators="activeIndicators"
-        :collapsed-ids="collapsedPanes"
-        :signal-timestamps="navSignalTimestamps"
-        :current-signal-index="currentSignalIndex"
-        :selected-signal-ids="selectedSignalIds"
-        @toggle-collapse="togglePaneCollapse"
-        @collapse-all="collapseAllPanes"
-        @expand-all="expandAllPanes"
-        @edit="handleEditIndicator"
-        @toggle-overlay="toggleOverlay"
-        @remove="handleRemoveIndicator"
-        @signal-prev="goToPrevSignal"
-        @signal-next="goToNextSignal"
-        @signal-goto="goToSignal"
-        @update:selected-signals="selectedSignalIds = $event"
-      />
-
-      <!-- Crosshair Data Legend -->
-      <ChartDataLegend
-        :data="crosshairData"
-        :price-precision="pricePrecision"
-      />
-
-      <!-- Chart Canvas -->
-      <div ref="chartWrapperRef" class="flex-1 min-h-0 relative">
-        <ChartCanvas
-          ref="chartCanvas"
-          :source="source"
-          :symbol="symbol"
-          :timeframe="timeframe"
-          :chart-type="chartType"
-          :price-precision="pricePrecision"
+      <!-- Main content: drawing sidebar + chart -->
+      <div class="flex flex-1 min-h-0">
+        <!-- Drawing Tools Sidebar -->
+        <ChartDrawingSidebar
           :active-drawing-tool="activeDrawingTool"
-          :load-all="!!queryRunId"
-          @crosshair-change="crosshairData = $event"
-          @drawing-cancelled="setDrawingTool(null)"
-          @data-loaded="handleDataLoaded"
+          :active-indicators="activeIndicators"
+          :has-active-indicators="activeIndicators.length > 0"
+          :range-interval="rangeInterval"
+          :range-start-time="rangeStartTime"
+          :range-end-time="rangeEndTime"
+          :range-weekdays="rangeWeekdays"
+          :range-use-open-close="rangeUseOpenClose"
+          :session-enabled-ids="sessionEnabledIds"
+          @update:drawing-tool="setDrawingTool"
+          @open-indicators="indicatorPanelOpen = true"
+          @create-signal="signalConfigOpen = true"
+          @save-strategy="strategySaveOpen = true"
+          @update:range-interval="handleRangeIntervalChange"
+          @update:range-start-time="(v: string) => { rangeStartTime = v; handleRangeTimeChange(); }"
+          @update:range-end-time="(v: string) => { rangeEndTime = v; handleRangeTimeChange(); }"
+          @update:range-weekdays="handleRangeWeekdaysChange"
+          @update:range-use-open-close="handleRangeUseOpenCloseChange"
+          @update:session-enabled-ids="handleSessionEnabledIdsChange"
         />
-        <!-- Indicator loading overlay -->
-        <Transition name="fade">
-          <div
-            v-if="indicatorLoading"
-            class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none"
-          >
-            <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900/90 text-sm text-gray-300">
-              <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
-              Indikatoren werden geladen...
-            </div>
+
+        <!-- Chart content -->
+        <div class="flex flex-col flex-1 min-w-0">
+          <!-- Active Indicators Strip -->
+          <ChartIndicatorStrip
+            :indicators="activeIndicators"
+            :collapsed-ids="collapsedPanes"
+            :signal-timestamps="navSignalTimestamps"
+            :current-signal-index="currentSignalIndex"
+            :selected-signal-ids="selectedSignalIds"
+            @toggle-collapse="togglePaneCollapse"
+            @collapse-all="collapseAllPanes"
+            @expand-all="expandAllPanes"
+            @edit="handleEditIndicator"
+            @toggle-overlay="toggleOverlay"
+            @remove="handleRemoveIndicator"
+            @signal-prev="goToPrevSignal"
+            @signal-next="goToNextSignal"
+            @signal-goto="goToSignal"
+            @update:selected-signals="selectedSignalIds = $event"
+          />
+
+          <!-- Crosshair Data Legend -->
+          <ChartDataLegend
+            :data="crosshairData"
+            :price-precision="pricePrecision"
+          />
+
+          <!-- Chart Canvas -->
+          <div ref="chartWrapperRef" class="flex-1 min-h-0 relative">
+            <ChartCanvas
+              ref="chartCanvas"
+              :source="source"
+              :symbol="symbol"
+              :timeframe="timeframe"
+              :chart-type="chartType"
+              :price-precision="pricePrecision"
+              :active-drawing-tool="activeDrawingTool"
+              :load-all="!!queryRunId"
+              :drop-flat-bars="queryDropFlatBars"
+              @crosshair-change="crosshairData = $event"
+              @drawing-cancelled="setDrawingTool(null)"
+              @data-loaded="handleDataLoaded"
+            />
+            <!-- Indicator loading overlay -->
+            <Transition name="fade">
+              <div
+                v-if="indicatorLoading"
+                class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none"
+              >
+                <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900/90 text-sm text-gray-300">
+                  <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
+                  Indikatoren werden geladen...
+                </div>
+              </div>
+            </Transition>
           </div>
-        </Transition>
+        </div>
       </div>
 
       <!-- Indicator Panel -->
@@ -735,15 +752,17 @@ watch(
         :active-indicators="activeIndicators"
         :default-name="previewStrategyName"
         :strategy-filename="queryStrategy"
+        :signal-rules="signalRules"
         @update:open="strategySaveOpen = $event"
       />
 
-      <!-- Signal Rule Builder -->
-      <ChartSignalRuleBuilder
-        :open="signalBuilderOpen"
+      <!-- Signal Config Sidebar -->
+      <ChartSignalConfig
+        :open="signalConfigOpen"
         :active-indicators="activeIndicators"
-        @update:open="signalBuilderOpen = $event"
-        @saved="pluginStore.refresh()"
+        :model-value="signalRules"
+        @update:open="signalConfigOpen = $event"
+        @update:model-value="signalRules = $event"
       />
     </div>
 

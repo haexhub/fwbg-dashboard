@@ -9,7 +9,7 @@ const strategyName = computed(() => route.params.name as string);
 
 const store = useStrategyConfigStore();
 const { config, isDirty, canUndo, canRedo } = storeToRefs(store);
-const { load, save, resetToSaved, undo, redo } = store;
+const { load, saveAndCommit, saveAs, resetToSaved, undo, redo } = store;
 const pluginStore = usePluginStore();
 const { plugins } = storeToRefs(pluginStore);
 
@@ -17,23 +17,66 @@ const { plugins } = storeToRefs(pluginStore);
 await Promise.all([pluginStore.load(), load(strategyName.value)]);
 
 const saving = ref(false);
+const saveError = ref<string | null>(null);
+const toast = useToast();
 
-async function handleSave() {
+// Run modal
+const runModalOpen = ref(false);
+
+// ── Commit modal (save to current file + git commit) ──
+const commitModalOpen = ref(false);
+const commitMessage = ref("");
+
+function openCommitModal() {
+  commitMessage.value = "";
+  saveError.value = null;
+  commitModalOpen.value = true;
+}
+
+async function handleCommit() {
   saving.value = true;
+  saveError.value = null;
   try {
-    await save();
+    await saveAndCommit(commitMessage.value.trim());
+    commitModalOpen.value = false;
+    toast.add({ title: "Gespeichert", description: commitMessage.value || "Änderungen committed", color: "success" });
+  } catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : String(e);
   } finally {
     saving.value = false;
   }
 }
 
-// Run modal
-const runModalOpen = ref(false);
+// ── Save As modal (create new config file) ──
+const saveAsModalOpen = ref(false);
+const saveAsName = ref("");
+const saveAsError = ref<string | null>(null);
 
-// Preview panel
-const previewPanelOpen = ref(false);
-const previewAssets = computed<string[]>(() => config.value?.assets?.filter ?? []);
-const isSignalModel = computed(() => config.value?.model?.type === "signal");
+function openSaveAsModal() {
+  saveAsName.value = store.filename;
+  saveAsError.value = null;
+  saveAsModalOpen.value = true;
+}
+
+async function handleSaveAs() {
+  saving.value = true;
+  saveAsError.value = null;
+  try {
+    const newFilename = await saveAs(saveAsName.value.trim());
+    saveAsModalOpen.value = false;
+    navigateTo(`/strategy/${newFilename}`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    saveAsError.value = msg.includes("409") || msg.includes("already exists")
+      ? "Eine Strategie mit diesem Namen existiert bereits."
+      : msg;
+  } finally {
+    saving.value = false;
+  }
+}
+
+// ── History panel ──
+const historyOpen = ref(false);
 
 // ── Open in Chart ──
 const { data: chartSources } = useFetch<ChartSource[]>("/api/chart/sources", {
@@ -75,18 +118,14 @@ const chartMenuItems = computed(() => {
 
 function openInChart(sym: string) {
   const pipelineEntries = config.value?.pipeline?.indicators ?? [];
-  const indicators = pipelineEntries
-    .map((e: { name: string; params: Record<string, unknown>; is_signal?: boolean }) => {
-      const plugin = plugins.value?.find((p: { name: string; fqn: string; defaults: Record<string, unknown> }) => p.name === e.name);
-      if (!plugin) return null;
-      return {
-        fqn: plugin.fqn,
-        params: { ...plugin.defaults, ...e.params },
-        columns: [],
-        isSignal: !!e.is_signal,
-      };
-    })
-    .filter(Boolean);
+  const indicators: Array<{ fqn: string; params: Record<string, unknown>; columns: string[]; isSignal?: boolean }> = [];
+  for (const e of pipelineEntries as Array<{ name: string; params: Record<string, unknown> }>) {
+    const plugin = plugins.value?.find((p: { name: string; fqn: string; defaults: Record<string, unknown> }) => p.name === e.name);
+    if (!plugin) continue;
+    const p = { ...plugin.defaults, ...e.params };
+    indicators.push({ fqn: plugin.fqn, params: p, columns: [] });
+    indicators.push({ fqn: plugin.fqn, params: p, columns: [], isSignal: true });
+  }
 
   navigateTo({
     path: "/chart",
@@ -98,6 +137,7 @@ function openInChart(sym: string) {
       ...(indicators.length > 0
         ? { indicators: JSON.stringify(indicators) }
         : {}),
+      ...(config.value?.assets?.drop_flat_bars ? { dropFlatBars: "1" } : {}),
     },
   });
 }
@@ -190,15 +230,26 @@ onKeyStroke("y", (e) => {
               Reset
             </UButton>
           </span>
-          <!-- Save / Chart / Run -->
-          <UButton
-            icon="i-heroicons-check"
-            :loading="saving"
-            :disabled="!isDirty || saving"
-            @click="handleSave"
-          >
-            Save
-          </UButton>
+          <!-- Save / History -->
+          <div class="flex items-center">
+            <UButton
+              icon="i-heroicons-check"
+              :loading="saving"
+              :disabled="!isDirty || saving"
+              class="rounded-r-none"
+              @click="openCommitModal"
+            >
+              Speichern
+            </UButton>
+            <UDropdownMenu
+              :items="[[
+                { label: 'Kopie speichern unter…', icon: 'i-heroicons-document-duplicate', onSelect: openSaveAsModal },
+                { label: 'Versionsverlauf', icon: 'i-heroicons-clock', onSelect: () => historyOpen = true },
+              ]]"
+            >
+              <UButton icon="i-heroicons-chevron-down" :disabled="saving" class="rounded-l-none border-l border-l-white/20 px-1.5" />
+            </UDropdownMenu>
+          </div>
           <!-- Open in Chart -->
           <UDropdownMenu
             v-if="chartSymbols.length > 1"
@@ -219,44 +270,7 @@ onKeyStroke("y", (e) => {
           >
             Chart
           </UButton>
-          <template v-if="isSignalModel">
-            <UTooltip
-              v-if="isDirty"
-              text="Bitte zuerst alle Änderungen speichern"
-            >
-              <UButton
-                icon="i-lucide-eye"
-                variant="ghost"
-                disabled
-              >
-                Vorschau
-              </UButton>
-            </UTooltip>
-            <UButton
-              v-else
-              icon="i-lucide-eye"
-              variant="ghost"
-              :disabled="!config"
-              @click="previewPanelOpen = true"
-            >
-              Vorschau
-            </UButton>
-          </template>
-          <UTooltip
-            v-if="isDirty"
-            text="Bitte zuerst alle Änderungen speichern"
-          >
-            <UButton
-              icon="i-heroicons-play"
-              color="success"
-              variant="soft"
-              disabled
-            >
-              Run
-            </UButton>
-          </UTooltip>
           <UButton
-            v-else
             icon="i-heroicons-play"
             color="success"
             variant="soft"
@@ -299,14 +313,71 @@ onKeyStroke("y", (e) => {
       <NuxtPage />
     </div>
 
-    <!-- Preview Panel -->
-    <StrategyPreviewPanel
-      v-if="config"
-      v-model:open="previewPanelOpen"
-      :strategy-name="strategyName"
-      :datasource="config.datasource"
-      :available-assets="previewAssets"
-    />
+    <!-- Commit Modal -->
+    <UModal v-model:open="commitModalOpen">
+      <template #header>
+        <h3 class="text-base font-semibold text-white">Änderungen speichern</h3>
+      </template>
+      <template #body>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Commit-Nachricht (optional)</label>
+            <UInput
+              v-model="commitMessage"
+              placeholder="z.B. TP auf 8 erhöht, SL beibehalten"
+              class="w-full"
+              autofocus
+              @keyup.enter="handleCommit"
+            />
+          </div>
+          <p v-if="saveError" class="text-sm text-red-400">{{ saveError }}</p>
+          <p class="text-xs text-gray-500">
+            Speichert <span class="font-mono text-gray-300">{{ store.filename }}</span>
+            und erstellt einen neuen Git-Commit.
+          </p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" color="neutral" @click="commitModalOpen = false">Abbrechen</UButton>
+          <UButton :loading="saving" @click="handleCommit">Speichern</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Save As Modal -->
+    <UModal v-model:open="saveAsModalOpen">
+      <template #header>
+        <h3 class="text-base font-semibold text-white">Kopie speichern unter…</h3>
+      </template>
+      <template #body>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Neuer Name (Dateiname)</label>
+            <UInput
+              v-model="saveAsName"
+              placeholder="meine-strategie"
+              class="w-full font-mono"
+              @keyup.enter="handleSaveAs"
+            />
+          </div>
+          <p v-if="saveAsError" class="text-sm text-red-400">{{ saveAsError }}</p>
+          <p class="text-xs text-gray-500">
+            Erstellt eine neue Konfigurationsdatei. Die aktuelle Datei
+            <span class="font-mono text-gray-300">{{ store.filename }}</span>
+            bleibt unverändert.
+          </p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" color="neutral" @click="saveAsModalOpen = false">Abbrechen</UButton>
+          <UButton :loading="saving" :disabled="!saveAsName.trim()" @click="handleSaveAs">
+            Speichern
+          </UButton>
+        </div>
+      </template>
+    </UModal>
 
     <!-- Run Start Modal -->
     <RunsRunStartModal
@@ -314,6 +385,13 @@ onKeyStroke("y", (e) => {
       :strategy-name="strategyName"
       @update:open="runModalOpen = $event"
       @started="handleRunStarted"
+    />
+
+    <!-- Version History Panel -->
+    <StrategyVersionHistoryPanel
+      v-model:open="historyOpen"
+      :strategy-name="strategyName"
+      @restore="(c) => { store.config = c as any; }"
     />
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginInfo, ParamSchema } from "~/types/strategy";
 import type { ActiveIndicator, IndicatorResponse } from "~/types/chart";
+import { TIMEFRAME_LABELS } from "~/types/chart";
 import { LINE_COLORS } from "~/composables/useChartIndicators";
 
 const props = defineProps<{
@@ -14,11 +15,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  add: [plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, isMainOverlay: boolean];
-  "add-signal": [plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>];
+  add: [plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, isMainOverlay: boolean, indicatorTimeframe?: string];
+  "add-signal": [plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, indicatorTimeframe?: string];
   "add-all-deps": [plugin: PluginInfo];
-  update: [indicatorId: string, plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, isMainOverlay: boolean];
-  "update-signal": [indicatorId: string, plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>];
+  update: [indicatorId: string, plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, isMainOverlay: boolean, indicatorTimeframe?: string];
+  "update-signal": [indicatorId: string, plugin: PluginInfo, params: Record<string, unknown>, columns: string[], colors: Record<string, string>, indicatorTimeframe?: string];
 }>();
 
 // ── Plugin type classification from API metadata ──
@@ -29,6 +30,8 @@ function getPluginType(plugin: PluginInfo): "indicator" | "signal" | "both" {
   if (hasSig) return "signal";
   return "indicator";
 }
+
+const timeframeLabel = computed(() => TIMEFRAME_LABELS[props.timeframe] ?? props.timeframe);
 
 // ── Type filter ──
 const typeFilter = ref<"" | "indicator" | "signal">("");
@@ -113,6 +116,22 @@ const configPlugin = ref<PluginInfo | null>(null);
 const configParams = ref<Record<string, unknown>>({});
 const configTab = ref("parameters");
 
+// MTF: indicator timeframe override (same as chart TF = no override)
+const indicatorTimeframe = ref(props.timeframe);
+const isMtf = computed(() => indicatorTimeframe.value !== props.timeframe);
+
+const TIMEFRAME_ORDER = ["MINUTE_1", "MINUTE_5", "MINUTE_15", "MINUTE_30", "HOUR", "HOUR_4", "DAY"];
+const timeframeOptions = computed(() => {
+  const idx = TIMEFRAME_ORDER.indexOf(props.timeframe);
+  if (idx < 0) return [];
+  const options = [{ label: (TIMEFRAME_LABELS[props.timeframe] ?? props.timeframe) + " (Chart)", value: props.timeframe }];
+  for (let i = idx + 1; i < TIMEFRAME_ORDER.length; i++) {
+    const tf = TIMEFRAME_ORDER[i]!;
+    options.push({ label: TIMEFRAME_LABELS[tf] ?? tf, value: tf });
+  }
+  return options;
+});
+
 // Column picker state
 const availableColumns = ref<string[]>([]);
 const selectedColumns = ref<string[]>([]);
@@ -148,6 +167,7 @@ function startConfig(entry: BrowseEntry) {
   editingIndicatorId.value = null;
   configPlugin.value = entry.plugin;
   configParams.value = { ...entry.plugin.defaults };
+  indicatorTimeframe.value = props.timeframe;
   configTab.value = "plot";
   availableColumns.value = [];
   selectedColumns.value = [];
@@ -166,6 +186,7 @@ watch(() => props.editIndicator, (ind: ActiveIndicator | null | undefined) => {
   editingIndicatorId.value = ind.id;
   configPlugin.value = plugin;
   configParams.value = { ...ind.params };
+  indicatorTimeframe.value = ind.indicatorTimeframe ?? props.timeframe;
   configTab.value = "plot";
   availableColumns.value = [];
   selectedColumns.value = [];
@@ -210,6 +231,7 @@ async function fetchColumns() {
           fqn: configPlugin.value.fqn,
           params: { ...configParams.value },
           limit: 500,
+          ...(isMtf.value ? { indicator_timeframe: indicatorTimeframe.value } : {}),
         },
       }
     );
@@ -391,14 +413,14 @@ async function confirmAdd() {
         for (const col of selectedColumns.value) {
           colors[col] = columnColors.value[col] ?? "#2196F3";
         }
-        emit("update", id, configPlugin.value, { ...configParams.value }, [...selectedColumns.value], colors, isMainOverlay.value);
+        emit("update", id, configPlugin.value, { ...configParams.value }, [...selectedColumns.value], colors, isMainOverlay.value, isMtf.value ? indicatorTimeframe.value : undefined);
       }
       if (selectedSignals.value.length > 0) {
         const colors: Record<string, string> = {};
         for (const col of selectedSignals.value) {
           colors[col] = signalColors.value[col] ?? "#4CAF50";
         }
-        emit("update-signal", id, configPlugin.value, { ...configParams.value }, [...selectedSignals.value], colors);
+        emit("update-signal", id, configPlugin.value, { ...configParams.value }, [...selectedSignals.value], colors, isMtf.value ? indicatorTimeframe.value : undefined);
       }
     } else {
       // Add mode
@@ -407,14 +429,14 @@ async function confirmAdd() {
         for (const col of selectedColumns.value) {
           colors[col] = columnColors.value[col] ?? "#2196F3";
         }
-        emit("add", configPlugin.value, { ...configParams.value }, [...selectedColumns.value], colors, isMainOverlay.value);
+        emit("add", configPlugin.value, { ...configParams.value }, [...selectedColumns.value], colors, isMainOverlay.value, isMtf.value ? indicatorTimeframe.value : undefined);
       }
       if (selectedSignals.value.length > 0) {
         const colors: Record<string, string> = {};
         for (const col of selectedSignals.value) {
           colors[col] = signalColors.value[col] ?? "#4CAF50";
         }
-        emit("add-signal", configPlugin.value, { ...configParams.value }, [...selectedSignals.value], colors);
+        emit("add-signal", configPlugin.value, { ...configParams.value }, [...selectedSignals.value], colors, isMtf.value ? indicatorTimeframe.value : undefined);
       }
     }
     configPlugin.value = null;
@@ -475,33 +497,62 @@ async function confirmAdd() {
 
         <!-- Tab: Plot columns -->
         <div v-if="configTab === 'plot'">
+          <!-- MTF Timeframe selector -->
+          <div v-if="timeframeOptions.length > 1" class="mb-4">
+            <label class="text-xs text-gray-500 mb-1 block">Indikator-Timeframe</label>
+            <USelect
+              :model-value="indicatorTimeframe"
+              :items="timeframeOptions"
+              value-key="value"
+              @update:model-value="indicatorTimeframe = $event; fetchColumns()"
+            />
+            <p v-if="isMtf" class="text-xs text-amber-400/70 mt-1">
+              Berechnung auf {{ TIMEFRAME_LABELS[indicatorTimeframe] ?? indicatorTimeframe }}, Anzeige auf {{ timeframeLabel }}
+            </p>
+          </div>
+
           <div v-if="columnsLoading" class="flex items-center gap-2 text-gray-400 text-sm py-4">
             <UIcon name="i-heroicons-arrow-path" class="animate-spin" />
             Loading columns...
           </div>
 
           <div v-else-if="columnsLoaded && availableColumns.length === 0 && signalColumns.length === 0" class="py-4">
-            <div class="text-center mb-4">
-              <UIcon name="i-heroicons-exclamation-triangle" class="text-amber-500 text-2xl mb-2" />
-              <p class="text-sm text-gray-300">Keine Daten verfügbar.</p>
-              <p class="text-xs text-gray-400 mt-1">
-                Dieses Plugin benötigt andere Indikatoren als Input und kann nicht isoliert berechnet werden.
-              </p>
-            </div>
-            <div v-if="configPlugin?.feature_columns?.length" class="text-left">
-              <p class="text-xs text-gray-400 mb-1.5">Erwartete Spalten ({{ configPlugin.feature_columns.length }}):</p>
-              <div class="text-xs text-gray-300 font-mono max-h-48 overflow-y-auto space-y-0.5 bg-gray-900/50 rounded-md p-2">
-                <div v-for="col in configPlugin.feature_columns" :key="col">{{ col }}</div>
+            <!-- Dependency-based: plugin needs other indicators as input -->
+            <template v-if="configPlugin?.feature_columns?.length">
+              <div class="text-center mb-4">
+                <UIcon name="i-heroicons-exclamation-triangle" class="text-amber-500 text-2xl mb-2" />
+                <p class="text-sm text-gray-300">Keine Daten verfügbar.</p>
+                <p class="text-xs text-gray-400 mt-1">
+                  Dieses Plugin benötigt andere Indikatoren als Input und kann nicht isoliert berechnet werden.
+                </p>
               </div>
-            </div>
-            <UButton
-              class="w-full mt-4"
-              variant="soft"
-              icon="i-heroicons-puzzle-piece"
-              @click="emit('add-all-deps', configPlugin!); cancelConfig()"
-            >
-              Alle Indikator-Plugins hinzufügen
-            </UButton>
+              <div class="text-left">
+                <p class="text-xs text-gray-400 mb-1.5">Erwartete Spalten ({{ configPlugin.feature_columns.length }}):</p>
+                <div class="text-xs text-gray-300 font-mono max-h-48 overflow-y-auto space-y-0.5 bg-gray-900/50 rounded-md p-2">
+                  <div v-for="col in configPlugin.feature_columns" :key="col">{{ col }}</div>
+                </div>
+              </div>
+              <UButton
+                class="w-full mt-4"
+                variant="soft"
+                icon="i-heroicons-puzzle-piece"
+                @click="emit('add-all-deps', configPlugin!); cancelConfig()"
+              >
+                Alle Indikator-Plugins hinzufügen
+              </UButton>
+            </template>
+
+            <!-- Timeframe-sensitive: plugin produces no data on this timeframe -->
+            <template v-else>
+              <div class="text-center mb-4">
+                <UIcon name="i-heroicons-information-circle" class="text-blue-400 text-2xl mb-2" />
+                <p class="text-sm text-gray-300">Keine Daten für diesen Timeframe.</p>
+                <p class="text-xs text-gray-400 mt-1">
+                  Dieser Indikator liefert auf dem aktuellen Timeframe ({{ timeframeLabel }}) keine Spalten.
+                  Wechsle zu einem Intraday-Timeframe für sinnvolle Ergebnisse.
+                </p>
+              </div>
+            </template>
           </div>
 
           <template v-else-if="columnsLoaded && (availableColumns.length > 0 || signalColumns.length > 0)">

@@ -2,16 +2,76 @@
 import { statusColor } from "~/types/strategy";
 import { aggregatePerformance } from "~/composables/useRunPerformance";
 
+definePageMeta({ ssr: false });
+
 const route = useRoute();
 const runId = computed(() => route.params.id as string);
 
-const { detail, gridDetails, performance, loading, error, load } =
+// Performance data (completed runs)
+const { detail, gridDetails, performance, loading, load } =
   useRunPerformance(runId.value);
 
-onMounted(() => {
-  load();
+// Progress data (active runs)
+const {
+  progress,
+  logs,
+  isTerminal,
+  assetList,
+  availableSymbols,
+  logLevelFilter,
+  logSymbolFilter,
+  init: initProgress,
+} = useRunProgress(runId.value);
+
+const cancelling = ref(false);
+async function cancelRun() {
+  cancelling.value = true;
+  try {
+    await $fetch(`/api/runs/${runId.value}/cancel`, { method: "POST" });
+  } finally {
+    cancelling.value = false;
+  }
+}
+
+// ── View mode state machine ──
+const viewMode = computed<
+  "loading" | "progress" | "performance" | "failed" | "no-results"
+>(() => {
+  const status = progress.value?.status ?? detail.value?.status;
+
+  if (status === "initializing" || status === "running") return "progress";
+  if (status === "failed") return "failed";
+  if (status === "completed" && performance.value) return "performance";
+  if (status === "completed" && !loading.value) return "no-results";
+
+  return "loading";
 });
 
+const displayStatus = computed(
+  () => progress.value?.status ?? detail.value?.status,
+);
+
+const strategyName = computed(
+  () => progress.value?.strategy_name ?? detail.value?.strategy?.name,
+);
+
+// When run completes, load performance data
+watch(isTerminal, (terminal) => {
+  if (terminal && progress.value?.status === "completed") {
+    load();
+  }
+});
+
+onMounted(async () => {
+  await initProgress();
+
+  // If already completed, load performance data right away
+  if (isTerminal.value) {
+    load();
+  }
+});
+
+// ── Performance tab logic (existing) ──
 const selectedTab = ref("all");
 
 const tabItems = computed(() => {
@@ -33,6 +93,11 @@ const activePerformance = computed(() => {
 });
 
 const isSingleAsset = computed(() => selectedTab.value !== "all");
+
+const analysisSymbol = computed(() => {
+  if (selectedTab.value !== "all") return selectedTab.value;
+  return gridDetails.value[0]?.symbol ?? "";
+});
 </script>
 
 <template>
@@ -47,48 +112,77 @@ const isSingleAsset = computed(() => selectedTab.value !== "all");
           {{ runId }}
         </h2>
         <UBadge
-          v-if="detail"
-          :color="statusColor(detail.status)"
+          v-if="displayStatus"
+          :color="statusColor(displayStatus)"
           variant="subtle"
         >
-          {{ detail.status }}
+          {{ displayStatus }}
         </UBadge>
       </div>
+      <ClientOnly>
+        <UButton
+          v-if="viewMode === 'progress'"
+          icon="i-heroicons-stop"
+          color="error"
+          variant="soft"
+          :loading="cancelling"
+          @click="cancelRun"
+        >
+          Abbrechen
+        </UButton>
+      </ClientOnly>
     </div>
 
     <!-- Strategy Info -->
     <div
-      v-if="detail?.strategy"
+      v-if="strategyName"
       class="flex items-center gap-3 text-sm text-gray-400"
     >
-      <span class="font-medium text-white">{{
-        detail.strategy.name
-      }}</span>
-      <span v-if="detail.strategy.description">
+      <span class="font-medium text-white">{{ strategyName }}</span>
+      <span v-if="detail?.strategy?.description">
         — {{ detail.strategy.description }}
       </span>
     </div>
 
+    <!-- Active run: progress view -->
+    <template v-if="viewMode === 'progress' && progress">
+      <div class="space-y-4">
+        <RunsProgressOverview :progress="progress" />
+        <RunsAssetProgressTable :assets="assetList" />
+        <RunsLogViewer
+          :logs="logs"
+          :available-symbols="availableSymbols"
+          v-model:level-filter="logLevelFilter"
+          v-model:symbol-filter="logSymbolFilter"
+        />
+      </div>
+    </template>
+
+    <!-- Failed run -->
+    <template v-else-if="viewMode === 'failed' && progress">
+      <div class="space-y-4">
+        <RunsProgressOverview :progress="progress" />
+        <RunsLogViewer
+          :logs="logs"
+          :available-symbols="availableSymbols"
+          v-model:level-filter="logLevelFilter"
+          v-model:symbol-filter="logSymbolFilter"
+        />
+      </div>
+    </template>
+
     <!-- Loading -->
-    <div v-if="loading" class="py-16 text-center text-gray-400">
+    <div v-else-if="viewMode === 'loading'" class="py-16 text-center text-gray-400">
       Lade Run-Daten...
     </div>
 
-    <!-- Error -->
-    <div v-else-if="error" class="py-16 text-center text-red-400">
-      {{ error }}
+    <!-- Completed but no results (e.g. killed before any fold finished) -->
+    <div v-else-if="viewMode === 'no-results'" class="py-16 text-center text-gray-400">
+      Run abgeschlossen, aber keine Ergebnisse vorhanden.
     </div>
 
-    <!-- No data -->
-    <div
-      v-else-if="!performance"
-      class="py-16 text-center text-gray-400"
-    >
-      Keine Performance-Daten verfügbar.
-    </div>
-
-    <!-- Dashboard -->
-    <template v-else>
+    <!-- Completed run: performance dashboard -->
+    <template v-else-if="viewMode === 'performance'">
       <!-- Asset Tabs -->
       <UTabs
         v-if="tabItems.length > 2"
@@ -142,7 +236,22 @@ const isSingleAsset = computed(() => selectedTab.value !== "all");
         <PerformanceTradeTable :trades="activePerformance.trades" />
 
         <!-- Asset Table -->
-        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" />
+        <PerformanceAssetTable v-if="!isSingleAsset" :assets="activePerformance.assetBreakdown" :run-id="runId" :run-detail="detail ?? undefined" />
+
+        <!-- Statistical Analysis -->
+        <PerformanceStatisticalAnalysis
+          v-if="analysisSymbol"
+          :run-id="runId"
+          :symbol="analysisSymbol"
+        />
+
+        <!-- Feature Discovery -->
+        <PerformanceFeatureDiscovery
+          v-if="analysisSymbol"
+          :run-id="runId"
+          :symbol="analysisSymbol"
+          :strategy-name="strategyName"
+        />
       </template>
     </template>
   </div>

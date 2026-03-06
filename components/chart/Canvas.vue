@@ -32,6 +32,7 @@ const props = defineProps<{
   activeDrawingTool: string | null;
   chartType: "candle_solid" | "ohlc" | "area";
   loadAll?: boolean;
+  dropFlatBars?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -147,7 +148,11 @@ async function fetchOhlcvData(
     });
   } else {
     response = await $fetch<OhlcvResponse>("/api/chart/ohlcv", {
-      params: { symbol, timeframe, source, limit, ...(before ? { before } : {}) },
+      params: {
+        symbol, timeframe, source, limit,
+        ...(before ? { before } : {}),
+        ...(props.dropFlatBars ? { drop_flat_bars: "true" } : {}),
+      },
     });
   }
 
@@ -362,7 +367,7 @@ onMounted(() => {
 
       // ── Init: load most recent page (or all data if loadAll is set) ──
       try {
-        const initLimit = props.loadAll ? 50000 : PAGE_SIZE;
+        const initLimit = props.loadAll ? 999_999 : PAGE_SIZE;
         const result = await fetchOhlcvData(
           params.symbol.ticker,
           props.timeframe,

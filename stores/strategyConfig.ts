@@ -147,6 +147,42 @@ export const useStrategyConfigStore = defineStore("strategy-config", () => {
     _channel?.postMessage({ type: "saved", filename: filename.value });
   }
 
+  /**
+   * Write the current config to disk AND create a git commit.
+   * Returns the commit hash.
+   */
+  async function saveAndCommit(message: string): Promise<string> {
+    if (!config.value || !filename.value) throw new Error("No config loaded");
+    const payload = buildSavePayload(config.value);
+    await $fetch(`/api/strategy/strategies/${filename.value}`, {
+      method: "PUT",
+      body: payload,
+    });
+    const result = await $fetch<{ hash: string }>(
+      `/api/strategy/strategies/${filename.value}/commit`,
+      { method: "POST", body: { message } },
+    );
+    _snapshot.value = JSON.stringify(config.value);
+    _lastKnown = _snapshot.value;
+    _channel?.postMessage({ type: "saved", filename: filename.value });
+    return result.hash;
+  }
+
+  /**
+   * Save the current config as a new strategy file (no overwrite).
+   * Returns the new filename.
+   */
+  async function saveAs(targetName: string): Promise<string> {
+    if (!config.value) throw new Error("No config loaded");
+    const payload = buildSavePayload(config.value);
+    payload.name = targetName;
+    const result = await $fetch<{ filename: string }>(
+      "/api/strategy/strategies",
+      { method: "POST", body: { name: targetName, data: payload } },
+    );
+    return result.filename;
+  }
+
   function resetToSaved() {
     if (!_snapshot.value) return;
     _isRestoring.value = true;
@@ -205,6 +241,8 @@ export const useStrategyConfigStore = defineStore("strategy-config", () => {
     canRedo,
     load,
     save,
+    saveAndCommit,
+    saveAs,
     resetToSaved,
     undo,
     redo,

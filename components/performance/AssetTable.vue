@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import type { TableColumn } from "@nuxt/ui";
 import type { AssetPerformance } from "~/types/performance";
+import type { RunDetail } from "~/types/strategy";
 import { formatNumber } from "~/types/dashboard";
+import { buildRunChartUrl } from "~/composables/useChartUrl";
 
-defineProps<{
+const props = defineProps<{
   assets: AssetPerformance[];
   runId?: string;
+  runDetail?: RunDetail;
 }>();
+
+const pluginStore = usePluginStore();
+const { plugins } = storeToRefs(pluginStore);
+
+function chartUrl(symbol: string): string {
+  if (props.runDetail && plugins.value?.length) {
+    return buildRunChartUrl(props.runDetail, symbol, plugins.value);
+  }
+  return `/chart?run=${props.runId}&symbol=${symbol}`;
+}
 
 const columns: TableColumn<AssetPerformance>[] = [
   { accessorKey: "symbol", header: "Symbol" },
@@ -36,7 +49,7 @@ const columns: TableColumn<AssetPerformance>[] = [
           </span>
           <NuxtLink
             v-if="runId"
-            :to="`/chart?run=${runId}&symbol=${row.original.symbol}`"
+            :to="chartUrl(row.original.symbol)"
             title="Im Chart anzeigen"
           >
             <UButton

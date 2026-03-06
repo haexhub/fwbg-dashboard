@@ -377,6 +377,28 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     ? Math.round((sumAnnualReturn / countAnnualReturn) * 10) / 10
     : null;
 
+  // Sharpe/Calmar: prefer backend values, fallback to frontend computation
+  let sharpeRatio: number | null = countSharpe > 0
+    ? Math.round((sumSharpe / countSharpe) * 100) / 100
+    : null;
+  let calmarRatio: number | null = countCalmar > 0
+    ? Math.round((sumCalmar / countCalmar) * 100) / 100
+    : null;
+
+  if (sharpeRatio == null && tradePnlValues.length >= 2) {
+    const mean = tradePnlValues.reduce((a, b) => a + b, 0) / tradePnlValues.length;
+    const variance = tradePnlValues.reduce((a, v) => a + (v - mean) ** 2, 0) / tradePnlValues.length;
+    const std = Math.sqrt(variance);
+    if (std > 0) {
+      sharpeRatio = Math.round((mean / std) * Math.sqrt(tradePnlValues.length) * 100) / 100;
+    }
+  }
+
+  if (calmarRatio == null && tradePnlValues.length > 0 && absoluteMaxDrawdown > 0) {
+    const totalReturn = tradePnlValues.reduce((a, b) => a + b, 0);
+    calmarRatio = Math.round(Math.min(10, totalReturn / Math.max(absoluteMaxDrawdown, 0.01)) * 100) / 100;
+  }
+
   return {
     totalTrades,
     winRate,
@@ -384,14 +406,8 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     profitFactor,
     avgWin,
     avgLoss,
-    sharpeRatio:
-      countSharpe > 0
-        ? Math.round((sumSharpe / countSharpe) * 100) / 100
-        : null,
-    calmarRatio:
-      countCalmar > 0
-        ? Math.round((sumCalmar / countCalmar) * 100) / 100
-        : null,
+    sharpeRatio,
+    calmarRatio,
     maxDrawdown: Math.round(absoluteMaxDrawdown * 100) / 100,
     maxDrawdownPct,
     annualReturn,

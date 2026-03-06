@@ -4,7 +4,17 @@ import type { TableColumn } from "@nuxt/ui";
 import { statusColor } from "~/types/strategy";
 import type { RunSummary } from "~/types/strategy";
 
-const { runs, status, refresh } = useRuns();
+const { runs, total, totalPages, page, status, refresh, cancelRun } = useRuns();
+
+const cancellingId = ref<string | null>(null);
+async function handleCancel(runId: string) {
+  cancellingId.value = runId;
+  try {
+    await cancelRun(runId);
+  } finally {
+    cancellingId.value = null;
+  }
+}
 
 // ── Sorting & filtering ──
 const sorting = ref<{ id: string; desc: boolean }[]>([
@@ -306,16 +316,35 @@ const columns: TableColumn<RunSummary>[] = [
 
         <!-- Actions -->
         <template #actions-cell="{ row }">
-          <UButton
-            icon="i-heroicons-trash"
-            variant="ghost"
-            color="error"
-            size="xs"
-            @click.prevent="confirmDeleteId = row.original.run_id"
-          />
+          <div class="flex items-center gap-1">
+            <UButton
+              v-if="row.original.status === 'running'"
+              icon="i-heroicons-stop"
+              variant="ghost"
+              color="warning"
+              size="xs"
+              :loading="cancellingId === row.original.run_id"
+              @click.prevent="handleCancel(row.original.run_id)"
+            />
+            <UButton
+              icon="i-heroicons-trash"
+              variant="ghost"
+              color="error"
+              size="xs"
+              @click.prevent="confirmDeleteId = row.original.run_id"
+            />
+          </div>
         </template>
       </UTable>
     </UCard>
+
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" class="flex items-center justify-between">
+      <span class="text-sm text-gray-500">
+        {{ total }} Runs gesamt
+      </span>
+      <UPagination v-model="page" :total="total" :items-per-page="20" />
+    </div>
 
     <!-- Single delete confirmation -->
     <UModal v-model:open="deleteModalOpen">

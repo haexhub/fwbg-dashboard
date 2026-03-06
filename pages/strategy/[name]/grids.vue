@@ -66,6 +66,15 @@ const assetExclude = computed({
     config.value.assets.exclude = val.length > 0 ? val : undefined;
   },
 });
+
+const dropFlatBars = computed({
+  get: () => config.value?.assets?.drop_flat_bars ?? false,
+  set: (val: boolean) => {
+    if (!config.value) return;
+    if (!config.value.assets) config.value.assets = {};
+    config.value.assets.drop_flat_bars = val || undefined;
+  },
+});
 </script>
 
 <template>
@@ -129,6 +138,18 @@ const assetExclude = computed({
           </template>
           <p v-else-if="config.datasource" class="text-xs text-gray-500 md:col-span-2 self-center">
             Keine Symbole für diese Datasource verfügbar.
+          </p>
+        </div>
+
+        <!-- Data options -->
+        <div class="mt-4 pt-4 border-t border-gray-800/50">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <UCheckbox v-model="dropFlatBars" />
+            <span class="text-sm text-gray-300">Flat Bars entfernen</span>
+          </label>
+          <p class="text-xs text-gray-500 mt-1 ml-6">
+            Bars ohne Kursbewegung (O=H=L=C, z.B. Wochenenden/Feiertage) vor der Berechnung filtern.
+            Verhindert Verzerrung bei SMA/EMA und anderen Rolling-Indikatoren.
           </p>
         </div>
       </UCard>

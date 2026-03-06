@@ -187,6 +187,84 @@ export function registerFwbgIndicator(
 }
 
 /**
+ * Register overlay columns (absolute price-scale values) for the main candle pane.
+ * Uses overlay_data from the response and strips leading underscores for legend.
+ */
+export function registerFwbgOverlayIndicator(
+  indicatorId: string,
+  response: IndicatorResponse,
+  columns: string[],
+  colors?: Record<string, string>
+) {
+  // Strip leading `_trend_` / `_` prefix for shorter legend labels
+  const shortNames = columns.map((c) => c.replace(/^_trend_/, "").replace(/^_/, ""));
+  // Detect precision from overlay data (price values → typically 1-2 decimals)
+  const data = response.overlay_data ?? {};
+  let maxDecimals = 0;
+  const sampleSize = Math.min(200, response.timestamps.length);
+  for (const col of columns) {
+    const values = data[col];
+    if (!values) continue;
+    for (let i = 0; i < sampleSize; i++) {
+      const v = values[i];
+      if (v == null) continue;
+      const str = String(v);
+      const dotIdx = str.indexOf(".");
+      if (dotIdx >= 0) {
+        const decimals = str.replace(/0+$/, "").length - dotIdx - 1;
+        maxDecimals = Math.max(maxDecimals, Math.min(decimals, 2));
+      }
+    }
+  }
+
+  const lines = columns.map((col, i) => {
+    const color = colors?.[col] ?? LINE_COLORS[i % LINE_COLORS.length]!;
+    return { style: "solid" as const, size: 1.5, color, smooth: false, dashedValue: [2, 2] };
+  });
+
+  // Build calc from overlay_data
+  const tsIndex = _buildTimestampIndex(response);
+  const calcFn = (klineDataList: { timestamp: number }[]) => {
+    const offset = klineDataList.length - response.timestamps.length;
+    return klineDataList.map((kline, i) => {
+      const dataIdx = i - offset;
+      if (dataIdx >= 0 && dataIdx < response.timestamps.length) {
+        if (kline.timestamp === response.timestamps[dataIdx]) {
+          const result: Record<string, number | null> = {};
+          for (const col of columns) {
+            result[col] = data[col]?.[dataIdx] ?? null;
+          }
+          return result;
+        }
+      }
+      const tsIdx = tsIndex.get(kline.timestamp);
+      if (tsIdx !== undefined) {
+        const result: Record<string, number | null> = {};
+        for (const col of columns) {
+          result[col] = data[col]?.[tsIdx] ?? null;
+        }
+        return result;
+      }
+      return {};
+    });
+  };
+
+  registerIndicator({
+    name: indicatorId,
+    shortName: indicatorId.replace(/^fwbg_/, "").replace(/_overlay$/, "").replace(/_\d+/, ""),
+    precision: maxDecimals,
+    calcParams: [],
+    styles: { lines },
+    figures: columns.map((col, i) => ({
+      key: col,
+      title: `${shortNames[i]}: `,
+      type: "line" as const,
+    })),
+    calc: calcFn,
+  });
+}
+
+/**
  * Register signal columns ({-1, 0, 1}) as a histogram-bar indicator.
  * Each signal gets its own bar with dynamic color (green = 1, red = -1, gray = 0).
  */
@@ -343,6 +421,12 @@ export function ensureSignalMarkerRegistered() {
 
 export const TRADE_MARKER_NAME = "fwbg_trade_markers";
 
+export interface ScaleInFill {
+  time: number;   // ms timestamp
+  price: number;
+  qty: number;
+}
+
 export interface RunTradeMarker {
   entryTime: number;        // ms timestamp
   exitTime: number;         // ms timestamp
@@ -354,6 +438,8 @@ export interface RunTradeMarker {
   tpLevel?: number;
   slLevel?: number;
   foldId?: number;
+  avgEntryPrice?: number;
+  scaleInFills?: ScaleInFill[];
 }
 
 const _tradeMarkers: RunTradeMarker[] = [];
@@ -498,6 +584,49 @@ export function ensureTradeMarkerRegistered() {
           ctx.arc(exitX, exitY, 5, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+        }
+
+        // ── Scale-in fill diamonds + avg entry dashed line ──
+        if (trade.scaleInFills?.length) {
+          const fillColor = isLong ? "#0d9488" : "#ea580c"; // darker teal / darker orange
+
+          for (const fill of trade.scaleInFills) {
+            const fillIdx = findBarIndex(fill.time);
+            const fillVisible = fillIdx >= range.from - 5 && fillIdx <= range.to + 5;
+            if (!fillVisible) continue;
+
+            const fx = xAxis.convertToPixel(fillIdx);
+            const fy = yAxis.convertToPixel(fill.price);
+            const d = 5; // diamond half-size
+
+            // Diamond shape
+            ctx.fillStyle = fillColor;
+            ctx.strokeStyle = "rgba(0,0,0,0.6)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(fx, fy - d);
+            ctx.lineTo(fx + d, fy);
+            ctx.lineTo(fx, fy + d);
+            ctx.lineTo(fx - d, fy);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+
+          // Avg entry price dashed line (from first fill to exit)
+          if (trade.avgEntryPrice != null) {
+            const avgY = yAxis.convertToPixel(trade.avgEntryPrice);
+            const firstFillIdx = findBarIndex(trade.scaleInFills[0]!.time);
+            const avgStartX = xAxis.convertToPixel(firstFillIdx);
+            ctx.strokeStyle = isLong ? "rgba(20,184,166,0.5)" : "rgba(249,115,22,0.5)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.moveTo(avgStartX, avgY);
+            ctx.lineTo(exitX, avgY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
         }
       }
 
