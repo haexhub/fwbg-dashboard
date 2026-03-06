@@ -267,8 +267,11 @@ onMounted(async () => {
   try {
     const list = await $fetch<{ filename: string }[]>("/api/strategy/strategies");
     strategyList.value = list.map((s) => s.filename);
-    if (!targetStrategy.value && strategyList.value.length) {
-      targetStrategy.value = resolvedStrategyName.value || strategyList.value[0]!;
+    // If current target isn't in the list, find best match or fall back to first
+    if (!strategyList.value.includes(targetStrategy.value)) {
+      const name = resolvedStrategyName.value;
+      const match = name ? strategyList.value.find((s) => s.includes(name) || name.includes(s)) : undefined;
+      targetStrategy.value = match ?? strategyList.value[0] ?? "";
     }
   } catch {
     // ignore

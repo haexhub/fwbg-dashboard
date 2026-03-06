@@ -8,7 +8,7 @@ const route = useRoute();
 const runId = computed(() => route.params.id as string);
 
 // Performance data (completed runs)
-const { detail, gridDetails, performance, load } =
+const { detail, gridDetails, performance, loading, load } =
   useRunPerformance(runId.value);
 
 // Progress data (active runs)
@@ -35,13 +35,14 @@ async function cancelRun() {
 
 // ── View mode state machine ──
 const viewMode = computed<
-  "loading" | "progress" | "performance" | "failed"
+  "loading" | "progress" | "performance" | "failed" | "no-results"
 >(() => {
   const status = progress.value?.status ?? detail.value?.status;
 
   if (status === "initializing" || status === "running") return "progress";
   if (status === "failed") return "failed";
   if (status === "completed" && performance.value) return "performance";
+  if (status === "completed" && !loading.value) return "no-results";
 
   return "loading";
 });
@@ -173,6 +174,11 @@ const analysisSymbol = computed(() => {
     <!-- Loading -->
     <div v-else-if="viewMode === 'loading'" class="py-16 text-center text-gray-400">
       Lade Run-Daten...
+    </div>
+
+    <!-- Completed but no results (e.g. killed before any fold finished) -->
+    <div v-else-if="viewMode === 'no-results'" class="py-16 text-center text-gray-400">
+      Run abgeschlossen, aber keine Ergebnisse vorhanden.
     </div>
 
     <!-- Completed run: performance dashboard -->
