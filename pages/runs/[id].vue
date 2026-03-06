@@ -21,6 +21,16 @@ const {
   init: initProgress,
 } = useRunProgress(runId.value);
 
+const cancelling = ref(false);
+async function cancelRun() {
+  cancelling.value = true;
+  try {
+    await $fetch(`/api/runs/${runId.value}/cancel`, { method: "POST" });
+  } finally {
+    cancelling.value = false;
+  }
+}
+
 // ── View mode state machine ──
 const viewMode = computed<
   "loading" | "progress" | "performance" | "failed"
@@ -106,6 +116,16 @@ const analysisSymbol = computed(() => {
           {{ displayStatus }}
         </UBadge>
       </div>
+      <UButton
+        v-if="viewMode === 'progress'"
+        icon="i-heroicons-stop"
+        color="error"
+        variant="soft"
+        :loading="cancelling"
+        @click="cancelRun"
+      >
+        Abbrechen
+      </UButton>
     </div>
 
     <!-- Strategy Info -->
