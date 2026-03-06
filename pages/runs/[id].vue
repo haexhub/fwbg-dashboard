@@ -116,16 +116,18 @@ const analysisSymbol = computed(() => {
           {{ displayStatus }}
         </UBadge>
       </div>
-      <UButton
-        v-if="viewMode === 'progress'"
-        icon="i-heroicons-stop"
-        color="error"
-        variant="soft"
-        :loading="cancelling"
-        @click="cancelRun"
-      >
-        Abbrechen
-      </UButton>
+      <ClientOnly>
+        <UButton
+          v-if="viewMode === 'progress'"
+          icon="i-heroicons-stop"
+          color="error"
+          variant="soft"
+          :loading="cancelling"
+          @click="cancelRun"
+        >
+          Abbrechen
+        </UButton>
+      </ClientOnly>
     </div>
 
     <!-- Strategy Info -->
