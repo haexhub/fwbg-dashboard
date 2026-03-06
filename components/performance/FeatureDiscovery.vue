@@ -255,6 +255,30 @@ const resolvedStrategyName = computed(() => {
   return props.strategyName || data.value?.strategy_name || "";
 });
 
+// ── Strategy selector for add-to-strategy ──
+const strategyList = ref<string[]>([]);
+const targetStrategy = ref("");
+
+watch(resolvedStrategyName, (name) => {
+  if (name && !targetStrategy.value) targetStrategy.value = name;
+}, { immediate: true });
+
+onMounted(async () => {
+  try {
+    const list = await $fetch<{ filename: string }[]>("/api/strategy/strategies");
+    strategyList.value = list.map((s) => s.filename);
+    if (!targetStrategy.value && strategyList.value.length) {
+      targetStrategy.value = resolvedStrategyName.value || strategyList.value[0]!;
+    }
+  } catch {
+    // ignore
+  }
+});
+
+const strategyOptions = computed(() =>
+  strategyList.value.map((s) => ({ label: s, value: s }))
+);
+
 // --- Add to strategy ---
 
 function openAddRule(feature: FeatureResult | DirectionFeature) {
@@ -290,7 +314,7 @@ function closeAddRule() {
 }
 
 async function saveRule() {
-  if (!ruleForm.value || !resolvedStrategyName.value) return;
+  if (!ruleForm.value || !targetStrategy.value) return;
 
   saving.value = true;
   saveError.value = null;
@@ -298,7 +322,7 @@ async function saveRule() {
   try {
     // Fetch current strategy
     const strategy = await $fetch<Record<string, any>>(
-      `/api/strategy/strategies/${resolvedStrategyName.value}`,
+      `/api/strategy/strategies/${targetStrategy.value}`,
     );
 
     // Ensure signal_rules structure exists
@@ -328,7 +352,7 @@ async function saveRule() {
     }
 
     // Save back
-    await $fetch(`/api/strategy/strategies/${resolvedStrategyName.value}`, {
+    await $fetch(`/api/strategy/strategies/${targetStrategy.value}`, {
       method: "PUT",
       body: strategy,
     });
@@ -349,7 +373,7 @@ async function saveRule() {
 }
 
 async function addComboToStrategy(combo: CombinationResult) {
-  if (!resolvedStrategyName.value) {
+  if (!targetStrategy.value) {
     toast.add({ title: "Kein Strategie-Name verfügbar", color: "error" });
     return;
   }
@@ -357,7 +381,7 @@ async function addComboToStrategy(combo: CombinationResult) {
   saving.value = true;
   try {
     const strategy = await $fetch<Record<string, any>>(
-      `/api/strategy/strategies/${resolvedStrategyName.value}`,
+      `/api/strategy/strategies/${targetStrategy.value}`,
     );
 
     if (!strategy.signal_rules) strategy.signal_rules = {};
@@ -381,7 +405,7 @@ async function addComboToStrategy(combo: CombinationResult) {
       }
     }
 
-    await $fetch(`/api/strategy/strategies/${resolvedStrategyName.value}`, {
+    await $fetch(`/api/strategy/strategies/${targetStrategy.value}`, {
       method: "PUT",
       body: strategy,
     });
@@ -567,7 +591,6 @@ const opOptions = [
                   size="xs"
                   variant="ghost"
                   color="neutral"
-                  class="opacity-0 group-hover:opacity-100 transition-opacity"
                   @click="openAddRule(r)"
                 />
               </td>
@@ -641,7 +664,6 @@ const opOptions = [
                   size="xs"
                   variant="ghost"
                   color="neutral"
-                  class="opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Beide Bedingungen zur Strategie hinzufügen"
                   :loading="saving"
                   @click="addComboToStrategy(c)"
@@ -704,7 +726,6 @@ const opOptions = [
                   size="xs"
                   variant="ghost"
                   color="neutral"
-                  class="opacity-0 group-hover:opacity-100 transition-opacity"
                   @click="openAddRule(r)"
                 />
               </td>
@@ -730,10 +751,16 @@ const opOptions = [
 
       <template #body>
         <div v-if="ruleForm" class="space-y-4">
-          <p class="text-sm text-gray-400">
-            Fügt eine <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">value_check</code>
-            Bedingung zur Strategie <span class="text-white font-medium">{{ resolvedStrategyName }}</span> hinzu.
-          </p>
+          <!-- Target strategy selector -->
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Ziel-Strategie</label>
+            <USelect
+              v-model="targetStrategy"
+              :items="strategyOptions"
+              value-key="value"
+              class="w-full"
+            />
+          </div>
 
           <!-- Feature (read-only) -->
           <div>
