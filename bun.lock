@@ -15,7 +15,7 @@
         "@vueuse/core": "^14.2.1",
         "ai": "^6.0.116",
         "echarts": "^6.1.0",
-        "klinecharts": "^10.0.0-beta1",
+        "klinecharts": "^10.0.0-beta3",
         "nuxt": "^4.4.8",
         "tailwindcss": "^4.1.18",
         "vue": "^3.5.13",
@@ -1243,7 +1243,7 @@
 
     "kleur": ["kleur@4.1.5", "", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
 
-    "klinecharts": ["klinecharts@10.0.0-beta1", "", {}, "sha512-5ZxFGjJeZqt9+q45lZDhApC3kdgrk51i27uSpIELgXJLNgfSc0anlb8XkU+52LVrBYnTv9dFr8/Q7lG81vIV1w=="],
+    "klinecharts": ["klinecharts@10.0.0-beta3", "", {}, "sha512-ZDYcw0+QfIa6oqgj+yV3+BMFVMDxkyoWazfhuYqu0I6XOsK9ezccO19dRNBw3wSqzidcVmMS7LpiVkm5rfV9ow=="],
 
     "klona": ["klona@2.0.6", "", {}, "sha512-dhG34DXATL5hSxJbIexCft8FChFXtmskoZYnoPWjXQuebWYCNkVeV3KkGegCK9CP1oswI/vQibS2GY7Em/sJJA=="],
 
