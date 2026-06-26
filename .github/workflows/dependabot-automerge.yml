@@ -1,0 +1,26 @@
+name: Dependabot Auto-Merge
+
+# Enables GitHub auto-merge on every Dependabot PR so it merges itself into
+# develop once required checks pass. Trimmed from haex-vault's version: that
+# repo's stale-required-check-rebase job exists to work around a multi-job
+# concurrency quirk specific to its 5-platform build matrix, which doesn't
+# apply to this repo's single-job CI.
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge "$PR_NUMBER" --squash --auto --repo "$REPO"
