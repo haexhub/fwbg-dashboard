@@ -1,0 +1,42 @@
+name: Release Please
+
+# Triggered on every push to `main`. Two modes:
+#   1. No release-worthy commits since the last tag -> no-op.
+#   2. Release-worthy commits exist -> open/update a "chore(release): vX.Y.Z"
+#      PR on main with the package.json version bump and CHANGELOG.md.
+#      Merging that PR tags the merge commit as vX.Y.Z, which deploy.yml's
+#      existing `push: tags: ["v*"]` trigger picks up to build and push the
+#      Docker image - no separate build job needed here.
+#
+# No develop branch / multi-platform matrix here (unlike haex-vault) - this
+# repo ships a single Docker image off main.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          # PAT (not GITHUB_TOKEN) so the tag this action pushes actually
+          # fires deploy.yml's tag trigger. GitHub's anti-recursion rule
+          # suppresses workflow runs for events produced by GITHUB_TOKEN -
+          # without a PAT, merging the release PR would tag the repo but
+          # never trigger the Docker build.
+          token: ${{ secrets.RELEASE_PAT }}
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
