@@ -13,6 +13,7 @@ export default defineNuxtConfig({
     dataPath: process.env.DATA_PATH || "./data",
     accountsPath: process.env.ACCOUNTS_PATH || "/app/accounts",
     fwbgApiUrl: process.env.FWBG_API_URL || "http://localhost:8420",
+    fwbgAgentsUrl: process.env.FWBG_AGENTS_API_URL || "http://localhost:8421",
     public: {
       appVersion: pkg.version,
     },

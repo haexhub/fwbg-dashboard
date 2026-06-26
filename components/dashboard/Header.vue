@@ -16,6 +16,7 @@ const navItems = [
   { label: "Runs", to: "/runs", icon: "i-heroicons-play-circle" },
   { label: "Exploration", to: "/exploration", icon: "i-heroicons-magnifying-glass-circle" },
   { label: "Plugins", to: "/plugins", icon: "i-heroicons-cube" },
+  { label: "Agents", to: "/agents", icon: "i-heroicons-cpu-chip" },
   { label: "Datenquellen", to: "/datasources", icon: "i-heroicons-circle-stack" },
   { label: "Presets", to: "/presets", icon: "i-heroicons-bookmark-square" },
   { label: "AI", to: "/ai", icon: "i-heroicons-sparkles" },
