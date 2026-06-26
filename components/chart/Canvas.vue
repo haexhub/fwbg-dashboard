@@ -327,9 +327,11 @@ onMounted(() => {
         },
       },
     },
-    layout: [
-      { type: "candle" },
-    ],
+    layout: {
+      panes: [
+        { type: "candle" },
+      ],
+    },
   });
 
   if (!chart) return;

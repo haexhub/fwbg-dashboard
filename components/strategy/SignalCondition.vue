@@ -46,7 +46,7 @@ const crossDirections = [
 /** Convert { label, items }[] grouped format to USelectMenu's T[][] format */
 function toSelectMenuGroups(groups: ColumnGroupItem[]) {
   return groups.map((g) => [
-    { label: g.label, type: "label" as const, disabled: true },
+    { label: g.label, value: "", type: "label" as const, disabled: true },
     ...g.items,
   ]);
 }

@@ -25,7 +25,7 @@ const { isDragOver } = makeDroppable(
     groups: ["lane-reorder"],
     events: {
       onDrop: (event) => {
-        const dropData = event.payload?.dropData as
+        const dropData = event.draggedItems[0]?.data as
           | { source: "lane"; instanceId: string; phase: PipelinePhase }
           | undefined;
         if (dropData?.source === "lane") {

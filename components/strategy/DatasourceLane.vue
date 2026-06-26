@@ -22,7 +22,7 @@ const { isDragOver } = makeDroppable(
     groups: ["datasource"],
     events: {
       onDrop: (event) => {
-        const ds = event.payload?.items[event.payload.index] as DataSourceBase | undefined;
+        const ds = event.draggedItems[0]?.item as DataSourceBase | undefined;
         if (ds) datasource.value = ds.name;
       },
     },

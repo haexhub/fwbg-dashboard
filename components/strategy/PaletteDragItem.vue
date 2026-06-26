@@ -14,8 +14,11 @@ const itemRef = ref<HTMLElement | null>(null);
 
 const { isDragging } = makeDraggable(
   itemRef,
-  { groups: [props.plugin.phase] },
-  () => [0, [props.plugin], { source: "palette" as const }]
+  {
+    groups: [props.plugin.phase],
+    data: () => ({ source: "palette" as const }),
+  },
+  () => [0, [props.plugin]]
 );
 </script>
 

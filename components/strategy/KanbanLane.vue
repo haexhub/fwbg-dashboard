@@ -81,11 +81,11 @@ const { isDragOver } = makeDroppable(
         stopTracking();
         activeProvider.value = null;
 
-        const payload = event.payload;
-        if (!payload) return;
+        const dragged = event.draggedItems[0];
+        if (!dragged) return;
 
-        const item = payload.items[payload.index];
-        const dropData = payload.dropData as
+        const item = dragged.item;
+        const dropData = dragged.data as
           | { source: "palette" }
           | { source: "lane"; instanceId: string; phase: string }
           | undefined;
