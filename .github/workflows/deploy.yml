@@ -35,6 +35,12 @@ jobs:
         run: bun run nuxi typecheck
 
       - name: Build
+        env:
+          # Nitro's server build spawns a Node subprocess for some of its
+          # bundling steps; the runner's default V8 heap sizing isn't enough
+          # for this app's chunk count and hits "JavaScript heap out of
+          # memory" without this.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: bun run build
 
       - name: Unit tests
