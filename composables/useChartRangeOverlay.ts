@@ -18,7 +18,7 @@ function forceRedraw(chart: Chart | null | undefined) {
   if (!chart) return;
   ensureRangeRectRegistered();
   chart.removeIndicator({ name: RANGE_RECT_NAME });
-  chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+  chart.createIndicator({ name: RANGE_RECT_NAME }, { isStack: true, pane: { id: "candle_pane" } });
 }
 
 export function useChartRangeOverlay(queryDefaults?: {
@@ -46,7 +46,7 @@ export function useChartRangeOverlay(queryDefaults?: {
     if (value) {
       ensureRangeRectRegistered();
       chart.removeIndicator({ name: RANGE_RECT_NAME });
-      chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+      chart.createIndicator({ name: RANGE_RECT_NAME }, { isStack: true, pane: { id: "candle_pane" } });
     } else {
       chart.removeIndicator({ name: RANGE_RECT_NAME });
     }
@@ -91,7 +91,7 @@ export function useChartRangeOverlay(queryDefaults?: {
     const chart = getChart();
     if (chart) {
       chart.removeIndicator({ name: RANGE_RECT_NAME });
-      chart.createIndicator({ name: RANGE_RECT_NAME }, true, { id: "candle_pane" });
+      chart.createIndicator({ name: RANGE_RECT_NAME }, { isStack: true, pane: { id: "candle_pane" } });
     }
   }
 

@@ -18,11 +18,11 @@ export function useChartPanes(
     delete collapsedPanes.value[id];
 
     if (indicator.paneId === "candle_pane") {
-      chart.createIndicator({ name: id }, false, { height: 150 });
+      chart.createIndicator({ name: id }, { isStack: false, pane: { height: 150 } });
       const inds = chart.getIndicators({ name: id });
       indicator.paneId = (inds[0] as any)?.paneId ?? "";
     } else {
-      chart.createIndicator({ name: id }, true, { id: "candle_pane" });
+      chart.createIndicator({ name: id }, { isStack: true, pane: { id: "candle_pane" } });
       indicator.paneId = "candle_pane";
     }
     nextTick(adjustLayout);
@@ -37,7 +37,7 @@ export function useChartPanes(
     if (collapsedPanes.value[id]) {
       delete collapsedPanes.value[id];
       const height = indicator.isSignal ? 80 : 120;
-      chart.createIndicator({ name: id }, false, { height });
+      chart.createIndicator({ name: id }, { isStack: false, pane: { height } });
       indicator.paneId = (chart.getIndicators({ name: id })[0] as any)?.paneId ?? "";
       adjustLayout();
     } else {
@@ -64,7 +64,7 @@ export function useChartPanes(
     for (const ind of activeIndicators.value) {
       if (collapsedPanes.value[ind.id]) {
         const height = ind.isSignal ? 80 : 120;
-        chart.createIndicator({ name: ind.id }, false, { height });
+        chart.createIndicator({ name: ind.id }, { isStack: false, pane: { height } });
         ind.paneId = (chart.getIndicators({ name: ind.id })[0] as any)?.paneId ?? "";
       }
     }

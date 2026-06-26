@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { IndicatorResponse } from "../../types/chart";
 
 // We import the pure utility functions directly — they don't depend on klinecharts.
-// The klinecharts import at the top of useChartIndicators.ts needs a mock.
+// The klinecharts import at the top of useChartIndicators.ts needs a mock: klinecharts
+// runs browser/OS detection (touches `window`) as a side effect of merely importing it,
+// which crashes under vitest's default node environment.
+vi.mock("klinecharts", () => ({ registerIndicator: () => {} }));
+
 import {
   _shortenColumns,
   _detectPrecision,

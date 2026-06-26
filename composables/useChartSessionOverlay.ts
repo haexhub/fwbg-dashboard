@@ -19,7 +19,7 @@ export function useChartSessionOverlay(querySessionIds?: string) {
     if (ids.length > 0) {
       ensureSessionOverlayRegistered();
       chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
-      chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+      chart.createIndicator({ name: SESSION_OVERLAY_NAME }, { isStack: true, pane: { id: "candle_pane" } });
     } else {
       chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
     }
@@ -32,7 +32,7 @@ export function useChartSessionOverlay(querySessionIds?: string) {
       const chart = getChart();
       if (chart) {
         chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
-        chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+        chart.createIndicator({ name: SESSION_OVERLAY_NAME }, { isStack: true, pane: { id: "candle_pane" } });
       }
     }
   }
@@ -45,7 +45,7 @@ export function useChartSessionOverlay(querySessionIds?: string) {
     const chart = getChart();
     if (chart) {
       chart.removeIndicator({ name: SESSION_OVERLAY_NAME });
-      chart.createIndicator({ name: SESSION_OVERLAY_NAME }, true, { id: "candle_pane" });
+      chart.createIndicator({ name: SESSION_OVERLAY_NAME }, { isStack: true, pane: { id: "candle_pane" } });
     }
   }
 
