@@ -73,7 +73,8 @@ async function syncAccounts() {
         </NuxtLink>
       </nav>
     </div>
-    <div class="flex gap-2">
+    <div class="flex items-center gap-2">
+      <DashboardLlmStatusBadge />
       <UButton
         v-if="hasAccounts"
         icon="i-heroicons-cloud-arrow-down"
