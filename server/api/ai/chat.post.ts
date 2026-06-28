@@ -27,8 +27,6 @@ import { z } from "zod";
 
 function getModel(provider: string, modelId: string, apiKey: string) {
   switch (provider) {
-    case "anthropic":
-      return createAnthropic({ apiKey })(modelId);
     case "openai":
       return createOpenAI({ apiKey })(modelId);
     case "google":
@@ -38,6 +36,23 @@ function getModel(provider: string, modelId: string, apiKey: string) {
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
+}
+
+/**
+ * Claude goes through haex-claude-proxy (OAuth subscription, see
+ * AiLlmConnectionCard on /ai) instead of a per-request API key. The proxy's
+ * data-plane endpoints don't check the key at all — same dummy-key pattern
+ * the fwbg-agents service already uses against it.
+ */
+function getAnthropicProxyModel(modelId: string) {
+  const claudeProxyUrl = process.env.CLAUDE_PROXY_URL || "http://localhost:12102";
+  return createAnthropic({
+    // @ai-sdk/anthropic appends /messages itself, so baseURL must include
+    // the /v1 root (mirrors the default https://api.anthropic.com/v1) —
+    // haex-claude-proxy only routes POST /v1/messages, not /messages.
+    baseURL: `${claudeProxyUrl}/v1`,
+    apiKey: "proxy-not-used-but-sdk-requires-it",
+  })(modelId);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,11 +300,12 @@ export default defineEventHandler(async (event) => {
   const provider: string = body.provider ?? "anthropic";
   const modelId: string = body.model ?? "claude-opus-4-6";
 
-  // API key: from env (server-side) or from request body (user-provided via UI)
-  const envKey =
-    provider === "anthropic"
-      ? process.env.ANTHROPIC_API_KEY
-      : provider === "openai"
+  // Claude has no per-request key at all (proxy-backed); other providers
+  // still take one from env (server-side) or the request body (UI localStorage).
+  let apiKey: string | undefined;
+  if (provider !== "anthropic") {
+    const envKey =
+      provider === "openai"
         ? process.env.OPENAI_API_KEY
         : provider === "google"
           ? process.env.GOOGLE_API_KEY
@@ -297,9 +313,10 @@ export default defineEventHandler(async (event) => {
             ? process.env.DEEPSEEK_API_KEY
             : undefined;
 
-  const apiKey = envKey || (body.apiKey as string | undefined);
-  if (!apiKey) {
-    throw createError({ statusCode: 401, statusMessage: "API_KEY_MISSING" });
+    apiKey = envKey || (body.apiKey as string | undefined);
+    if (!apiKey) {
+      throw createError({ statusCode: 401, statusMessage: "API_KEY_MISSING" });
+    }
   }
 
   const config = useRuntimeConfig();
@@ -317,7 +334,8 @@ export default defineEventHandler(async (event) => {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const model = getModel(provider, modelId, apiKey);
+        const model =
+          provider === "anthropic" ? getAnthropicProxyModel(modelId) : getModel(provider, modelId, apiKey!);
         const tools = makeFwbgTools(fwbgApiUrl);
 
         const result = streamText({

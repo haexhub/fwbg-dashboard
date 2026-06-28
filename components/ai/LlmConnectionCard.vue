@@ -76,12 +76,12 @@ async function handleRetry() {
         color="error"
         variant="subtle"
         title="haex-claude-proxy nicht erreichbar"
-        description="Der Proxy-Container scheint nicht zu laufen oder ist nicht erreichbar. Agents können ohne ihn keine LLM-Aufrufe machen."
+        description="Der Proxy-Container scheint nicht zu laufen oder ist nicht erreichbar. Weder die Agents (Researcher, Translator, ...) noch der AI-Assistent hier können ohne ihn LLM-Aufrufe machen."
       />
 
       <template v-else-if="isConnected">
         <p class="text-sm text-gray-400">
-          Claude ist über haex-claude-proxy verbunden. Agents (Researcher, Translator, ...) können LLM-Aufrufe machen.
+          Claude ist über haex-claude-proxy verbunden. Sowohl die Agents (Researcher, Translator, ...) als auch der AI-Assistent unten nutzen diese eine Verbindung.
         </p>
         <UButton variant="outline" color="neutral" :loading="starting" @click="handleStart">
           Neu verbinden
@@ -117,8 +117,8 @@ async function handleRetry() {
 
       <template v-else>
         <p class="text-sm text-gray-400">
-          Claude ist noch nicht verbunden. Agents können erst LLM-Aufrufe machen, sobald die Verbindung
-          hergestellt ist.
+          Claude ist noch nicht verbunden. Weder Agents noch der AI-Assistent unten können LLM-Aufrufe machen,
+          bevor die Verbindung hergestellt ist.
         </p>
         <UButton color="primary" :loading="starting" @click="handleStart">Mit Claude verbinden</UButton>
       </template>
