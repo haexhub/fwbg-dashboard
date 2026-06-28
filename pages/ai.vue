@@ -17,6 +17,8 @@ useSeoMeta({ title: "AI Assistent – FWBG" });
       </div>
     </div>
 
+    <AiLlmConnectionCard class="mb-4" />
+
     <div class="flex-1 rounded-xl border border-gray-800 overflow-hidden min-h-0">
       <AiChat />
     </div>

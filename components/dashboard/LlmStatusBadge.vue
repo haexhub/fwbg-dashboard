@@ -2,7 +2,7 @@
 /**
  * Small global indicator of the Claude (haex-claude-proxy) connection
  * state — visible on every page via the header, links through to the
- * detailed connection card on /agents.
+ * detailed connection card on /ai.
  */
 const { status, unreachable } = useLlmConnection();
 
@@ -28,7 +28,7 @@ const label = computed(() => {
 </script>
 
 <template>
-  <NuxtLink to="/agents">
+  <NuxtLink to="/ai">
     <UBadge :color="color" variant="subtle" class="cursor-pointer whitespace-nowrap shrink-0">
       {{ label }}
     </UBadge>
