@@ -65,7 +65,7 @@ oneYearAgo.setFullYear(today.getFullYear() - 1);
 
 const dukaForm = reactive({
   symbols: "",
-  timeframe: "HOUR_1",
+  timeframe: "HOUR_1" as (typeof DUKASCOPY_TIMEFRAMES)[number],
   start: isoDate(oneYearAgo),
   end: isoDate(today),
   offer_side: "bid",

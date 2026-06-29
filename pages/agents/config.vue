@@ -13,12 +13,21 @@ const availableModels = computed(() => data.value?.available_models ?? []);
 
 // Per-agent editable copy (model + prompt), keyed by agent name. Seeded from
 // the server's effective values; user edits are preserved across refreshes.
-const edits = reactive<Record<string, { model: string; prompt: string }>>({});
+type AgentEdit = { model: string; prompt: string };
+const edits = reactive<Record<string, AgentEdit>>({});
 watchEffect(() => {
   for (const a of data.value?.agents ?? []) {
     if (!edits[a.name]) edits[a.name] = { model: a.model, prompt: a.prompt };
   }
 });
+
+// Pair each agent with its (always-seeded) editable copy so the template can
+// bind v-model to a guaranteed-defined object instead of an indexed lookup.
+const agentRows = computed(() =>
+  (data.value?.agents ?? [])
+    .map((agent) => ({ agent, edit: edits[agent.name] }))
+    .filter((r): r is { agent: AgentConfig; edit: AgentEdit } => !!r.edit),
+);
 
 const savingName = ref<string | null>(null);
 
@@ -96,7 +105,7 @@ async function resetToDefault(a: AgentConfig) {
       Lade Konfiguration…
     </div>
 
-    <UCard v-for="a in data?.agents ?? []" v-else :key="a.name">
+    <UCard v-for="{ agent: a, edit } in agentRows" v-else :key="a.name">
       <template #header>
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -115,10 +124,10 @@ async function resetToDefault(a: AgentConfig) {
         </div>
       </template>
 
-      <div v-if="edits[a.name]" class="space-y-4">
+      <div v-if="edit" class="space-y-4">
         <UFormField label="Modell">
           <USelect
-            v-model="edits[a.name].model"
+            v-model="edit.model"
             :items="availableModels"
             class="w-full sm:w-80"
           />
@@ -129,7 +138,7 @@ async function resetToDefault(a: AgentConfig) {
 
         <UFormField label="Persona / System-Prompt">
           <UTextarea
-            v-model="edits[a.name].prompt"
+            v-model="edit.prompt"
             :rows="12"
             class="w-full font-mono text-xs"
             spellcheck="false"
