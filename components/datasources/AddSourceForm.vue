@@ -1,16 +1,29 @@
 <script setup lang="ts">
 import type { SourceType } from "~/types/datasource";
 import { SOURCE_TYPE_LABELS, SOURCE_TYPE_ICONS } from "~/types/datasource";
+import { DUKASCOPY_TIMEFRAMES } from "~/composables/useDukascopy";
 
 const emit = defineEmits<{
   submit: [data: Record<string, unknown>];
+  done: [];
   cancel: [];
 }>();
 
-const step = ref<1 | 2>(1);
-const selectedType = ref<SourceType | null>(null);
+// "dukascopy" is a dashboard-only pseudo-type: it creates a CSV source and
+// pulls historical data into it. All other types map 1:1 to the backend.
+type PickerType = SourceType | "dukascopy";
 
-const sourceTypes: SourceType[] = ["csv", "rest", "websocket", "database"];
+const step = ref<1 | 2>(1);
+const selectedType = ref<PickerType | null>(null);
+
+const sourceTypes: PickerType[] = ["csv", "rest", "websocket", "database", "dukascopy"];
+
+function typeLabel(t: PickerType): string {
+  return t === "dukascopy" ? "Dukascopy" : SOURCE_TYPE_LABELS[t];
+}
+function typeIcon(t: PickerType): string {
+  return t === "dukascopy" ? "i-heroicons-arrow-down-tray" : SOURCE_TYPE_ICONS[t];
+}
 
 // Form state per type
 const common = reactive({ name: "", description: "" });
@@ -42,6 +55,24 @@ const dbForm = reactive({
   driver: "sqlalchemy",
 });
 
+// ── Dukascopy ──
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+const today = new Date();
+const oneYearAgo = new Date(today);
+oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+const dukaForm = reactive({
+  symbols: "",
+  timeframe: "HOUR_1",
+  start: isoDate(oneYearAgo),
+  end: isoDate(today),
+  offer_side: "bid",
+});
+const downloading = ref(false);
+const dukaError = ref<string | null>(null);
+
 function addEndpoint() {
   restForm.endpoints.push({ key: "", value: "" });
 }
@@ -49,7 +80,7 @@ function removeEndpoint(i: number) {
   restForm.endpoints.splice(i, 1);
 }
 
-function selectType(t: SourceType) {
+function selectType(t: PickerType) {
   selectedType.value = t;
   step.value = 2;
 }
@@ -58,8 +89,52 @@ function back() {
   step.value = 1;
 }
 
+const { createSourceAndDownload } = useDukascopy();
+const toast = useToast();
+
+async function handleDukascopy() {
+  const symbols = dukaForm.symbols
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!common.name || symbols.length === 0) return;
+  downloading.value = true;
+  dukaError.value = null;
+  try {
+    const task = await createSourceAndDownload({
+      name: common.name,
+      description: common.description,
+      symbols,
+      timeframe: dukaForm.timeframe,
+      start: dukaForm.start,
+      end: dukaForm.end,
+      offer_side: dukaForm.offer_side,
+    });
+    if (task.status === "error") {
+      dukaError.value = task.error ?? "Download fehlgeschlagen";
+      return;
+    }
+    const total = (task.result ?? []).reduce((n, r) => n + r.rows, 0);
+    toast.add({
+      title: "Dukascopy-Daten geladen",
+      description: `${task.result?.length ?? 0} Symbol(e), ${total} Bars.`,
+      color: "success",
+    });
+    emit("done");
+  } catch (e) {
+    dukaError.value = e instanceof Error ? e.message : "Download fehlgeschlagen";
+  } finally {
+    downloading.value = false;
+  }
+}
+
 function submit() {
   if (!selectedType.value || !common.name) return;
+
+  if (selectedType.value === "dukascopy") {
+    handleDukascopy();
+    return;
+  }
 
   const base = {
     type: selectedType.value,
@@ -127,8 +202,8 @@ function submit() {
           class="flex flex-col items-center gap-2 rounded-lg border border-gray-700 p-4 text-center hover:border-gray-500 hover:bg-gray-800 transition-colors"
           @click="selectType(t)"
         >
-          <UIcon :name="SOURCE_TYPE_ICONS[t]" class="text-2xl text-gray-300" />
-          <span class="text-sm font-medium text-white">{{ SOURCE_TYPE_LABELS[t] }}</span>
+          <UIcon :name="typeIcon(t)" class="text-2xl text-gray-300" />
+          <span class="text-sm font-medium text-white">{{ typeLabel(t) }}</span>
         </button>
       </div>
     </template>
@@ -137,8 +212,8 @@ function submit() {
     <template v-else-if="step === 2 && selectedType">
       <div class="flex items-center gap-2">
         <UButton icon="i-heroicons-arrow-left" variant="ghost" @click="back" />
-        <UIcon :name="SOURCE_TYPE_ICONS[selectedType]" class="text-gray-400" />
-        <span class="text-sm font-medium text-gray-300">{{ SOURCE_TYPE_LABELS[selectedType] }}</span>
+        <UIcon :name="typeIcon(selectedType)" class="text-gray-400" />
+        <span class="text-sm font-medium text-gray-300">{{ typeLabel(selectedType) }}</span>
       </div>
 
       <div class="space-y-3">
@@ -251,15 +326,55 @@ function submit() {
             <UInput v-model="dbForm.driver" placeholder="sqlalchemy" />
           </UFormField>
         </template>
+
+        <!-- Dukascopy fields -->
+        <template v-else-if="selectedType === 'dukascopy'">
+          <p class="text-xs text-gray-500">
+            Lädt historische OHLC-Daten direkt von Dukascopy in diese Quelle —
+            fertig zum Backtesten, ohne ETL.
+          </p>
+          <UFormField label="Symbole" class="w-full">
+            <UInput
+              v-model="dukaForm.symbols"
+              placeholder="EURUSD, GBPUSD, USDJPY"
+              class="font-mono w-full"
+            />
+            <template #hint>
+              <span class="text-xs text-gray-500">Komma- oder leerzeichengetrennt.</span>
+            </template>
+          </UFormField>
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField label="Timeframe">
+              <USelect v-model="dukaForm.timeframe" :items="[...DUKASCOPY_TIMEFRAMES]" class="w-full" />
+            </UFormField>
+            <UFormField label="Seite">
+              <USelect
+                v-model="dukaForm.offer_side"
+                :items="[{ label: 'Bid', value: 'bid' }, { label: 'Ask', value: 'ask' }]"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField label="Von">
+              <UInput v-model="dukaForm.start" type="date" class="w-full" />
+            </UFormField>
+            <UFormField label="Bis">
+              <UInput v-model="dukaForm.end" type="date" class="w-full" />
+            </UFormField>
+          </div>
+          <UAlert v-if="dukaError" color="error" variant="subtle" :title="dukaError" />
+        </template>
       </div>
 
       <div class="flex justify-end gap-2 pt-2">
-        <UButton variant="ghost" @click="emit('cancel')">Abbrechen</UButton>
+        <UButton variant="ghost" :disabled="downloading" @click="emit('cancel')">Abbrechen</UButton>
         <UButton
-          :disabled="!common.name"
+          :loading="downloading"
+          :disabled="!common.name || (selectedType === 'dukascopy' && !dukaForm.symbols.trim())"
           @click="submit"
         >
-          Hinzufügen
+          {{ selectedType === 'dukascopy' ? 'Herunterladen' : 'Hinzufügen' }}
         </UButton>
       </div>
     </template>

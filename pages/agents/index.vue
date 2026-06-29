@@ -47,9 +47,19 @@ const showResearchModal = ref(false);
         </UBadge>
         <UBadge v-else color="error" variant="subtle">Offline</UBadge>
       </div>
-      <UButton icon="i-heroicons-sparkles" color="primary" @click="showResearchModal = true">
-        New Research
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton
+          to="/agents/config"
+          icon="i-heroicons-adjustments-horizontal"
+          variant="outline"
+          color="neutral"
+        >
+          Agenten konfigurieren
+        </UButton>
+        <UButton icon="i-heroicons-sparkles" color="primary" @click="showResearchModal = true">
+          New Research
+        </UButton>
+      </div>
     </div>
 
     <!-- Stat cards -->
