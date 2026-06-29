@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.13.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.12.0...v1.13.0) (2026-06-29)
+
+
+### Features
+
+* integrate onboarding wizard, per-agent config & Dukascopy into develop ([922265b](https://github.com/haexhub/fwbg-dashboard/commit/922265b5fa7424d3e6dec0817942187634d18079))
+* make Asset Class a creatable select in New Research modal ([e47b9d4](https://github.com/haexhub/fwbg-dashboard/commit/e47b9d460f7629a8aafb7649933f991e6dd4b34d))
+* make Asset Class a creatable select in New Research modal ([f1808c1](https://github.com/haexhub/fwbg-dashboard/commit/f1808c19fb6c76061eeae4328186fb2480c2494b))
+* onboarding wizard, per-agent config UI, Dukascopy data source ([0e4f2ef](https://github.com/haexhub/fwbg-dashboard/commit/0e4f2efb5c8e5b14dc998aeafe66bbae6f178db7))
+
+
+### Bug Fixes
+
+* resolve type errors in onboarding agent config & Dukascopy form ([0b20e3a](https://github.com/haexhub/fwbg-dashboard/commit/0b20e3aaf148a3807487e1cf812cef2aeb2a3b83))
+
 ## [1.12.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.11.0...v1.12.0) (2026-06-29)
 
 
