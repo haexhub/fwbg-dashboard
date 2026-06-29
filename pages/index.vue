@@ -201,6 +201,9 @@ const selectedAccount = computed(() =>
 
 <template>
   <div class="space-y-6">
+    <!-- First-run onboarding checklist (hides itself once setup is complete) -->
+    <SetupChecklist />
+
     <!-- Account Tabs -->
     <UTabs
       v-if="accounts.length > 0"

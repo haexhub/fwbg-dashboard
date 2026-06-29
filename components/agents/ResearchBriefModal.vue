@@ -10,7 +10,7 @@ const emit = defineEmits<{
 const { criteriaList } = useAgentCriteria();
 const toast = useToast();
 
-const assetClass = ref("");
+const assetClass = ref<string | undefined>(undefined);
 const strategyFamilyHint = ref("");
 const freeTextBrief = ref("");
 const submitting = ref(false);
@@ -24,7 +24,7 @@ const createdAssetClasses = ref<string[]>([]);
 const assetClassOptions = computed(() => [
   ...new Set([...knownAssetClasses.value, ...createdAssetClasses.value]),
 ]);
-const canSubmit = computed(() => assetClass.value.trim().length > 0);
+const canSubmit = computed(() => !!assetClass.value && assetClass.value.trim().length > 0);
 
 function onCreateAssetClass(value: string) {
   const trimmed = value.trim();
@@ -34,7 +34,7 @@ function onCreateAssetClass(value: string) {
 }
 
 function resetForm() {
-  assetClass.value = "";
+  assetClass.value = undefined;
   strategyFamilyHint.value = "";
   freeTextBrief.value = "";
   createdAssetClasses.value = [];
@@ -94,7 +94,7 @@ async function submit() {
               v-model="assetClass"
               :items="assetClassOptions"
               create-item
-              placeholder="z.B. FX_MAJORS"
+              placeholder="Asset-Klasse wählen oder eingeben (z.B. FX_MAJORS)"
               class="w-full"
               @create="onCreateAssetClass"
             />
