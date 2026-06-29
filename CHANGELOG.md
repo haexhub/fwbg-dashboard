@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.11.0...v1.12.0) (2026-06-29)
+
+
+### Features
+
+* unify Claude LLM config into one place on /ai ([#27](https://github.com/haexhub/fwbg-dashboard/issues/27)) ([0dc7f65](https://github.com/haexhub/fwbg-dashboard/commit/0dc7f65adadc0db56c70fe02d5d61ce3023c2120))
+
 ## [1.11.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.10.1...v1.11.0) (2026-06-27)
 
 
