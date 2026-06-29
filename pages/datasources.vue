@@ -36,6 +36,12 @@ async function handleSubmit(data: Record<string, unknown>) {
   }
 }
 
+// Dukascopy creates the source + downloads itself; just close and refresh.
+async function handleDone() {
+  slideoverOpen.value = false;
+  await refresh();
+}
+
 // ── Delete source ───────────────────────────────────────────────────────────
 async function handleDelete(name: string) {
   await $fetch(`/api/datasources/${name}`, { method: "DELETE" });
@@ -185,6 +191,7 @@ async function handleETLDone() {
           />
           <DatasourcesAddSourceForm
             @submit="handleSubmit"
+            @done="handleDone"
             @cancel="slideoverOpen = false"
           />
         </div>

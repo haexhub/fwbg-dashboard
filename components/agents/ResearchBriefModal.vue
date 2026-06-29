@@ -10,21 +10,34 @@ const emit = defineEmits<{
 const { criteriaList } = useAgentCriteria();
 const toast = useToast();
 
-const assetClass = ref("");
+const assetClass = ref<string | undefined>(undefined);
 const strategyFamilyHint = ref("");
 const freeTextBrief = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
-// Existing asset classes are shown as quick-picks, not a hard constraint —
-// the backend accepts any string and there may be none yet on a fresh install.
+// Known asset classes populate the dropdown, but they're not a hard constraint —
+// the backend accepts any string and there may be none yet on a fresh install,
+// so the select stays creatable (users can type a new asset class).
 const knownAssetClasses = computed(() => criteriaList.value?.asset_classes ?? []);
-const canSubmit = computed(() => assetClass.value.trim().length > 0);
+const createdAssetClasses = ref<string[]>([]);
+const assetClassOptions = computed(() => [
+  ...new Set([...knownAssetClasses.value, ...createdAssetClasses.value]),
+]);
+const canSubmit = computed(() => !!assetClass.value && assetClass.value.trim().length > 0);
+
+function onCreateAssetClass(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  if (!assetClassOptions.value.includes(trimmed)) createdAssetClasses.value.push(trimmed);
+  assetClass.value = trimmed;
+}
 
 function resetForm() {
-  assetClass.value = "";
+  assetClass.value = undefined;
   strategyFamilyHint.value = "";
   freeTextBrief.value = "";
+  createdAssetClasses.value = [];
   errorMessage.value = "";
 }
 
@@ -77,22 +90,14 @@ async function submit() {
 
         <div class="space-y-4">
           <UFormField label="Asset Class" required>
-            <UInput v-model="assetClass" placeholder="z.B. FX_MAJORS" class="w-full" />
-            <template v-if="knownAssetClasses.length" #hint>
-              <div class="flex flex-wrap gap-1 mt-1">
-                <UBadge
-                  v-for="ac in knownAssetClasses"
-                  :key="ac"
-                  color="neutral"
-                  variant="subtle"
-                  size="xs"
-                  class="cursor-pointer"
-                  @click="assetClass = ac"
-                >
-                  {{ ac }}
-                </UBadge>
-              </div>
-            </template>
+            <USelectMenu
+              v-model="assetClass"
+              :items="assetClassOptions"
+              create-item
+              placeholder="Asset-Klasse wählen oder eingeben (z.B. FX_MAJORS)"
+              class="w-full"
+              @create="onCreateAssetClass"
+            />
           </UFormField>
 
           <UFormField label="Strategy Family (optional)">

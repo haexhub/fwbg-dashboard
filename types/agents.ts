@@ -252,3 +252,39 @@ export function agentRunStatusColor(status: AgentRunStatus | string): BadgeColor
       return "neutral";
   }
 }
+
+// ──────────────────────────────────────────────
+// Per-agent configuration (model + persona/system-prompt)
+//
+// Mirrors fwbg-agents' /agents/config. The configurable set is the LLM-driven
+// roles only (not the deterministic Runner/Calibrator) — see that backend.
+// ──────────────────────────────────────────────
+
+export interface AgentConfig {
+  name: string;
+  model: string;
+  default_model: string;
+  has_model_override: boolean;
+  prompt: string;
+  default_prompt: string;
+  has_prompt_override: boolean;
+}
+
+export interface AgentConfigListResponse {
+  agents: AgentConfig[];
+  available_models: string[];
+}
+
+export interface AgentConfigUpdate {
+  model?: string | null;
+  prompt?: string | null;
+}
+
+export const CONFIGURABLE_AGENT_LABELS: Record<string, string> = {
+  researcher: "Researcher",
+  translator: "Translator",
+  analyst: "Analyst",
+  paper_analyst: "Paper-Analyst",
+  plugin_planner: "Plugin-Planner",
+  plugin_implementer: "Plugin-Implementer",
+};
