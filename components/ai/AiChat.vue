@@ -131,6 +131,15 @@ const apiHistory = ref<ApiMessage[]>([]);
 const selectedModelId = ref(MODELS[0]!.id);
 const selectedModel = computed(() => MODELS.find((m) => m.id === selectedModelId.value) ?? MODELS[0]!);
 
+// Claude/Anthropic models go through the shared haex-claude-proxy subscription
+// connection (see the AiLlmConnectionCard above) instead of a pasted API key.
+const { status: claudeStatus } = useLlmConnection();
+const claudeConnected = computed(
+  () =>
+    !!claudeStatus.value?.credentialsExist &&
+    (claudeStatus.value?.state === "idle" || claudeStatus.value?.state === "done")
+);
+
 // API key state
 const apiKeys = ref<Record<string, string>>({});
 const apiKeyInput = ref("");
@@ -152,6 +161,12 @@ onMounted(() => {
 });
 
 function checkKeyForModel() {
+  if (selectedModel.value.provider === "anthropic") {
+    showKeyInput.value = false;
+    keyError.value = "";
+    apiKeyInput.value = "";
+    return;
+  }
   const key = apiKeys.value[selectedModel.value.storageKey];
   showKeyInput.value = !key;
   keyError.value = "";
@@ -202,6 +217,7 @@ const toolLabels: Record<string, string> = {
 async function submit() {
   const text = input.value.trim();
   if (!text || loading.value) return;
+  if (selectedModel.value.provider === "anthropic" && !claudeConnected.value) return;
   input.value = "";
 
   messages.value.push({ role: "user", parts: [{ type: "text", content: text }] });
@@ -395,6 +411,15 @@ function clearChat() {
 
     <!-- Chat UI -->
     <template v-else>
+      <UAlert
+        v-if="selectedModel.provider === 'anthropic' && !claudeConnected"
+        color="warning"
+        variant="subtle"
+        class="m-3"
+        title="Claude nicht verbunden"
+        description="Verbindung oben auf der Seite herstellen, bevor du eine Nachricht sendest."
+      />
+
       <!-- Messages -->
       <div ref="scrollEl" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         <!-- Empty state -->
@@ -481,6 +506,7 @@ function clearChat() {
         />
         <div class="flex gap-1">
           <UButton
+            v-if="selectedModel.provider !== 'anthropic'"
             icon="i-heroicons-key"
             variant="ghost"
             color="neutral"
@@ -501,7 +527,7 @@ function clearChat() {
           <UButton
             icon="i-heroicons-paper-airplane"
             size="sm"
-            :disabled="!input.trim() || loading"
+            :disabled="!input.trim() || loading || (selectedModel.provider === 'anthropic' && !claudeConnected)"
             :loading="loading"
             @click="submit"
           />
