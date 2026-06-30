@@ -6,6 +6,7 @@ import {
   TIMEFRAME_GRANULARITY,
   earliestAvailable,
   type DukascopyInstrument,
+  type DukascopyProgress,
   type DukascopyTimeframe,
 } from "~/composables/useDukascopy";
 
@@ -77,6 +78,7 @@ const dukaForm = reactive({
   end: todayIso,
 });
 const downloading = ref(false);
+const downloadProgress = ref<DukascopyProgress | null>(null);
 const dukaError = ref<string | null>(null);
 
 const { fetchInstruments, createSourceAndDownload } = useDukascopy();
@@ -167,16 +169,22 @@ async function handleDukascopy() {
   const symbols = dukaForm.symbols;
   if (!common.name || symbols.length === 0) return;
   downloading.value = true;
+  downloadProgress.value = null;
   dukaError.value = null;
   try {
-    const task = await createSourceAndDownload({
-      name: common.name,
-      description: common.description,
-      symbols,
-      timeframe: dukaForm.timeframe,
-      start: dukaForm.start,
-      end: dukaForm.end,
-    });
+    const task = await createSourceAndDownload(
+      {
+        name: common.name,
+        description: common.description,
+        symbols,
+        timeframe: dukaForm.timeframe,
+        start: dukaForm.start,
+        end: dukaForm.end,
+      },
+      (t) => {
+        downloadProgress.value = t.progress ?? null;
+      },
+    );
     if (task.status === "error") {
       dukaError.value = task.error ?? "Download fehlgeschlagen";
       return;
@@ -197,6 +205,7 @@ async function handleDukascopy() {
     dukaError.value = e instanceof Error ? e.message : "Download fehlgeschlagen";
   } finally {
     downloading.value = false;
+    downloadProgress.value = null;
   }
 }
 
@@ -461,6 +470,16 @@ function submit() {
             Der reale Spread wird gemessen (p90, konservativ) und pro Asset gespeichert —
             unter „Spreads" kannst du ihn jederzeit manuell überschreiben.
           </p>
+          <div v-if="downloading" class="space-y-1 pt-1">
+            <UProgress :model-value="downloadProgress?.percent ?? null" :max="100" />
+            <p class="text-xs text-gray-500">
+              <template v-if="downloadProgress">
+                Lädt {{ downloadProgress.symbol }}<template v-if="downloadProgress.symbol_total > 1"> ({{ downloadProgress.symbol_index }}/{{ downloadProgress.symbol_total }})</template>
+                — {{ downloadProgress.phase === 'write' ? 'verarbeite' : downloadProgress.phase === 'bid' ? 'lade Bid' : 'lade Ask' }} · {{ downloadProgress.percent }} %
+              </template>
+              <template v-else>Download wird gestartet…</template>
+            </p>
+          </div>
           <UAlert v-if="dukaError" color="error" variant="subtle" :title="dukaError" />
         </template>
       </div>
