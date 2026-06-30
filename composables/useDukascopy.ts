@@ -13,6 +13,30 @@ export const DUKASCOPY_TIMEFRAMES = [
   "DAY_1",
 ] as const;
 
+export type DukascopyTimeframe = (typeof DUKASCOPY_TIMEFRAMES)[number];
+
+/** Dukascopy publishes history starts per candle granularity, not per timeframe. */
+export type HistoryGranularity = "minute" | "hourly" | "daily";
+
+/** Map each timeframe onto the history-start granularity it draws from. */
+export const TIMEFRAME_GRANULARITY: Record<DukascopyTimeframe, HistoryGranularity> = {
+  MINUTE_1: "minute",
+  MINUTE_5: "minute",
+  MINUTE_15: "minute",
+  MINUTE_30: "minute",
+  HOUR_1: "hourly",
+  HOUR_4: "hourly",
+  DAY_1: "daily",
+};
+
+export interface DukascopyInstrument {
+  symbol: string; // normalized, ready to pass as a download symbol (e.g. "EURUSD")
+  id: string; // dukascopy id (e.g. "EUR/USD")
+  description: string;
+  group: string; // asset class label (Forex, Krypto, …)
+  historyStart: Record<HistoryGranularity, string | null>; // ISO dates (YYYY-MM-DD)
+}
+
 export interface DukascopyParams {
   name: string;
   description?: string;
@@ -20,13 +44,13 @@ export interface DukascopyParams {
   timeframe: string;
   start: string; // ISO date (YYYY-MM-DD)
   end: string;
-  offer_side: string; // "bid" | "ask"
 }
 
 export interface DukascopyDownloadResult {
   symbol: string;
   file: string;
   rows: number;
+  spread?: number; // measured bid-ask spread (price units), used in backtesting
   warning?: string;
 }
 
@@ -36,7 +60,50 @@ export interface DukascopyTask {
   error: string | null;
 }
 
+/** Per-asset spread used in backtesting: measured p90, manual override, effective. */
+export interface DukascopySpread {
+  symbol: string;
+  measured: number | null;
+  manual: number | null;
+  effective: number | null;
+}
+
+/**
+ * Earliest date for which *all* selected instruments have data at the given
+ * timeframe — i.e. the latest (most restrictive) history start across the
+ * selection. Returns null when nothing is selected or no start is known.
+ */
+export function earliestAvailable(
+  selected: DukascopyInstrument[],
+  timeframe: DukascopyTimeframe,
+): string | null {
+  const granularity = TIMEFRAME_GRANULARITY[timeframe];
+  let latest: string | null = null;
+  for (const inst of selected) {
+    const start = inst.historyStart[granularity];
+    if (!start) continue;
+    if (latest === null || start > latest) latest = start;
+  }
+  return latest;
+}
+
 export function useDukascopy() {
+  async function fetchInstruments(): Promise<DukascopyInstrument[]> {
+    return $fetch<DukascopyInstrument[]>("/api/dukascopy/instruments");
+  }
+
+  async function fetchSpreads(): Promise<DukascopySpread[]> {
+    return $fetch<DukascopySpread[]>("/api/dukascopy/spreads");
+  }
+
+  /** Set (spread>0) or clear (null) the manual spread override for a symbol. */
+  async function setSpread(symbol: string, spread: number | null): Promise<DukascopySpread> {
+    return $fetch<DukascopySpread>(`/api/dukascopy/spreads/${encodeURIComponent(symbol)}`, {
+      method: "PUT",
+      body: { spread },
+    });
+  }
+
   async function createSourceAndDownload(p: DukascopyParams): Promise<DukascopyTask> {
     // Reuse the source if it already exists (409), otherwise create it as CSV.
     try {
@@ -60,7 +127,6 @@ export function useDukascopy() {
           timeframe: p.timeframe,
           start: p.start,
           end: p.end,
-          offer_side: p.offer_side,
         },
       },
     );
@@ -86,5 +152,5 @@ export function useDukascopy() {
     });
   }
 
-  return { createSourceAndDownload, download, poll };
+  return { fetchInstruments, fetchSpreads, setSpread, createSourceAndDownload, download, poll };
 }
