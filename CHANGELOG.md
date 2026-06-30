@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.14.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.13.0...v1.14.0) (2026-06-30)
+
+
+### Features
+
+* **datasources:** Dukascopy asset catalogue, adaptive dates & per-asset spreads ([c048f80](https://github.com/haexhub/fwbg-dashboard/commit/c048f80eee3019dd77972d1ef89404bbfc37d7f3))
+* **datasources:** Dukascopy asset catalogue, adaptive dates & per-asset spreads ([98f0d4d](https://github.com/haexhub/fwbg-dashboard/commit/98f0d4dd08acb8c2aed4c4da94f7b5544fb89cd3))
+* **datasources:** show Dukascopy download progress ([d233b70](https://github.com/haexhub/fwbg-dashboard/commit/d233b701798ebf4636cf85a2cc619259073c86fc))
+* **datasources:** show Dukascopy download progress (follow-up to [#40](https://github.com/haexhub/fwbg-dashboard/issues/40)) ([7981c1e](https://github.com/haexhub/fwbg-dashboard/commit/7981c1e194e5f7e025d127d72db796130b6b4cf1))
+
 ## [1.13.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.12.0...v1.13.0) (2026-06-29)
 
 
