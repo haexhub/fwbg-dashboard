@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { SourceType } from "~/types/datasource";
 import { SOURCE_TYPE_LABELS, SOURCE_TYPE_ICONS } from "~/types/datasource";
-import { DUKASCOPY_TIMEFRAMES } from "~/composables/useDukascopy";
+import {
+  DUKASCOPY_TIMEFRAMES,
+  TIMEFRAME_GRANULARITY,
+  earliestAvailable,
+  type DukascopyInstrument,
+  type DukascopyTimeframe,
+} from "~/composables/useDukascopy";
 
 const emit = defineEmits<{
   submit: [data: Record<string, unknown>];
@@ -60,18 +66,83 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 const today = new Date();
+const todayIso = isoDate(today);
 const oneYearAgo = new Date(today);
 oneYearAgo.setFullYear(today.getFullYear() - 1);
 
 const dukaForm = reactive({
-  symbols: "",
-  timeframe: "HOUR_1" as (typeof DUKASCOPY_TIMEFRAMES)[number],
+  symbols: [] as string[],
+  timeframe: "HOUR_1" as DukascopyTimeframe,
   start: isoDate(oneYearAgo),
-  end: isoDate(today),
-  offer_side: "bid",
+  end: todayIso,
 });
 const downloading = ref(false);
 const dukaError = ref<string | null>(null);
+
+const { fetchInstruments, createSourceAndDownload } = useDukascopy();
+
+// Available-instrument catalogue (loaded lazily when Dukascopy is picked).
+const instruments = ref<DukascopyInstrument[]>([]);
+const instrumentsLoading = ref(false);
+const instrumentsError = ref<string | null>(null);
+
+async function loadInstruments() {
+  if (instruments.value.length || instrumentsLoading.value) return;
+  instrumentsLoading.value = true;
+  instrumentsError.value = null;
+  try {
+    instruments.value = await fetchInstruments();
+  } catch (e) {
+    instrumentsError.value =
+      e instanceof Error ? e.message : "Instrumente konnten nicht geladen werden";
+  } finally {
+    instrumentsLoading.value = false;
+  }
+}
+
+const instrumentBySymbol = computed(
+  () => new Map(instruments.value.map((i) => [i.symbol, i])),
+);
+
+// Grouped into USelectMenu's T[][] shape: a disabled label header per group.
+const instrumentMenuItems = computed(() => {
+  const byGroup = new Map<string, { label: string; value: string }[]>();
+  for (const inst of instruments.value) {
+    const arr = byGroup.get(inst.group) ?? [];
+    arr.push({ label: `${inst.symbol} · ${inst.description}`, value: inst.symbol });
+    byGroup.set(inst.group, arr);
+  }
+  return [...byGroup.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([group, items]) => [
+      { label: group, value: "", type: "label" as const, disabled: true },
+      ...items,
+    ]);
+});
+
+const selectedInstruments = computed(() =>
+  dukaForm.symbols
+    .map((s) => instrumentBySymbol.value.get(s))
+    .filter((i): i is DukascopyInstrument => !!i),
+);
+
+// Earliest date all selected assets have data for, at the chosen timeframe.
+const minDate = computed(() =>
+  earliestAvailable(selectedInstruments.value, dukaForm.timeframe),
+);
+
+// Which selected asset limits the range (has the latest history start).
+const limitingInstrument = computed(() => {
+  const md = minDate.value;
+  if (!md) return null;
+  const g = TIMEFRAME_GRANULARITY[dukaForm.timeframe];
+  return selectedInstruments.value.find((i) => i.historyStart[g] === md) ?? null;
+});
+
+// Keep the start date within the available range when the selection changes.
+watch(minDate, (md) => {
+  if (md && dukaForm.start < md) dukaForm.start = md;
+});
 
 function addEndpoint() {
   restForm.endpoints.push({ key: "", value: "" });
@@ -83,20 +154,17 @@ function removeEndpoint(i: number) {
 function selectType(t: PickerType) {
   selectedType.value = t;
   step.value = 2;
+  if (t === "dukascopy") loadInstruments();
 }
 
 function back() {
   step.value = 1;
 }
 
-const { createSourceAndDownload } = useDukascopy();
 const toast = useToast();
 
 async function handleDukascopy() {
-  const symbols = dukaForm.symbols
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const symbols = dukaForm.symbols;
   if (!common.name || symbols.length === 0) return;
   downloading.value = true;
   dukaError.value = null;
@@ -108,16 +176,20 @@ async function handleDukascopy() {
       timeframe: dukaForm.timeframe,
       start: dukaForm.start,
       end: dukaForm.end,
-      offer_side: dukaForm.offer_side,
     });
     if (task.status === "error") {
       dukaError.value = task.error ?? "Download fehlgeschlagen";
       return;
     }
-    const total = (task.result ?? []).reduce((n, r) => n + r.rows, 0);
+    const results = task.result ?? [];
+    const total = results.reduce((n, r) => n + r.rows, 0);
+    const measured = results.filter((r) => typeof r.spread === "number" && r.spread! > 0);
+    const spreadNote = measured.length
+      ? ` Spread (p90): ${measured.map((r) => `${r.symbol} ${r.spread}`).join(", ")}.`
+      : "";
     toast.add({
       title: "Dukascopy-Daten geladen",
-      description: `${task.result?.length ?? 0} Symbol(e), ${total} Bars.`,
+      description: `${results.length} Symbol(e), ${total} Bars (Mid-Preis).${spreadNote} Pro-Asset anpassbar unter „Spreads".`,
       color: "success",
     });
     emit("done");
@@ -331,38 +403,64 @@ function submit() {
         <template v-else-if="selectedType === 'dukascopy'">
           <p class="text-xs text-gray-500">
             Lädt historische OHLC-Daten direkt von Dukascopy in diese Quelle —
-            fertig zum Backtesten, ohne ETL.
+            fertig zum Backtesten, ohne ETL. Bid + Ask werden geladen, die Kurse als
+            Mid-Preis gespeichert und der reale Spread gemessen (fürs Backtesting).
           </p>
-          <UFormField label="Symbole" class="w-full">
-            <UInput
+          <UFormField label="Assets" class="w-full">
+            <USelectMenu
               v-model="dukaForm.symbols"
-              placeholder="EURUSD, GBPUSD, USDJPY"
-              class="font-mono w-full"
+              :items="instrumentMenuItems"
+              value-key="value"
+              multiple
+              :loading="instrumentsLoading"
+              :disabled="instrumentsLoading || !!instrumentsError"
+              placeholder="Assets wählen oder suchen (z.B. EURUSD, BTCUSD)…"
+              class="w-full"
             />
             <template #hint>
-              <span class="text-xs text-gray-500">Komma- oder leerzeichengetrennt.</span>
+              <span class="text-xs text-gray-500">{{ dukaForm.symbols.length }} gewählt</span>
             </template>
           </UFormField>
+          <UAlert
+            v-if="instrumentsError"
+            color="error"
+            variant="subtle"
+            :title="instrumentsError"
+          />
+          <UFormField label="Timeframe" class="w-full">
+            <USelect v-model="dukaForm.timeframe" :items="[...DUKASCOPY_TIMEFRAMES]" class="w-full" />
+          </UFormField>
           <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Timeframe">
-              <USelect v-model="dukaForm.timeframe" :items="[...DUKASCOPY_TIMEFRAMES]" class="w-full" />
+            <UFormField label="Von">
+              <UInput
+                v-model="dukaForm.start"
+                type="date"
+                :min="minDate ?? undefined"
+                :max="dukaForm.end"
+                class="w-full"
+              />
             </UFormField>
-            <UFormField label="Seite">
-              <USelect
-                v-model="dukaForm.offer_side"
-                :items="[{ label: 'Bid', value: 'bid' }, { label: 'Ask', value: 'ask' }]"
+            <UFormField label="Bis">
+              <UInput
+                v-model="dukaForm.end"
+                type="date"
+                :min="dukaForm.start"
+                :max="todayIso"
                 class="w-full"
               />
             </UFormField>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Von">
-              <UInput v-model="dukaForm.start" type="date" class="w-full" />
-            </UFormField>
-            <UFormField label="Bis">
-              <UInput v-model="dukaForm.end" type="date" class="w-full" />
-            </UFormField>
-          </div>
+          <p v-if="minDate" class="text-xs text-gray-500">
+            Frühester verfügbarer Zeitpunkt für {{ dukaForm.timeframe }}:
+            <span class="font-mono text-gray-400">{{ minDate }}</span>
+            <template v-if="limitingInstrument && dukaForm.symbols.length > 1">
+              (begrenzt durch {{ limitingInstrument.symbol }})
+            </template>
+          </p>
+          <p class="text-xs text-gray-500">
+            Der reale Spread wird gemessen (p90, konservativ) und pro Asset gespeichert —
+            unter „Spreads" kannst du ihn jederzeit manuell überschreiben.
+          </p>
           <UAlert v-if="dukaError" color="error" variant="subtle" :title="dukaError" />
         </template>
       </div>
@@ -371,7 +469,7 @@ function submit() {
         <UButton variant="ghost" :disabled="downloading" @click="emit('cancel')">Abbrechen</UButton>
         <UButton
           :loading="downloading"
-          :disabled="!common.name || (selectedType === 'dukascopy' && !dukaForm.symbols.trim())"
+          :disabled="!common.name || (selectedType === 'dukascopy' && dukaForm.symbols.length === 0)"
           @click="submit"
         >
           {{ selectedType === 'dukascopy' ? 'Herunterladen' : 'Hinzufügen' }}

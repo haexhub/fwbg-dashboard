@@ -19,6 +19,7 @@ function sourcesOfType(type: SourceType) {
 
 // ── Add source slideover ────────────────────────────────────────────────────
 const slideoverOpen = ref(false);
+const spreadsOpen = ref(false);
 const saving = ref(false);
 const saveError = ref<string | null>(null);
 
@@ -125,9 +126,19 @@ async function handleETLDone() {
         <UIcon name="i-heroicons-circle-stack" class="text-xl text-gray-400" />
         <h2 class="text-xl font-semibold text-white">Datenquellen</h2>
       </div>
-      <UButton icon="i-heroicons-plus" @click="slideoverOpen = true">
-        Hinzufügen
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton
+          icon="i-heroicons-adjustments-horizontal"
+          variant="outline"
+          color="neutral"
+          @click="spreadsOpen = true"
+        >
+          Spreads
+        </UButton>
+        <UButton icon="i-heroicons-plus" @click="slideoverOpen = true">
+          Hinzufügen
+        </UButton>
+      </div>
     </div>
 
     <!-- Upload error -->
@@ -197,6 +208,15 @@ async function handleETLDone() {
         </div>
       </template>
     </USlideover>
+
+    <!-- Per-asset spreads Modal -->
+    <UModal v-model:open="spreadsOpen" title="Spreads (Backtesting)">
+      <template #body>
+        <div class="p-4">
+          <DatasourcesSpreadSettings />
+        </div>
+      </template>
+    </UModal>
 
     <!-- ETL Modal -->
     <UModal v-model:open="etlOpen" title="Datei verarbeiten">
