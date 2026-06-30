@@ -54,10 +54,19 @@ export interface DukascopyDownloadResult {
   warning?: string;
 }
 
+export interface DukascopyProgress {
+  percent: number;
+  symbol: string;
+  phase: "bid" | "ask" | "write";
+  symbol_index: number;
+  symbol_total: number;
+}
+
 export interface DukascopyTask {
   status: "running" | "done" | "error";
   result: DukascopyDownloadResult[] | null;
   error: string | null;
+  progress?: DukascopyProgress | null;
 }
 
 /** Per-asset spread used in backtesting: measured p90, manual override, effective. */
@@ -104,7 +113,12 @@ export function useDukascopy() {
     });
   }
 
-  async function createSourceAndDownload(p: DukascopyParams): Promise<DukascopyTask> {
+  type ProgressHandler = (task: DukascopyTask) => void;
+
+  async function createSourceAndDownload(
+    p: DukascopyParams,
+    onProgress?: ProgressHandler,
+  ): Promise<DukascopyTask> {
     // Reuse the source if it already exists (409), otherwise create it as CSV.
     try {
       await $fetch("/api/datasources", {
@@ -114,10 +128,14 @@ export function useDukascopy() {
     } catch (e) {
       if ((e as { statusCode?: number }).statusCode !== 409) throw e;
     }
-    return download(p.name, p);
+    return download(p.name, p, onProgress);
   }
 
-  async function download(name: string, p: DukascopyParams): Promise<DukascopyTask> {
+  async function download(
+    name: string,
+    p: DukascopyParams,
+    onProgress?: ProgressHandler,
+  ): Promise<DukascopyTask> {
     const { task_id } = await $fetch<{ task_id: string }>(
       `/api/datasources/${name}/dukascopy`,
       {
@@ -130,16 +148,21 @@ export function useDukascopy() {
         },
       },
     );
-    return poll(name, task_id);
+    return poll(name, task_id, onProgress);
   }
 
-  function poll(name: string, taskId: string): Promise<DukascopyTask> {
+  function poll(
+    name: string,
+    taskId: string,
+    onProgress?: ProgressHandler,
+  ): Promise<DukascopyTask> {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
         try {
           const s = await $fetch<DukascopyTask>(
             `/api/datasources/${name}/dukascopy/${taskId}`,
           );
+          onProgress?.(s);
           if (s.status !== "running") {
             clearInterval(interval);
             resolve(s);
@@ -148,7 +171,7 @@ export function useDukascopy() {
           clearInterval(interval);
           reject(e);
         }
-      }, 1500);
+      }, 1000);
     });
   }
 
