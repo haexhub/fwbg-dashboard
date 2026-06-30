@@ -1,7 +1,7 @@
 import type { AssetsResponse } from "~/types/datasource";
 
 export function useDataSourceAssets() {
-  const { data, status, refresh } = useFetch<AssetsResponse>("/api/datasources/assets", {
+  const { data, status, refresh } = useFetch<AssetsResponse>("/api/datasource-assets", {
     default: () => ({ assets: [], by_source: {} }),
   });
 
