@@ -78,3 +78,17 @@ export const SOURCE_TYPE_ICONS: Record<SourceType, string> = {
   websocket: "i-heroicons-signal",
   database: "i-heroicons-circle-stack",
 };
+
+export interface AssetInfo {
+  symbol: string;
+  timeframes: string[];
+  date_from: string | null;
+  date_to: string | null;
+  source: string;
+  source_type: SourceType;
+}
+
+export interface AssetsResponse {
+  assets: AssetInfo[];
+  by_source: Record<string, AssetInfo[]>;
+}

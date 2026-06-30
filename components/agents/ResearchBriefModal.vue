@@ -8,6 +8,7 @@ const emit = defineEmits<{
 }>();
 
 const { criteriaList } = useAgentCriteria();
+const { availableSymbols, status: assetsStatus } = useDataSourceAssets();
 const toast = useToast();
 
 const assetClass = ref<string | undefined>(undefined);
@@ -16,13 +17,12 @@ const freeTextBrief = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
-// Known asset classes populate the dropdown, but they're not a hard constraint —
-// the backend accepts any string and there may be none yet on a fresh install,
-// so the select stays creatable (users can type a new asset class).
+// Dropdown combines: known asset-class criteria (from fwbg-agents) + actual symbols (from fwbg datasources).
+// The select stays creatable so users can enter any string on a fresh install.
 const knownAssetClasses = computed(() => criteriaList.value?.asset_classes ?? []);
 const createdAssetClasses = ref<string[]>([]);
 const assetClassOptions = computed(() => [
-  ...new Set([...knownAssetClasses.value, ...createdAssetClasses.value]),
+  ...new Set([...knownAssetClasses.value, ...availableSymbols.value, ...createdAssetClasses.value]),
 ]);
 const canSubmit = computed(() => !!assetClass.value && assetClass.value.trim().length > 0);
 
@@ -89,12 +89,13 @@ async function submit() {
         </template>
 
         <div class="space-y-4">
-          <UFormField label="Asset Class" required>
+          <UFormField label="Asset / Asset Class" required>
             <USelectMenu
               v-model="assetClass"
               :items="assetClassOptions"
+              :loading="assetsStatus === 'pending'"
               create-item
-              placeholder="Asset-Klasse wählen oder eingeben (z.B. FX_MAJORS)"
+              placeholder="Symbol oder Klasse wählen (z.B. EURUSD, FX_MAJORS)"
               class="w-full"
               @create="onCreateAssetClass"
             />
