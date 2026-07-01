@@ -2,6 +2,7 @@ import type {
   AgentStrategySummary,
   AgentStrategyDetail,
   AgentStrategyState,
+  HypothesisContentResponse,
   PaperSummary,
   PaperPosition,
   PromoteLiveInput,
@@ -33,6 +34,11 @@ export function useAgentStrategies() {
 
   async function getStrategyDetail(id: number): Promise<AgentStrategyDetail> {
     return $fetch<AgentStrategyDetail>(`/api/agents/strategies/${id}`);
+  }
+
+  /** Full researcher hypothesis (sources + suggested_universe). 404 if none. */
+  async function getHypothesis(id: number): Promise<HypothesisContentResponse> {
+    return $fetch<HypothesisContentResponse>(`/api/agents/strategies/${id}/hypothesis`);
   }
 
   async function getPaperSummary(id: number): Promise<PaperSummary | null> {
@@ -87,6 +93,7 @@ export function useAgentStrategies() {
     stateFilter,
     assetClassFilter,
     getStrategyDetail,
+    getHypothesis,
     getPaperSummary,
     getPaperPositions,
     runBacktest,

@@ -139,13 +139,18 @@ const showResearchModal = ref(false);
             class="block py-3 hover:bg-gray-900/50 transition-colors -mx-4 px-4"
           >
             <div class="flex items-center justify-between">
-              <span class="text-sm text-white font-medium">{{ h.slug }}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-white font-medium">{{ h.slug }}</span>
+                <UBadge v-if="h.model_knowledge_only" color="warning" variant="subtle" size="xs">
+                  MK
+                </UBadge>
+              </div>
               <UBadge :color="agentStrategyStateColor(h.current_state)" variant="subtle" size="xs">
                 {{ h.current_state }}
               </UBadge>
             </div>
             <p class="text-xs text-gray-500 mt-1">
-              {{ h.asset_class }} · {{ h.strategy_family }}
+              {{ h.asset_class ?? "agnostic" }} · {{ h.strategy_family }}
             </p>
           </NuxtLink>
         </div>
