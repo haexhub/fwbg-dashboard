@@ -296,7 +296,7 @@ const showPromoteModal = ref(false);
             <p class="text-sm text-gray-300 whitespace-pre-line">{{ hypothesis.expected_edge_explanation }}</p>
           </div>
 
-          <div v-if="hypothesis.key_indicators.length">
+          <div v-if="hypothesis.key_indicators?.length">
             <h4 class="text-sm font-medium text-gray-400 mb-2">Key Indicators</h4>
             <div class="flex flex-wrap gap-1">
               <UBadge
@@ -312,7 +312,7 @@ const showPromoteModal = ref(false);
           </div>
 
           <!-- Suggested universe: the Researcher's asset recommendation. -->
-          <div v-if="hypothesis.suggested_universe.length">
+          <div v-if="hypothesis.suggested_universe?.length">
             <h4 class="text-sm font-medium text-gray-400 mb-2">Suggested Universe</h4>
             <div class="space-y-2">
               <div
@@ -335,9 +335,9 @@ const showPromoteModal = ref(false);
           <!-- Sources: first-class citations backing the edge. -->
           <div>
             <h4 class="text-sm font-medium text-gray-400 mb-2">
-              Sources ({{ hypothesis.sources.length }})
+              Sources ({{ hypothesis.sources?.length || 0 }})
             </h4>
-            <div v-if="!hypothesis.sources.length" class="text-sm text-gray-500">
+            <div v-if="!hypothesis.sources?.length" class="text-sm text-gray-500">
               Keine Quellen hinterlegt.
             </div>
             <div v-else class="space-y-3">
@@ -360,7 +360,7 @@ const showPromoteModal = ref(false);
                   <span v-else class="text-sm text-white font-medium">{{ src.title }}</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">{{ src.why_relevant }}</p>
-                <ul v-if="src.key_points.length" class="mt-2 space-y-1">
+                <ul v-if="src.key_points?.length" class="mt-2 space-y-1">
                   <li
                     v-for="(kp, j) in src.key_points"
                     :key="j"
