@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.15.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.14.0...v1.15.0) (2026-07-02)
+
+
+### Features
+
+* **agents:** constrained research form + hypothesis sources view ([7882b2c](https://github.com/haexhub/fwbg-dashboard/commit/7882b2ce770b0f1c97558005909110bd197405ab))
+* **agents:** constrained research form + hypothesis sources view ([07a4196](https://github.com/haexhub/fwbg-dashboard/commit/07a4196f23bd1a3827a301014d330295f72b131b))
+* datasource assets endpoint + ResearchBriefModal update ([5907f01](https://github.com/haexhub/fwbg-dashboard/commit/5907f0135f6202907370b2c30ee810610b92e1be))
+* datasource assets proxy + ResearchBriefModal mit echten Symbolen ([59bb18b](https://github.com/haexhub/fwbg-dashboard/commit/59bb18b2553cfba2fa36dade88c249680f71a173))
+
+
+### Bug Fixes
+
+* **agents:** guard hypothesis detail against missing arrays ([a60d55a](https://github.com/haexhub/fwbg-dashboard/commit/a60d55a7e5d618fcd45bc4d9ff6ccc73ef7d6c9e))
+* move assets endpoint out of datasources dir to avoid TS conflict ([5e080ba](https://github.com/haexhub/fwbg-dashboard/commit/5e080ba0b078bc0ca46c945cc737c43a5e3797bb))
+
 ## [1.14.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.13.0...v1.14.0) (2026-06-30)
 
 
