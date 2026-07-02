@@ -133,7 +133,7 @@ export interface VerificationRun {
   created_at: string | null;
 }
 
-export type AgentRunStatus = "pending" | "running" | "done" | "failed";
+export type AgentRunStatus = "pending" | "running" | "done" | "failed" | "cancelled";
 
 export type AgentName =
   | "runner"
@@ -303,6 +303,8 @@ export function agentRunStatusColor(status: AgentRunStatus | string): BadgeColor
       return "success";
     case "failed":
       return "error";
+    case "cancelled":
+      return "neutral";
     case "running":
     case "pending":
       return "warning";
