@@ -7,7 +7,10 @@ const emit = defineEmits<{
   created: [];
 }>();
 
-const { criteriaList } = useAgentCriteria();
+// Strategy-first: research is asset-agnostic by default. The optional asset
+// class is constrained to fwbg's registry (single source of truth) — no
+// free-text, so it can never drift from what the backend accepts at intake.
+const { classes, status: classesStatus } = useAssetClasses();
 const toast = useToast();
 
 const assetClass = ref<string | undefined>(undefined);
@@ -16,28 +19,15 @@ const freeTextBrief = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
-// Known asset classes populate the dropdown, but they're not a hard constraint —
-// the backend accepts any string and there may be none yet on a fresh install,
-// so the select stays creatable (users can type a new asset class).
-const knownAssetClasses = computed(() => criteriaList.value?.asset_classes ?? []);
-const createdAssetClasses = ref<string[]>([]);
-const assetClassOptions = computed(() => [
-  ...new Set([...knownAssetClasses.value, ...createdAssetClasses.value]),
-]);
-const canSubmit = computed(() => !!assetClass.value && assetClass.value.trim().length > 0);
-
-function onCreateAssetClass(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return;
-  if (!assetClassOptions.value.includes(trimmed)) createdAssetClasses.value.push(trimmed);
-  assetClass.value = trimmed;
-}
+// Always submittable: no asset class = asset-agnostic research.
+const scopeLabel = computed(() =>
+  assetClass.value ? assetClass.value : "asset-agnostisch",
+);
 
 function resetForm() {
   assetClass.value = undefined;
   strategyFamilyHint.value = "";
   freeTextBrief.value = "";
-  createdAssetClasses.value = [];
   errorMessage.value = "";
 }
 
@@ -47,12 +37,11 @@ function close() {
 }
 
 async function submit() {
-  if (!canSubmit.value || !assetClass.value) return;
   submitting.value = true;
   errorMessage.value = "";
   try {
     const body: ResearchBriefInput = {
-      asset_class: assetClass.value.trim(),
+      asset_class: assetClass.value?.trim() || undefined,
       strategy_family_hint: strategyFamilyHint.value.trim() || undefined,
       free_text_brief: freeTextBrief.value.trim() || undefined,
     };
@@ -89,15 +78,30 @@ async function submit() {
         </template>
 
         <div class="space-y-4">
-          <UFormField label="Asset Class" required>
-            <USelectMenu
-              v-model="assetClass"
-              :items="assetClassOptions"
-              create-item
-              placeholder="Asset-Klasse wählen oder eingeben (z.B. FX_MAJORS)"
-              class="w-full"
-              @create="onCreateAssetClass"
-            />
+          <UFormField label="Asset Class (optional)">
+            <div class="flex items-center gap-2">
+              <USelectMenu
+                v-model="assetClass"
+                :items="classes"
+                :loading="classesStatus === 'pending'"
+                placeholder="Asset-agnostisch (empfohlen)"
+                class="w-full"
+              />
+              <UButton
+                v-if="assetClass"
+                icon="i-heroicons-x-mark"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                aria-label="Auswahl löschen"
+                @click="assetClass = undefined"
+              />
+            </div>
+            <template #help>
+              Leer lassen für asset-agnostische Recherche — der Researcher findet
+              Edges frei und empfiehlt danach ein Universe. Nur setzen, um bewusst
+              auf eine Klasse einzuschränken.
+            </template>
           </UFormField>
 
           <UFormField label="Strategy Family (optional)">
@@ -117,11 +121,16 @@ async function submit() {
         </div>
 
         <template #footer>
-          <div class="flex justify-end gap-2">
-            <UButton variant="ghost" @click="close">Abbrechen</UButton>
-            <UButton color="primary" :loading="submitting" :disabled="!canSubmit" @click="submit">
-              Research starten
-            </UButton>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs text-gray-500">
+              Scope: <span class="text-gray-300 font-medium">{{ scopeLabel }}</span>
+            </span>
+            <div class="flex gap-2">
+              <UButton variant="ghost" @click="close">Abbrechen</UButton>
+              <UButton color="primary" :loading="submitting" @click="submit">
+                Research starten
+              </UButton>
+            </div>
           </div>
         </template>
       </UCard>

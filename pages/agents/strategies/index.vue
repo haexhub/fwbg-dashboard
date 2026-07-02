@@ -70,6 +70,7 @@ function sortableHeader(label: string) {
 const columns: TableColumn<AgentStrategySummary>[] = [
   { accessorKey: "slug", header: sortableHeader("Slug") },
   { accessorKey: "asset_class", header: sortableHeader("Asset Class") },
+  { id: "universe", header: "Universe", cell: () => "" },
   { accessorKey: "strategy_family", header: sortableHeader("Family") },
   { accessorKey: "current_state", header: sortableHeader("State") },
   { id: "tags", header: "Tags", cell: () => "" },
@@ -154,12 +155,44 @@ const columns: TableColumn<AgentStrategySummary>[] = [
       >
         <!-- Slug -->
         <template #slug-cell="{ row }">
-          <NuxtLink
-            :to="`/agents/strategies/${row.original.id}`"
-            class="text-white font-mono text-sm hover:text-blue-400 transition-colors"
-          >
-            {{ row.original.slug }}
-          </NuxtLink>
+          <div class="flex items-center gap-2">
+            <NuxtLink
+              :to="`/agents/strategies/${row.original.id}`"
+              class="text-white font-mono text-sm hover:text-blue-400 transition-colors"
+            >
+              {{ row.original.slug }}
+            </NuxtLink>
+            <UTooltip
+              v-if="row.original.model_knowledge_only"
+              text="Ohne Web-Suche recherchiert — Quellen aus Modellwissen"
+            >
+              <UBadge color="warning" variant="subtle" size="xs">MK</UBadge>
+            </UTooltip>
+          </div>
+        </template>
+
+        <!-- Asset Class (null = asset-agnostic) -->
+        <template #asset_class-cell="{ row }">
+          <span v-if="row.original.asset_class" class="text-sm text-white">
+            {{ row.original.asset_class }}
+          </span>
+          <span v-else class="text-sm text-gray-500 italic">agnostic</span>
+        </template>
+
+        <!-- Suggested universe (Researcher's asset recommendation) -->
+        <template #universe-cell="{ row }">
+          <div v-if="row.original.suggested_universe?.length" class="flex flex-wrap gap-1">
+            <UBadge
+              v-for="u in row.original.suggested_universe"
+              :key="u.scope + u.value"
+              :color="u.scope === 'symbol' ? 'primary' : 'info'"
+              variant="subtle"
+              size="xs"
+            >
+              {{ u.value }}
+            </UBadge>
+          </div>
+          <span v-else class="text-xs text-gray-600">—</span>
         </template>
 
         <!-- State -->

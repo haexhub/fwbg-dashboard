@@ -12,17 +12,33 @@ export type AgentStrategyState =
   | "live_trading"
   | "abandoned";
 
+/**
+ * One entry in the Researcher's asset recommendation. `scope="asset_class"`
+ * covers the whole class; `scope="symbol"` pins to one instrument.
+ * (Mirrors fwbg-agents' SuggestedUniverse pydantic model.)
+ */
+export interface SuggestedUniverseEntry {
+  scope: "symbol" | "asset_class";
+  value: string;
+  timeframe: string | null;
+  rationale: string;
+}
+
 export interface AgentStrategySummary {
   id: number;
   slug: string;
   current_state: AgentStrategyState;
   iteration_count: number;
   parent_strategy_id: number | null;
-  asset_class: string;
+  // Null = asset-agnostic (strategy-first research finds edges without pinning
+  // to a class up front). Rendered as "agnostic" in the UI.
+  asset_class: string | null;
   strategy_family: string;
   hypothesis_path: string | null;
   spec_path: string | null;
   post_mortem_path: string | null;
+  suggested_universe: SuggestedUniverseEntry[] | null;
+  model_knowledge_only: boolean;
   tags: string[];
   created_at: string | null;
   updated_at: string | null;
@@ -140,7 +156,10 @@ export interface AgentRun {
 }
 
 export interface ResearchBriefInput {
-  asset_class: string;
+  // Optional: omitted = asset-agnostic research (the strategy-first default).
+  // When set, must be a value from fwbg's asset registry (/api/assets/classes),
+  // which the backend re-validates at intake.
+  asset_class?: string;
   strategy_family_hint?: string;
   free_text_brief?: string;
 }
@@ -155,13 +174,50 @@ export interface Hypothesis {
   id: number;
   slug: string;
   current_state: AgentStrategyState;
-  asset_class: string;
+  asset_class: string | null;
   strategy_family: string;
   iteration_count: number;
   parent_strategy_id: number | null;
   hypothesis_path: string | null;
   spec_path: string | null;
+  suggested_universe: SuggestedUniverseEntry[] | null;
+  model_knowledge_only: boolean;
   created_at: string | null;
+}
+
+/** fwbg asset registry — controlled vocabulary + known symbols per class. */
+export interface AssetClassesResponse {
+  classes: string[];
+  by_class: Record<string, string[]>;
+}
+
+/** A first-class citation backing a hypothesis (fwbg-agents' Source model). */
+export interface HypothesisSource {
+  url: string;
+  title: string;
+  why_relevant: string;
+  key_points: string[];
+}
+
+/** The researcher hypothesis JSON stored on disk (read back for the detail view). */
+export interface HypothesisContent {
+  title: string;
+  asset_class: string | null;
+  strategy_family: string;
+  hypothesis: string;
+  expected_edge_explanation: string;
+  key_indicators: string[];
+  tags: string[];
+  sources: HypothesisSource[];
+  suggested_universe: SuggestedUniverseEntry[];
+  model_knowledge_only: boolean;
+  differentiates_from: string[];
+}
+
+export interface HypothesisContentResponse {
+  strategy_id: number;
+  slug: string;
+  hypothesis: HypothesisContent;
 }
 
 export interface CriteriaSection {

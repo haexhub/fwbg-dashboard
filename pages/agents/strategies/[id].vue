@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { agentStrategyStateColor } from "~/types/agents";
-import type { AgentStrategyDetail, PaperSummary, PaperPosition } from "~/types/agents";
+import type {
+  AgentStrategyDetail,
+  HypothesisContent,
+  PaperSummary,
+  PaperPosition,
+} from "~/types/agents";
 
 definePageMeta({ ssr: false });
 
@@ -10,6 +15,7 @@ const strategyId = computed(() => Number(route.params.id));
 
 const {
   getStrategyDetail,
+  getHypothesis,
   getPaperSummary,
   getPaperPositions,
   runBacktest,
@@ -23,6 +29,13 @@ const loading = ref(true);
 const notFound = ref(false);
 const paperSummary = ref<PaperSummary | null>(null);
 const paperPositions = ref<PaperPosition[]>([]);
+
+// Hypothesis content is loaded lazily the first time its tab is opened. It
+// lives on disk (sources + suggested_universe) rather than in the DB row.
+const hypothesis = ref<HypothesisContent | null>(null);
+const hypothesisLoading = ref(false);
+const hypothesisError = ref("");
+const hypothesisLoaded = ref(false);
 
 const strategy = computed(() => detail.value?.strategy ?? null);
 const showPaperTab = computed(
@@ -55,9 +68,29 @@ async function loadDetail() {
 
 onMounted(loadDetail);
 
+async function loadHypothesis() {
+  if (hypothesisLoaded.value || hypothesisLoading.value) return;
+  hypothesisLoading.value = true;
+  hypothesisError.value = "";
+  try {
+    const res = await getHypothesis(strategyId.value);
+    hypothesis.value = res.hypothesis;
+    hypothesisLoaded.value = true;
+  } catch (e) {
+    const statusCode = (e as { statusCode?: number }).statusCode;
+    hypothesisError.value =
+      statusCode === 404
+        ? "Keine Hypothese für diese Strategie hinterlegt (manuell erstellt oder Datei entfernt)."
+        : extractErrorMessage(e);
+  } finally {
+    hypothesisLoading.value = false;
+  }
+}
+
 const tabItems = computed(() => {
   const items = [
     { label: "Overview", value: "overview" },
+    { label: "Hypothesis", value: "hypothesis" },
     { label: "Strategy JSON", value: "json" },
     { label: "Transitions", value: "transitions" },
   ];
@@ -65,6 +98,10 @@ const tabItems = computed(() => {
   return items;
 });
 const selectedTab = ref("overview");
+
+watch(selectedTab, (tab) => {
+  if (tab === "hypothesis") loadHypothesis();
+});
 
 function formatDate(ts?: string | null): string {
   if (!ts) return "-";
@@ -192,7 +229,8 @@ const showPromoteModal = ref(false);
           </div>
           <div>
             <span class="text-gray-500">Asset Class</span>
-            <p class="text-white">{{ strategy.asset_class }}</p>
+            <p v-if="strategy.asset_class" class="text-white">{{ strategy.asset_class }}</p>
+            <p v-else class="text-gray-400 italic">agnostic</p>
           </div>
           <div>
             <span class="text-gray-500">Family</span>
@@ -226,6 +264,115 @@ const showPromoteModal = ref(false);
           <p v-if="strategy.hypothesis_path">Hypothesis: <span class="font-mono">{{ strategy.hypothesis_path }}</span></p>
           <p v-if="strategy.spec_path">Spec: <span class="font-mono">{{ strategy.spec_path }}</span></p>
           <p v-if="strategy.post_mortem_path">Post-Mortem: <span class="font-mono">{{ strategy.post_mortem_path }}</span></p>
+        </div>
+      </UCard>
+
+      <!-- Hypothesis: the researcher's edge, sources (with key_points) and the
+           suggested asset universe — read on-demand from the hypothesis.json. -->
+      <UCard v-else-if="selectedTab === 'hypothesis'">
+        <div v-if="hypothesisLoading" class="py-8 text-center text-gray-400">
+          Lade Hypothese...
+        </div>
+        <div v-else-if="hypothesisError" class="py-8 text-center text-gray-400">
+          {{ hypothesisError }}
+        </div>
+        <div v-else-if="hypothesis" class="space-y-6">
+          <UAlert
+            v-if="hypothesis.model_knowledge_only"
+            color="warning"
+            variant="subtle"
+            icon="i-heroicons-cpu-chip"
+            title="Model-Knowledge only"
+            description="Diese Hypothese entstand ohne Web-Suche — alle Quellen stammen aus dem Modellwissen und sind nicht extern verifiziert."
+          />
+
+          <div>
+            <h3 class="text-base font-semibold text-white">{{ hypothesis.title }}</h3>
+            <p class="text-sm text-gray-300 mt-2 whitespace-pre-line">{{ hypothesis.hypothesis }}</p>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-400 mb-1">Expected Edge</h4>
+            <p class="text-sm text-gray-300 whitespace-pre-line">{{ hypothesis.expected_edge_explanation }}</p>
+          </div>
+
+          <div v-if="hypothesis.key_indicators?.length">
+            <h4 class="text-sm font-medium text-gray-400 mb-2">Key Indicators</h4>
+            <div class="flex flex-wrap gap-1">
+              <UBadge
+                v-for="ind in hypothesis.key_indicators"
+                :key="ind"
+                color="neutral"
+                variant="subtle"
+                size="xs"
+              >
+                {{ ind }}
+              </UBadge>
+            </div>
+          </div>
+
+          <!-- Suggested universe: the Researcher's asset recommendation. -->
+          <div v-if="hypothesis.suggested_universe?.length">
+            <h4 class="text-sm font-medium text-gray-400 mb-2">Suggested Universe</h4>
+            <div class="space-y-2">
+              <div
+                v-for="u in hypothesis.suggested_universe"
+                :key="u.scope + u.value"
+                class="rounded border border-gray-800 bg-gray-950/50 p-3"
+              >
+                <div class="flex items-center gap-2">
+                  <UBadge :color="u.scope === 'symbol' ? 'primary' : 'info'" variant="subtle" size="xs">
+                    {{ u.scope }}
+                  </UBadge>
+                  <span class="text-sm text-white font-mono">{{ u.value }}</span>
+                  <span v-if="u.timeframe" class="text-xs text-gray-500">· {{ u.timeframe }}</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">{{ u.rationale }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sources: first-class citations backing the edge. -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-400 mb-2">
+              Sources ({{ hypothesis.sources?.length || 0 }})
+            </h4>
+            <div v-if="!hypothesis.sources?.length" class="text-sm text-gray-500">
+              Keine Quellen hinterlegt.
+            </div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="(src, i) in hypothesis.sources"
+                :key="i"
+                class="rounded border border-gray-800 bg-gray-950/50 p-3"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <a
+                    v-if="src.url && src.url.startsWith('http')"
+                    :href="src.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-sm text-blue-400 hover:underline font-medium"
+                  >
+                    {{ src.title }}
+                    <UIcon name="i-heroicons-arrow-top-right-on-square" class="w-3 h-3 inline" />
+                  </a>
+                  <span v-else class="text-sm text-white font-medium">{{ src.title }}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">{{ src.why_relevant }}</p>
+                <ul v-if="src.key_points?.length" class="mt-2 space-y-1">
+                  <li
+                    v-for="(kp, j) in src.key_points"
+                    :key="j"
+                    class="text-xs text-gray-400 flex gap-2"
+                  >
+                    <span class="text-gray-600">•</span>
+                    <span>{{ kp }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </UCard>
 
