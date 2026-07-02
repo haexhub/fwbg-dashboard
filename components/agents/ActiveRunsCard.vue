@@ -23,7 +23,7 @@ async function fetchRuns() {
         query: { status: "pending,running", limit: 20 },
       }),
       $fetch<{ runs: AgentRun[] }>("/api/agents/runs", {
-        query: { status: "failed", limit: 5 },
+        query: { status: "failed,cancelled", limit: 5 },
       }),
     ]);
     activeRuns.value = active.runs;
@@ -229,7 +229,7 @@ const allEmpty = computed(
       <!-- Recent failed research runs -->
       <template v-if="recentFailed.length">
         <p class="text-xs text-gray-600 font-medium uppercase tracking-wide pt-1">
-          Fehlgeschlagen
+          Fehlgeschlagen / Abgebrochen
         </p>
         <div
           v-for="run in recentFailed"
@@ -245,7 +245,9 @@ const allEmpty = computed(
               <span class="text-xs text-gray-500">#{{ run.id }}</span>
             </div>
             <div class="flex items-center gap-2">
-              <UBadge color="error" variant="subtle" size="xs">failed</UBadge>
+              <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs">
+                {{ run.status }}
+              </UBadge>
               <UButton
                 size="xs"
                 color="primary"
