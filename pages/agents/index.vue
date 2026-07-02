@@ -120,6 +120,9 @@ const showResearchModal = ref(false);
       </UCard>
     </div>
 
+    <!-- Active Runs -->
+    <AgentsActiveRunsCard />
+
     <!-- Live Event Feed + Recent Hypotheses -->
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <AgentsEventFeed />
