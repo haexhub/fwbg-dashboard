@@ -140,7 +140,9 @@ export type AgentName =
   | "analyst"
   | "paper_analyst"
   | "promote_live"
-  | "research_flow";
+  | "research_flow"
+  | "researcher"
+  | "reiterate";
 
 export interface AgentRun {
   id: number;
