@@ -130,14 +130,14 @@ const AGENT_LABELS: Record<string, string> = {
         </p>
 
         <!-- Research progress (for researcher runs) -->
-        <template v-if="run.agent_name === 'researcher' && researchProgress[run.id]">
+        <template v-if="(run.agent_name as string) === 'researcher'">
           <div class="space-y-2 pt-1">
             <!-- Active queries -->
-            <div v-if="researchProgress[run.id].queries.length" class="space-y-1">
+            <div v-if="researchProgress[run.id]?.queries.length" class="space-y-1">
               <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Suchen</p>
               <div class="space-y-1">
                 <div
-                  v-for="q in researchProgress[run.id].queries"
+                  v-for="q in researchProgress[run.id]?.queries"
                   :key="q"
                   class="flex items-center gap-2 text-xs"
                 >
@@ -147,13 +147,13 @@ const AGENT_LABELS: Record<string, string> = {
             </div>
 
             <!-- Found URLs -->
-            <div v-if="researchProgress[run.id].urls.length" class="space-y-1">
+            <div v-if="researchProgress[run.id]?.urls.length" class="space-y-1">
               <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                Quellen ({{ researchProgress[run.id].urls.length }})
+                Quellen ({{ researchProgress[run.id]?.urls.length }})
               </p>
               <div class="space-y-1 max-h-40 overflow-y-auto">
                 <a
-                  v-for="u in researchProgress[run.id].urls"
+                  v-for="u in researchProgress[run.id]?.urls"
                   :key="u.url"
                   :href="u.url"
                   target="_blank"
@@ -167,7 +167,7 @@ const AGENT_LABELS: Record<string, string> = {
             </div>
 
             <p
-              v-if="!researchProgress[run.id].queries.length"
+              v-if="!researchProgress[run.id]?.queries.length"
               class="text-xs text-gray-600 italic"
             >
               Warte auf erste Suche...
