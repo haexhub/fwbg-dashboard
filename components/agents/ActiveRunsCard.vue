@@ -13,14 +13,23 @@ interface ResearchProgress {
 
 const POLL_INTERVAL_MS = 5_000;
 
-const runs = ref<AgentRun[]>([]);
+const activeRuns = ref<AgentRun[]>([]);
+const recentFailed = ref<AgentRun[]>([]);
 
 async function fetchRuns() {
   try {
-    const data = await $fetch<{ runs: AgentRun[] }>("/api/agents/runs", {
-      query: { status: "pending,running", limit: 20 },
-    });
-    runs.value = data.runs;
+    const [active, failed] = await Promise.all([
+      $fetch<{ runs: AgentRun[] }>("/api/agents/runs", {
+        query: { status: "pending,running", limit: 20 },
+      }),
+      $fetch<{ runs: AgentRun[] }>("/api/agents/runs", {
+        query: { status: "failed", limit: 5 },
+      }),
+    ]);
+    activeRuns.value = active.runs;
+    recentFailed.value = failed.runs.filter(
+      (r) => r.agent_name === "research_flow"
+    );
   } catch {
     // silently ignore — runs card is non-critical
   }
@@ -84,6 +93,36 @@ const AGENT_LABELS: Record<string, string> = {
   promote_live: "Promote Live",
   reiterate: "Reiterate",
 };
+
+const actionLoading = ref<Record<number, boolean>>({});
+
+async function cancelRun(run: AgentRun) {
+  actionLoading.value[run.id] = true;
+  try {
+    await $fetch(`/api/agents/runs/${run.id}/cancel`, { method: "POST" });
+    await fetchRuns();
+  } catch (e) {
+    console.error("cancel failed", e);
+  } finally {
+    actionLoading.value[run.id] = false;
+  }
+}
+
+async function retryRun(run: AgentRun) {
+  actionLoading.value[run.id] = true;
+  try {
+    await $fetch(`/api/agents/runs/${run.id}/retry`, { method: "POST" });
+    await fetchRuns();
+  } catch (e) {
+    console.error("retry failed", e);
+  } finally {
+    actionLoading.value[run.id] = false;
+  }
+}
+
+const allEmpty = computed(
+  () => activeRuns.value.length === 0 && recentFailed.value.length === 0
+);
 </script>
 
 <template>
@@ -97,13 +136,14 @@ const AGENT_LABELS: Record<string, string> = {
       </div>
     </template>
 
-    <div v-if="!runs.length" class="py-8 text-center text-gray-500 text-sm">
+    <div v-if="allEmpty" class="py-8 text-center text-gray-500 text-sm">
       Keine laufenden Agents.
     </div>
 
     <div v-else class="space-y-4">
+      <!-- Active runs (pending / running) -->
       <div
-        v-for="run in runs"
+        v-for="run in activeRuns"
         :key="run.id"
         class="rounded-lg border border-gray-800 p-3 space-y-2"
       >
@@ -120,9 +160,21 @@ const AGENT_LABELS: Record<string, string> = {
             </span>
             <span class="text-xs text-gray-500">#{{ run.id }}</span>
           </div>
-          <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs">
-            {{ run.status }}
-          </UBadge>
+          <div class="flex items-center gap-2">
+            <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs">
+              {{ run.status }}
+            </UBadge>
+            <UButton
+              v-if="run.agent_name === 'research_flow'"
+              size="xs"
+              color="error"
+              variant="ghost"
+              :loading="actionLoading[run.id]"
+              @click="cancelRun(run)"
+            >
+              Abbrechen
+            </UButton>
+          </div>
         </div>
 
         <p class="text-xs text-gray-500">
@@ -132,7 +184,6 @@ const AGENT_LABELS: Record<string, string> = {
         <!-- Research progress (for researcher runs) -->
         <template v-if="(run.agent_name as string) === 'researcher'">
           <div class="space-y-2 pt-1">
-            <!-- Active queries -->
             <div v-if="researchProgress[run.id]?.queries.length" class="space-y-1">
               <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Suchen</p>
               <div class="space-y-1">
@@ -146,7 +197,6 @@ const AGENT_LABELS: Record<string, string> = {
               </div>
             </div>
 
-            <!-- Found URLs -->
             <div v-if="researchProgress[run.id]?.urls.length" class="space-y-1">
               <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">
                 Quellen ({{ researchProgress[run.id]?.urls.length }})
@@ -175,6 +225,43 @@ const AGENT_LABELS: Record<string, string> = {
           </div>
         </template>
       </div>
+
+      <!-- Recent failed research runs -->
+      <template v-if="recentFailed.length">
+        <p class="text-xs text-gray-600 font-medium uppercase tracking-wide pt-1">
+          Fehlgeschlagen
+        </p>
+        <div
+          v-for="run in recentFailed"
+          :key="`failed-${run.id}`"
+          class="rounded-lg border border-gray-800 p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-red-500" />
+              <span class="text-sm font-medium text-white">
+                {{ AGENT_LABELS[run.agent_name] ?? run.agent_name }}
+              </span>
+              <span class="text-xs text-gray-500">#{{ run.id }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <UBadge color="error" variant="subtle" size="xs">failed</UBadge>
+              <UButton
+                size="xs"
+                color="primary"
+                variant="ghost"
+                :loading="actionLoading[run.id]"
+                @click="retryRun(run)"
+              >
+                Wiederholen
+              </UButton>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500">
+            {{ relativeTime(run.ended_at) }} · {{ run.error ?? "Unbekannter Fehler" }}
+          </p>
+        </div>
+      </template>
     </div>
   </UCard>
 </template>
