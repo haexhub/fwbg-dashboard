@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.16.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.15.0...v1.16.0) (2026-07-02)
+
+
+### Features
+
+* **agents:** active runs card + live research progress ([1816a38](https://github.com/haexhub/fwbg-dashboard/commit/1816a3888c10174183f814aabfdce43fd6a86f37))
+* **agents:** active runs card + live research progress ([1271cfd](https://github.com/haexhub/fwbg-dashboard/commit/1271cfdf4429452c9e442ae7a684aff304b2d3c0))
+
+
+### Bug Fixes
+
+* **types:** add researcher+reiterate to AgentName, fix typecheck errors ([8124383](https://github.com/haexhub/fwbg-dashboard/commit/81243837223d5fe83d77723a5da8d6b6ffdd3136))
+
 ## [1.15.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.14.0...v1.15.0) (2026-07-02)
 
 
