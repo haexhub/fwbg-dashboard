@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.16.0...v1.17.0) (2026-07-02)
+
+
+### Features
+
+* **agents:** cancel + retry buttons for research_flow runs ([e86c6e5](https://github.com/haexhub/fwbg-dashboard/commit/e86c6e545e688cdd2432dd2bd81817fbdaa63e56))
+* **agents:** cancel + retry buttons for stuck/failed research_flow runs ([81a33e4](https://github.com/haexhub/fwbg-dashboard/commit/81a33e4bd6f68a7d857174998f912656e4363a8f))
+
 ## [1.16.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.15.0...v1.16.0) (2026-07-02)
 
 
