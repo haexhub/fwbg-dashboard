@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.18.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.17.0...v1.18.0) (2026-07-03)
+
+
+### Features
+
+* **agents:** link agent strategies to their published fwbg strategy ([6365265](https://github.com/haexhub/fwbg-dashboard/commit/63652652d5fc55bdd967405597d92b57c899343f))
+* **agents:** link agent strategies to their published fwbg strategy ([a5c2edb](https://github.com/haexhub/fwbg-dashboard/commit/a5c2edb2a51e749bb443abf4432d6f50863bbb0b))
+* **agents:** model badge + context on active runs, better config error state ([b2dfdd1](https://github.com/haexhub/fwbg-dashboard/commit/b2dfdd130d06604570e06f21f481528101bdb2aa))
+* **agents:** show model + context on active runs, improve config error state ([bc2b8b8](https://github.com/haexhub/fwbg-dashboard/commit/bc2b8b82bcc723db72408c14c7c3925e9fa8dcb1))
+* **agents:** show researcher search queries and result URLs live ([18322f2](https://github.com/haexhub/fwbg-dashboard/commit/18322f29a69b460f9ec6c6b4fbf0ee4b81a93a7c))
+* **agents:** show researcher search queries and result URLs live ([265e8e8](https://github.com/haexhub/fwbg-dashboard/commit/265e8e809c6e4b021bd75e768fd827f72c79cea5))
+
+
+### Bug Fixes
+
+* **agents:** remove duplicate progressFor function introduced by rebase ([c552b7f](https://github.com/haexhub/fwbg-dashboard/commit/c552b7f6abfa6abb7d01f1ee33d1a6da61caa093))
+* **agents:** show cancelled runs in retry list ([affff19](https://github.com/haexhub/fwbg-dashboard/commit/affff19466f2e6744b9264924f848859abe3ec4b))
+* **agents:** show cancelled runs in retry list ([1c3489b](https://github.com/haexhub/fwbg-dashboard/commit/1c3489b48b411947bc9985144b8e0f023659b1c4))
+
 ## [1.17.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.16.0...v1.17.0) (2026-07-02)
 
 
