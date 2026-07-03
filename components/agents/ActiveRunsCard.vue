@@ -114,6 +114,12 @@ onMounted(() => {
   });
 });
 
+function progressFor(run: AgentRun): ResearchProgress | undefined {
+  return (run.agent_name as string) === "researcher"
+    ? researchProgress.value[run.id]
+    : researchFlowProgress.value;
+}
+
 function relativeTime(ts: string | null): string {
   if (!ts) return "—";
   const diffSec = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
