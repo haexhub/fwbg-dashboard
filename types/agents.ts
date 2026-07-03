@@ -39,6 +39,9 @@ export interface AgentStrategySummary {
   post_mortem_path: string | null;
   suggested_universe: SuggestedUniverseEntry[] | null;
   model_knowledge_only: boolean;
+  // fwbg filename once the strategy was published into fwbg (research flow
+  // or runner) — links to /strategy/<name>. Null until first publish.
+  fwbg_strategy_name: string | null;
   tags: string[];
   created_at: string | null;
   updated_at: string | null;
