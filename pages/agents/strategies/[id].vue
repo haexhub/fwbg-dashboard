@@ -178,6 +178,15 @@ const showPromoteModal = ref(false);
         </div>
         <div class="flex items-center gap-2">
           <UButton
+            v-if="strategy.fwbg_strategy_name"
+            :to="`/strategy/${strategy.fwbg_strategy_name}`"
+            icon="i-heroicons-pencil-square"
+            variant="outline"
+            color="neutral"
+          >
+            In fwbg öffnen
+          </UButton>
+          <UButton
             v-if="strategy.current_state === 'proposed'"
             icon="i-heroicons-play"
             :loading="runningAction === 'run'"
