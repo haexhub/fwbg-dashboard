@@ -98,8 +98,24 @@ async function resetToDefault(a: AgentConfig) {
       description="Wähle pro Agent ein Claude-Modell und passe optional den System-Prompt (Persona) an. Platzhalter wie {{ asset_class }} müssen erhalten bleiben. Änderungen greifen beim nächsten Agent-Run."
     />
 
-    <div v-if="error" class="py-12 text-center text-gray-400">
-      fwbg-agents nicht erreichbar — Agenten-Konfiguration kann nicht geladen werden.
+    <div v-if="error" class="py-12 flex flex-col items-center gap-4 text-center">
+      <UIcon name="i-heroicons-signal-slash" class="w-8 h-8 text-gray-600" />
+      <div class="space-y-1">
+        <p class="text-gray-300 font-medium">fwbg-agents nicht erreichbar</p>
+        <p class="text-gray-500 text-sm">
+          Der Agents-Dienst läuft nicht oder ist unter einer anderen Adresse erreichbar.
+        </p>
+      </div>
+      <UButton
+        icon="i-heroicons-arrow-path"
+        variant="outline"
+        color="neutral"
+        size="sm"
+        :loading="status === 'pending'"
+        @click="refresh()"
+      >
+        Neu laden
+      </UButton>
     </div>
     <div v-else-if="status === 'pending'" class="py-12 text-center text-gray-400">
       Lade Konfiguration…
