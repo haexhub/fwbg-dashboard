@@ -183,12 +183,6 @@ async function retryRun(run: AgentRun) {
 const allEmpty = computed(
   () => activeRuns.value.length === 0 && recentFailed.value.length === 0
 );
-
-function progressFor(run: AgentRun): ResearchProgress | undefined {
-  return (run.agent_name as string) === "researcher"
-    ? researchProgress.value[run.id]
-    : researchFlowProgress.value;
-}
 </script>
 
 <template>
