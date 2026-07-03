@@ -35,6 +35,37 @@ const paperTradingCount = computed(() => strategyCounts.value.paper_trading ?? 0
 const liveTradingCount = computed(() => strategyCounts.value.live_trading ?? 0);
 
 const showResearchModal = ref(false);
+
+// ── Runner auto mode: waiting proposed strategies are backtested
+// automatically (single-flight) while this is on. ──
+const toast = useToast();
+const { data: runnerAuto, refresh: refreshRunnerAuto } = useFetch<{ enabled: boolean }>(
+  "/api/agents/runner-auto",
+);
+const runnerAutoBusy = ref(false);
+
+async function setRunnerAuto(enabled: boolean) {
+  runnerAutoBusy.value = true;
+  try {
+    await $fetch("/api/agents/runner-auto", { method: "PUT", body: { enabled } });
+    await refreshRunnerAuto();
+    toast.add({
+      title: enabled ? "Auto-Backtesting aktiviert" : "Auto-Backtesting deaktiviert",
+      description: enabled
+        ? "Wartende Strategien werden automatisch nacheinander gebacktestet."
+        : "Backtests starten nur noch manuell.",
+      color: enabled ? "success" : "neutral",
+    });
+  } catch {
+    toast.add({
+      title: "Fehler",
+      description: "Konnte Auto-Modus nicht umschalten.",
+      color: "error",
+    });
+  } finally {
+    runnerAutoBusy.value = false;
+  }
+}
 </script>
 
 <template>
@@ -48,6 +79,17 @@ const showResearchModal = ref(false);
         <UBadge v-else color="error" variant="subtle">Offline</UBadge>
       </div>
       <div class="flex items-center gap-2">
+        <div
+          class="flex items-center gap-2 rounded-md border border-gray-800 px-3 py-1.5"
+          title="Wartende Strategien automatisch nacheinander backtesten"
+        >
+          <span class="text-sm text-gray-400">Auto-Backtest</span>
+          <USwitch
+            :model-value="runnerAuto?.enabled ?? false"
+            :disabled="runnerAutoBusy"
+            @update:model-value="setRunnerAuto"
+          />
+        </div>
         <UButton
           to="/agents/config"
           icon="i-heroicons-adjustments-horizontal"
