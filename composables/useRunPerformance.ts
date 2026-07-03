@@ -283,12 +283,12 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
 
         tradePnlValues.push(tradePnl);
 
-        if (tradePnl > 0) {
+        if (t.result === 1) {
           totalWins++;
-          grossProfit += tradePnl;
+          grossProfit += Math.abs(tradePnl);
           assetWins.set(pf.symbol, (assetWins.get(pf.symbol) ?? 0) + 1);
-          assetGrossProfit.set(pf.symbol, (assetGrossProfit.get(pf.symbol) ?? 0) + tradePnl);
-        } else if (tradePnl < 0) {
+          assetGrossProfit.set(pf.symbol, (assetGrossProfit.get(pf.symbol) ?? 0) + Math.abs(tradePnl));
+        } else if (t.result === -1) {
           totalLosses++;
           grossLoss += Math.abs(tradePnl);
           assetLosses.set(pf.symbol, (assetLosses.get(pf.symbol) ?? 0) + 1);
