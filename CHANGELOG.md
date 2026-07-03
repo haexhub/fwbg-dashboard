@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.18.0...v1.19.0) (2026-07-03)
+
+
+### Features
+
+* **agents:** Auto-Backtest toggle on the agents page ([0d9a9e4](https://github.com/haexhub/fwbg-dashboard/commit/0d9a9e40f18f2ee1b4c5195241215e6077d17f65))
+* **agents:** Auto-Backtest toggle on the agents page ([f79ca91](https://github.com/haexhub/fwbg-dashboard/commit/f79ca915f1480591ef37c493a824a7684c3977df))
+
 ## [1.18.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.17.0...v1.18.0) (2026-07-03)
 
 
