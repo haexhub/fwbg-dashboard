@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.21.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.20.0...v1.21.0) (2026-07-04)
+
+
+### Features
+
+* **agents:** add backtest queue overview with drag & drop reordering ([17eab3f](https://github.com/haexhub/fwbg-dashboard/commit/17eab3fedcfe88bfc614a7bd0b7284411bc1c3e4))
+* **agents:** backtest queue overview with drag & drop reordering ([d7e8820](https://github.com/haexhub/fwbg-dashboard/commit/d7e882077d8dc1e993a41afd2ac3ae930646aea2))
+
+
+### Bug Fixes
+
+* **queue:** fix TypeScript error on splice destructuring in QueueCard ([f122ed7](https://github.com/haexhub/fwbg-dashboard/commit/f122ed7cb8ff1ef11cd05772b2468f61cd1f8105))
+
 ## [1.20.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.19.1...v1.20.0) (2026-07-04)
 
 
