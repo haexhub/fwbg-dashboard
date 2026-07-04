@@ -1,4 +1,23 @@
 <script setup lang="ts">
+const route = useRoute();
+
+const initialMessage = computed<string | undefined>(() => {
+  const runId = route.query.runId as string | undefined;
+  const strategy = route.query.strategy as string | undefined;
+  if (!runId && !strategy) return undefined;
+
+  const parts: string[] = [];
+  if (runId && strategy) {
+    parts.push(`Analysiere Run \`${runId}\` der Strategie \`${strategy}\`.`);
+  } else if (runId) {
+    parts.push(`Analysiere Run \`${runId}\`.`);
+  } else if (strategy) {
+    parts.push(`Analysiere die Strategie \`${strategy}\`.`);
+  }
+  parts.push("Lade zunächst die Ergebnisse und erkläre mir dann die wichtigsten KPIs sowie konkrete Verbesserungsvorschläge.");
+  return parts.join(" ");
+});
+
 useSeoMeta({ title: "AI Assistent – FWBG" });
 </script>
 
@@ -20,7 +39,7 @@ useSeoMeta({ title: "AI Assistent – FWBG" });
     <AiLlmConnectionCard class="mb-4" />
 
     <div class="flex-1 rounded-xl border border-gray-800 overflow-hidden min-h-0">
-      <AiChat />
+      <AiChat :initial-message="initialMessage" />
     </div>
   </div>
 </template>
