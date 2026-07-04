@@ -39,10 +39,18 @@ const showResearchModal = ref(false);
 // ── Runner auto mode: waiting proposed strategies are backtested
 // automatically (single-flight) while this is on. ──
 const toast = useToast();
-const { data: runnerAuto, refresh: refreshRunnerAuto } = useFetch<{ enabled: boolean }>(
-  "/api/agents/runner-auto",
-);
+const { data: runnerAuto, refresh: refreshRunnerAuto } = useFetch<{
+  enabled: boolean;
+  pipeline_min_proposed: number;
+}>("/api/agents/runner-auto");
 const runnerAutoBusy = ref(false);
+const pipelineMinProposedInput = ref<number | null>(null);
+
+watch(runnerAuto, (v) => {
+  if (v && pipelineMinProposedInput.value === null) {
+    pipelineMinProposedInput.value = v.pipeline_min_proposed;
+  }
+}, { immediate: true });
 
 async function setRunnerAuto(enabled: boolean) {
   runnerAutoBusy.value = true;
@@ -57,13 +65,24 @@ async function setRunnerAuto(enabled: boolean) {
       color: enabled ? "success" : "neutral",
     });
   } catch {
-    toast.add({
-      title: "Fehler",
-      description: "Konnte Auto-Modus nicht umschalten.",
-      color: "error",
-    });
+    toast.add({ title: "Fehler", description: "Konnte Auto-Modus nicht umschalten.", color: "error" });
   } finally {
     runnerAutoBusy.value = false;
+  }
+}
+
+async function savePipelineMinProposed() {
+  const value = pipelineMinProposedInput.value;
+  if (value === null || value === runnerAuto.value?.pipeline_min_proposed) return;
+  try {
+    await $fetch("/api/agents/runner-auto", {
+      method: "PUT",
+      body: { pipeline_min_proposed: value },
+    });
+    await refreshRunnerAuto();
+    toast.add({ title: `Pipeline-Minimum auf ${value} gesetzt`, color: "success" });
+  } catch {
+    toast.add({ title: "Fehler", description: "Konnte Pipeline-Minimum nicht speichern.", color: "error" });
   }
 }
 </script>
@@ -79,16 +98,28 @@ async function setRunnerAuto(enabled: boolean) {
         <UBadge v-else color="error" variant="subtle">Offline</UBadge>
       </div>
       <div class="flex items-center gap-2">
-        <div
-          class="flex items-center gap-2 rounded-md border border-gray-800 px-3 py-1.5"
-          title="Wartende Strategien automatisch nacheinander backtesten"
-        >
+        <div class="flex items-center gap-3 rounded-md border border-gray-800 px-3 py-1.5">
           <span class="text-sm text-gray-400">Auto-Backtest</span>
           <USwitch
             :model-value="runnerAuto?.enabled ?? false"
             :disabled="runnerAutoBusy"
             @update:model-value="setRunnerAuto"
           />
+          <div
+            class="flex items-center gap-1.5 border-l border-gray-700 pl-3"
+            title="Mindestanzahl PROPOSED-Strategien in der Pipeline"
+          >
+            <span class="text-sm text-gray-400">Pipeline min.</span>
+            <UInput
+              v-model.number="pipelineMinProposedInput"
+              type="number"
+              :min="0"
+              :max="20"
+              size="xs"
+              class="w-16"
+              @change="savePipelineMinProposed"
+            />
+          </div>
         </div>
         <UButton
           to="/agents/config"
