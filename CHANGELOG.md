@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.19.1...v1.20.0) (2026-07-04)
+
+
+### Features
+
+* **agents:** add pipeline-min input to auto-backtest controls ([6c73586](https://github.com/haexhub/fwbg-dashboard/commit/6c73586bb8df54e7a806fa02642dfa92a175648d))
+* **agents:** add pipeline-min input to auto-backtest controls ([d7d39a0](https://github.com/haexhub/fwbg-dashboard/commit/d7d39a088e32b1db90603f5637061dfe852625b8))
+* **agents:** pipeline-min input in auto-backtest controls ([fa81d49](https://github.com/haexhub/fwbg-dashboard/commit/fa81d49ca96b873e93aae140a6ee8bf7761933e4))
+
 ## [1.19.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.19.0...v1.19.1) (2026-07-04)
 
 
