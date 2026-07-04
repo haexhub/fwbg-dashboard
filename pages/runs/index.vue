@@ -326,6 +326,16 @@ const columns: TableColumn<RunSummary>[] = [
               :loading="cancellingId === row.original.run_id"
               @click.prevent="handleCancel(row.original.run_id)"
             />
+            <UTooltip text="Mit LLM besprechen">
+              <UButton
+                icon="i-heroicons-chat-bubble-left-ellipsis"
+                variant="ghost"
+                color="primary"
+                size="xs"
+                :to="`/ai?runId=${row.original.run_id}&strategy=${encodeURIComponent(row.original.strategy_name ?? '')}`"
+                @click.stop
+              />
+            </UTooltip>
             <UButton
               icon="i-heroicons-trash"
               variant="ghost"

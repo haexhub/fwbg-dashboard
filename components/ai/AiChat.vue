@@ -121,6 +121,8 @@ const MODEL_OPTIONS = MODELS.map((m) => ({
   value: m.id,
 }));
 
+const props = defineProps<{ initialMessage?: string }>();
+
 const messages = ref<Message[]>([]);
 const input = ref("");
 const loading = ref(false);
@@ -158,7 +160,25 @@ onMounted(() => {
   }
 
   checkKeyForModel();
+
+  if (props.initialMessage) {
+    input.value = props.initialMessage;
+  }
 });
+
+// Auto-submit initialMessage once the selected provider is ready.
+const autoSubmitPending = ref(!!props.initialMessage);
+const providerReady = computed(() => {
+  if (!autoSubmitPending.value) return false;
+  if (selectedModel.value.provider === "anthropic") return claudeConnected.value;
+  return !!apiKeys.value[selectedModel.value.storageKey];
+});
+watch(providerReady, (ready) => {
+  if (ready) {
+    autoSubmitPending.value = false;
+    nextTick(() => submit());
+  }
+}, { immediate: true });
 
 function checkKeyForModel() {
   if (selectedModel.value.provider === "anthropic") {
@@ -212,6 +232,9 @@ const toolLabels: Record<string, string> = {
   list_indicators: "Indikatoren laden",
   get_indicator_schema: "Indikator-Schema laden",
   list_exit_strategies: "Exit-Strategien laden",
+  trigger_analyst: "Analyst starten",
+  trigger_runner: "Runner starten",
+  get_agent_run_status: "Agent-Run-Status prüfen",
 };
 
 async function submit() {
