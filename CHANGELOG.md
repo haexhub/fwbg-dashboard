@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.19.0...v1.19.1) (2026-07-04)
+
+
+### Bug Fixes
+
+* **performance:** use trade result field for win/loss classification ([8c6bd69](https://github.com/haexhub/fwbg-dashboard/commit/8c6bd6909caef18273addb372f5a8cd50eed443a))
+* **performance:** use trade result field for win/loss classification ([a5127fc](https://github.com/haexhub/fwbg-dashboard/commit/a5127fcee96dad42d0514681c770b26bc222fcde))
+
 ## [1.19.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.18.0...v1.19.0) (2026-07-03)
 
 
