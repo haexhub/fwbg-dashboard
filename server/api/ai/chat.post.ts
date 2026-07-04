@@ -61,6 +61,7 @@ function getAnthropicProxyModel(modelId: string) {
 
 function makeFwbgTools(fwbgApiUrl: string) {
   const base = fwbgApiUrl.replace(/\/?$/, "");
+  const agentsBase = (process.env.FWBG_AGENTS_API_URL || "http://localhost:8421").replace(/\/?$/, "");
 
   const apiFetch = async (path: string) => {
     const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(30_000) });
@@ -87,6 +88,28 @@ function makeFwbgTools(fwbgApiUrl: string) {
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     return res.json();
   };
+  const agentsFetch = async (path: string) => {
+    const res = await fetch(`${agentsBase}${path}`, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    return res.json();
+  };
+  const agentsPost = async (path: string) => {
+    const res = await fetch(`${agentsBase}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    return res.json();
+  };
+
+  async function findAgentStrategy(strategyName: string): Promise<{ id: number; slug: string } | null> {
+    const result = await agentsFetch("/strategies") as unknown;
+    const list: Array<{ id: number; slug: string }> = Array.isArray(result)
+      ? result
+      : ((result as Record<string, unknown>).strategies as Array<{ id: number; slug: string }> ?? []);
+    return list.find((s) => s.slug === strategyName) ?? null;
+  }
 
   return {
     list_strategies: tool({
@@ -273,6 +296,58 @@ function makeFwbgTools(fwbgApiUrl: string) {
         );
       },
     }),
+
+    trigger_analyst: tool({
+      description:
+        "Trigger the Analyst agent for a strategy by its slug/name. " +
+        "The analyst reads the latest backtest results, updates the hypothesis, and derives improvement suggestions. " +
+        "Returns agent_run_id — use get_agent_run_status to track progress.",
+      inputSchema: z.object({
+        strategy_name: z.string().describe("Strategy slug/name as used in fwbg (e.g. 'my_strategy')"),
+      }),
+      execute: async ({ strategy_name }) => {
+        const strategy = await findAgentStrategy(strategy_name);
+        if (!strategy) {
+          return JSON.stringify({
+            error: `Strategy '${strategy_name}' not found in the agent system. Make sure it exists as an agent strategy first.`,
+          });
+        }
+        const result = await agentsPost(`/strategies/${strategy.id}/analyze`);
+        return JSON.stringify(result);
+      },
+    }),
+
+    trigger_runner: tool({
+      description:
+        "Trigger the Runner agent (backtest) for a strategy by its slug/name. " +
+        "Returns agent_run_id — use get_agent_run_status to track progress.",
+      inputSchema: z.object({
+        strategy_name: z.string().describe("Strategy slug/name as used in fwbg (e.g. 'my_strategy')"),
+      }),
+      execute: async ({ strategy_name }) => {
+        const strategy = await findAgentStrategy(strategy_name);
+        if (!strategy) {
+          return JSON.stringify({
+            error: `Strategy '${strategy_name}' not found in the agent system.`,
+          });
+        }
+        const result = await agentsPost(`/strategies/${strategy.id}/run`);
+        return JSON.stringify(result);
+      },
+    }),
+
+    get_agent_run_status: tool({
+      description:
+        "Get the status of an fwbg-agents run (analyst, runner, researcher, etc.) by its agent_run_id. " +
+        "Returns status (pending/running/done/failed) and error if any.",
+      inputSchema: z.object({
+        agent_run_id: z.number().int().describe("The agent_run_id returned by trigger_analyst or trigger_runner"),
+      }),
+      execute: async ({ agent_run_id }) => {
+        const result = await agentsFetch(`/agents/runs/${agent_run_id}`);
+        return JSON.stringify(result);
+      },
+    }),
   };
 }
 
@@ -292,7 +367,14 @@ Wichtige Regeln für Strategiekonfigurationen:
 - Wenn ein Run gestartet wird: dem User mitteilen dass er je nach Strategie 15-90 Minuten dauern kann
 
 Wenn der User fragt ob ein Run noch läuft: get_run_status aufrufen.
-Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).`;
+Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).
+
+Du hast auch Zugriff auf das fwbg-agents System (Analyst, Runner, Researcher):
+- trigger_analyst: Startet den Analyst-Agenten für eine Strategie (liest Backtest-Ergebnisse und erstellt Hypothesen/Verbesserungsvorschläge)
+- trigger_runner: Startet den Runner-Agenten (führt den nächsten Backtest in der Queue aus)
+- get_agent_run_status: Prüft den Status eines gestarteten Agent-Runs
+
+Wenn der User konkrete Verbesserungen umsetzen will: erst save_strategy, dann trigger_runner und trigger_analyst in Reihe.`;
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
