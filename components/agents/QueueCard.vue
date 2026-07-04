@@ -66,7 +66,8 @@ async function onDrop(targetIndex: number, event: DragEvent) {
 
   // Optimistic update: reorder locally
   const updated = [...strategies.value];
-  const [moved] = updated.splice(from, 1);
+  const moved = updated.splice(from, 1)[0];
+  if (!moved) return;
   updated.splice(targetIndex, 0, moved);
   const previous = strategies.value;
   strategies.value = updated;
