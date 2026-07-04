@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.22.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.21.0...v1.22.0) (2026-07-04)
+
+
+### Features
+
+* **agents:** add history tab, LLM chat context & analyst tools ([695113c](https://github.com/haexhub/fwbg-dashboard/commit/695113c6625cca9e50e5bf33e64779af9e74aeb0))
+* **agents:** history tab, LLM chat context & analyst tools ([f3f9c07](https://github.com/haexhub/fwbg-dashboard/commit/f3f9c0762a2f21ce1fd7d941bc2914348e69b0d5))
+
 ## [1.21.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.20.0...v1.21.0) (2026-07-04)
 
 
