@@ -196,6 +196,9 @@ async function savePipelineMinProposed() {
     <!-- Active Runs -->
     <AgentsActiveRunsCard />
 
+    <!-- Backtest Queue (PROPOSED strategies) -->
+    <AgentsQueueCard />
+
     <!-- Live Event Feed + Recent Hypotheses -->
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <AgentsEventFeed />
