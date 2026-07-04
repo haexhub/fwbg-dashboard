@@ -337,8 +337,92 @@ const allEmpty = computed(
           <p class="text-xs text-gray-500">
             {{ relativeTime(run.ended_at) }} · {{ run.error ?? "Unbekannter Fehler" }}
           </p>
+          <div
+            v-for="run in recentFailed"
+            :key="`failed-${run.id}`"
+            class="rounded-lg border border-gray-800 p-3 space-y-2"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="h-2 w-2 rounded-full bg-red-500" />
+                <span class="text-sm font-medium text-white">
+                  {{ AGENT_LABELS[run.agent_name] ?? run.agent_name }}
+                </span>
+                <span class="text-xs text-gray-500">#{{ run.id }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs">
+                  {{ run.status }}
+                </UBadge>
+                <UButton
+                  size="xs"
+                  color="primary"
+                  variant="ghost"
+                  :loading="actionLoading[run.id]"
+                  @click="retryRun(run)"
+                >
+                  Wiederholen
+                </UButton>
+              </div>
+            </div>
+            <p class="text-xs text-gray-500">
+              {{ relativeTime(run.ended_at) }} · {{ run.error ?? "Unbekannter Fehler" }}
+            </p>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── Tab: Historie ── -->
+    <div v-else-if="activeTab === 'history'">
+      <div v-if="historyLoading && !historyLoaded" class="py-8 text-center text-gray-500 text-sm">
+        Lade Historie...
+      </div>
+
+      <div v-else-if="historyRuns.length === 0" class="py-8 text-center text-gray-500 text-sm">
+        Noch keine abgeschlossenen Runs.
+      </div>
+
+      <div v-else class="pt-3 divide-y divide-gray-800 -mx-4">
+        <div
+          v-for="run in historyRuns"
+          :key="run.id"
+          class="px-4 py-2.5"
+        >
+          <div class="flex items-center gap-3">
+            <span
+              class="h-2 w-2 rounded-full shrink-0"
+              :class="run.status === 'done' ? 'bg-emerald-500' : 'bg-red-500'"
+            />
+
+            <span class="text-sm text-white font-medium w-28 shrink-0 truncate">
+              {{ AGENT_LABELS[run.agent_name] ?? run.agent_name }}
+            </span>
+
+            <span class="text-xs text-gray-500 flex-1 truncate">
+              <template v-if="run.strategy_id">Strategie #{{ run.strategy_id }}</template>
+              <template v-else-if="run.plugin_id">Plugin #{{ run.plugin_id }}</template>
+              <template v-else>—</template>
+            </span>
+
+            <span class="text-xs text-gray-600 shrink-0 font-mono w-14 text-right">
+              {{ duration(run) }}
+            </span>
+
+            <span class="text-xs text-gray-600 shrink-0 w-20 text-right">
+              {{ relativeTime(run.ended_at ?? run.started_at) }}
+            </span>
+
+            <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs" class="shrink-0">
+              {{ run.status }}
+            </UBadge>
+          </div>
+
+          <p v-if="run.status !== 'done' && run.error" class="mt-1 ml-5 text-xs text-red-400/80 truncate" :title="run.error">
+            {{ run.error }}
+          </p>
         </div>
-      </template>
+      </div>
     </div>
   </UCard>
 </template>
