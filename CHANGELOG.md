@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.23.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.22.0...v1.23.0) (2026-07-05)
+
+
+### Features
+
+* **agents:** backtest queue, history tab & error display ([fddef0c](https://github.com/haexhub/fwbg-dashboard/commit/fddef0c6df8e018118036cd93d60e88aa95e8e07))
+
+
+### Bug Fixes
+
+* **agents:** show error text for failed runs in history tab ([a9fca54](https://github.com/haexhub/fwbg-dashboard/commit/a9fca5477c62cf1e39650947bdc47671195ec85c))
+* **agents:** show error text for failed runs in history tab ([f7f769c](https://github.com/haexhub/fwbg-dashboard/commit/f7f769cb40dce5c9b8a3065c6d9964bcd65c0e80))
+
 ## [1.22.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.21.0...v1.22.0) (2026-07-04)
 
 
