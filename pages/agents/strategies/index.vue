@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { h, resolveComponent } from "vue";
-import type { TableColumn } from "@nuxt/ui";
 import { agentStrategyStateColor } from "~/types/agents";
 import type { AgentStrategySummary, AgentStrategyState } from "~/types/agents";
 
@@ -9,21 +7,7 @@ const { criteriaList } = useAgentCriteria();
 
 const showResearchModal = ref(false);
 
-// ── Sorting ──
-const sorting = ref<{ id: string; desc: boolean }[]>([{ id: "created_at", desc: true }]);
-
-// ── Free-text search (client-side; backend has no text-search query param) ──
 const searchQuery = ref("");
-const filteredStrategies = computed(() => {
-  if (!searchQuery.value.trim()) return strategies.value;
-  const q = searchQuery.value.toLowerCase();
-  return strategies.value.filter(
-    (s) =>
-      s.slug.toLowerCase().includes(q) ||
-      s.strategy_family.toLowerCase().includes(q) ||
-      s.tags.some((t) => t.toLowerCase().includes(q)),
-  );
-});
 
 // ── Filter options ──
 const stateOptions: { label: string; value: AgentStrategyState }[] = [
@@ -38,6 +22,57 @@ const assetClassOptions = computed(() =>
   (criteriaList.value?.asset_classes ?? []).map((ac) => ({ label: ac, value: ac })),
 );
 
+// ── Grouping by strategy_family ──
+interface StrategyGroup {
+  family: string;
+  strategies: AgentStrategySummary[];
+  latestState: AgentStrategyState;
+}
+
+const strategyGroups = computed<StrategyGroup[]>(() => {
+  const q = searchQuery.value.toLowerCase().trim();
+  const items = (strategies.value ?? []).filter((s) => {
+    if (!q) return true;
+    return (
+      s.slug.toLowerCase().includes(q) ||
+      s.strategy_family.toLowerCase().includes(q) ||
+      s.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
+  const map = new Map<string, AgentStrategySummary[]>();
+  for (const s of items) {
+    const family = s.strategy_family || s.slug;
+    if (!map.has(family)) map.set(family, []);
+    map.get(family)!.push(s);
+  }
+
+  return Array.from(map.entries())
+    .map(([family, strats]) => {
+      const sorted = [...strats].sort((a, b) =>
+        (a.created_at ?? "").localeCompare(b.created_at ?? ""),
+      );
+      // Latest state = most recently updated strategy's state
+      const latest = [...strats].sort((a, b) =>
+        (b.updated_at ?? "").localeCompare(a.updated_at ?? ""),
+      )[0];
+      return { family, strategies: sorted, latestState: latest?.current_state ?? "proposed" };
+    })
+    .sort((a, b) => a.family.localeCompare(b.family));
+});
+
+const openGroups = ref<string[]>([]);
+
+function toggleGroup(family: string) {
+  const idx = openGroups.value.indexOf(family);
+  if (idx >= 0) openGroups.value.splice(idx, 1);
+  else openGroups.value.push(family);
+}
+
+function isOpen(family: string) {
+  return openGroups.value.includes(family);
+}
+
 function formatDate(ts?: string | null): string {
   if (!ts) return "-";
   return new Date(ts).toLocaleString("de-DE", {
@@ -49,34 +84,11 @@ function formatDate(ts?: string | null): string {
   });
 }
 
-function sortableHeader(label: string) {
-  return ({ column }: { column: { getIsSorted: () => false | "asc" | "desc"; toggleSorting: (desc: boolean) => void } }) => {
-    const isSorted = column.getIsSorted();
-    return h(resolveComponent("UButton"), {
-      label,
-      variant: "ghost",
-      size: "xs",
-      icon: isSorted
-        ? isSorted === "asc"
-          ? "i-lucide-arrow-up-narrow-wide"
-          : "i-lucide-arrow-down-wide-narrow"
-        : "i-lucide-arrow-up-down",
-      class: "-mx-2",
-      onClick: () => column.toggleSorting(column.getIsSorted() === "asc"),
-    });
-  };
+// Label each strategy within its family as v1, v2, ...
+function iterationLabel(group: StrategyGroup, s: AgentStrategySummary): string {
+  const idx = group.strategies.indexOf(s);
+  return `it${String(idx + 1).padStart(3, "0")}`;
 }
-
-const columns: TableColumn<AgentStrategySummary>[] = [
-  { accessorKey: "slug", header: sortableHeader("Slug") },
-  { accessorKey: "asset_class", header: sortableHeader("Asset Class") },
-  { id: "universe", header: "Universe", cell: () => "" },
-  { accessorKey: "strategy_family", header: sortableHeader("Family") },
-  { accessorKey: "current_state", header: sortableHeader("State") },
-  { id: "tags", header: "Tags", cell: () => "" },
-  { accessorKey: "created_at", header: sortableHeader("Erstellt") },
-  { accessorKey: "updated_at", header: sortableHeader("Aktualisiert") },
-];
 </script>
 
 <template>
@@ -94,7 +106,7 @@ const columns: TableColumn<AgentStrategySummary>[] = [
     </div>
 
     <!-- Filters -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 flex-wrap">
       <UInput
         v-model="searchQuery"
         icon="i-lucide-search"
@@ -138,94 +150,99 @@ const columns: TableColumn<AgentStrategySummary>[] = [
       </div>
     </div>
 
-    <UCard :ui="{ body: 'p-0 sm:p-0' }">
-      <div v-if="status === 'pending'" class="py-8 text-center text-gray-400">
-        Loading strategies...
-      </div>
-      <div v-else-if="!filteredStrategies.length" class="py-8 text-center text-gray-400">
-        No strategies found.
-      </div>
+    <div v-if="status === 'pending'" class="py-8 text-center text-gray-400">
+      Loading strategies...
+    </div>
+    <div v-else-if="!strategyGroups.length" class="py-8 text-center text-gray-400">
+      No strategies found.
+    </div>
 
-      <UTable
-        v-else
-        :data="filteredStrategies"
-        :columns="columns"
-        v-model:sorting="sorting"
-        class="w-full"
+    <div v-else class="space-y-2">
+      <UCard
+        v-for="group in strategyGroups"
+        :key="group.family"
+        :ui="{ body: 'p-0 sm:p-0' }"
       >
-        <!-- Slug -->
-        <template #slug-cell="{ row }">
-          <div class="flex items-center gap-2">
-            <NuxtLink
-              :to="`/agents/strategies/${row.original.id}`"
-              class="text-white font-mono text-sm hover:text-blue-400 transition-colors"
-            >
-              {{ row.original.slug }}
-            </NuxtLink>
-            <UTooltip
-              v-if="row.original.model_knowledge_only"
-              text="Ohne Web-Suche recherchiert — Quellen aus Modellwissen"
-            >
-              <UBadge color="warning" variant="subtle" size="xs">MK</UBadge>
-            </UTooltip>
+        <!-- Accordion header -->
+        <button
+          class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-900/50 transition-colors"
+          @click="toggleGroup(group.family)"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-white font-medium">{{ group.family }}</span>
+              <UBadge color="neutral" variant="subtle" size="xs">
+                {{ group.strategies.length }}
+                {{ group.strategies.length === 1 ? "Iteration" : "Iterationen" }}
+              </UBadge>
+              <UBadge :color="agentStrategyStateColor(group.latestState)" variant="subtle" size="xs">
+                {{ group.latestState }}
+              </UBadge>
+            </div>
           </div>
-        </template>
+          <UIcon
+            :name="isOpen(group.family) ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'"
+            class="text-gray-400 shrink-0 ml-4 w-4 h-4"
+          />
+        </button>
 
-        <!-- Asset Class (null = asset-agnostic) -->
-        <template #asset_class-cell="{ row }">
-          <span v-if="row.original.asset_class" class="text-sm text-white">
-            {{ row.original.asset_class }}
-          </span>
-          <span v-else class="text-sm text-gray-500 italic">agnostic</span>
-        </template>
-
-        <!-- Suggested universe (Researcher's asset recommendation) -->
-        <template #universe-cell="{ row }">
-          <div v-if="row.original.suggested_universe?.length" class="flex flex-wrap gap-1">
-            <UBadge
-              v-for="u in row.original.suggested_universe"
-              :key="u.scope + u.value"
-              :color="u.scope === 'symbol' ? 'primary' : 'info'"
-              variant="subtle"
-              size="xs"
-            >
-              {{ u.value }}
-            </UBadge>
+        <!-- Accordion body -->
+        <div v-if="isOpen(group.family)" class="border-t border-gray-800">
+          <div
+            v-for="s in group.strategies"
+            :key="s.id"
+            class="flex items-center justify-between px-6 py-2.5 border-b border-gray-800/50 last:border-0 hover:bg-gray-900/30 transition-colors"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <NuxtLink
+                  :to="`/agents/strategies/${s.id}`"
+                  class="font-mono text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  {{ iterationLabel(group, s) }}
+                </NuxtLink>
+                <UBadge :color="agentStrategyStateColor(s.current_state)" variant="subtle" size="xs">
+                  {{ s.current_state }}
+                </UBadge>
+                <span v-if="s.asset_class" class="text-xs text-gray-400">{{ s.asset_class }}</span>
+                <span v-else class="text-xs text-gray-500 italic">agnostic</span>
+                <UTooltip
+                  v-if="s.model_knowledge_only"
+                  text="Ohne Web-Suche recherchiert"
+                >
+                  <UBadge color="warning" variant="subtle" size="xs">MK</UBadge>
+                </UTooltip>
+              </div>
+              <div v-if="s.suggested_universe?.length" class="flex flex-wrap gap-1 mt-1">
+                <UBadge
+                  v-for="u in s.suggested_universe"
+                  :key="u.scope + u.value"
+                  :color="u.scope === 'symbol' ? 'primary' : 'info'"
+                  variant="subtle"
+                  size="xs"
+                >
+                  {{ u.value }}
+                </UBadge>
+              </div>
+              <div v-if="s.tags.length" class="flex flex-wrap gap-1 mt-1">
+                <UBadge
+                  v-for="tag in s.tags"
+                  :key="tag"
+                  color="neutral"
+                  variant="subtle"
+                  size="xs"
+                >
+                  {{ tag }}
+                </UBadge>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500 shrink-0 ml-4 text-right">
+              <div>{{ formatDate(s.created_at) }}</div>
+            </div>
           </div>
-          <span v-else class="text-xs text-gray-600">—</span>
-        </template>
-
-        <!-- State -->
-        <template #current_state-cell="{ row }">
-          <UBadge :color="agentStrategyStateColor(row.original.current_state)" variant="subtle" size="xs">
-            {{ row.original.current_state }}
-          </UBadge>
-        </template>
-
-        <!-- Tags -->
-        <template #tags-cell="{ row }">
-          <div class="flex flex-wrap gap-1">
-            <UBadge
-              v-for="tag in row.original.tags"
-              :key="tag"
-              color="neutral"
-              variant="subtle"
-              size="xs"
-            >
-              {{ tag }}
-            </UBadge>
-          </div>
-        </template>
-
-        <!-- Created / Updated -->
-        <template #created_at-cell="{ row }">
-          <span class="text-sm text-gray-400">{{ formatDate(row.original.created_at) }}</span>
-        </template>
-        <template #updated_at-cell="{ row }">
-          <span class="text-sm text-gray-400">{{ formatDate(row.original.updated_at) }}</span>
-        </template>
-      </UTable>
-    </UCard>
+        </div>
+      </UCard>
+    </div>
 
     <AgentsResearchBriefModal v-model:open="showResearchModal" @created="refresh" />
   </div>
