@@ -407,34 +407,40 @@ const tabs = [
         <div
           v-for="run in historyRuns"
           :key="run.id"
-          class="flex items-center gap-3 px-4 py-2.5"
+          class="px-4 py-2.5"
         >
-          <span
-            class="h-2 w-2 rounded-full shrink-0"
-            :class="run.status === 'done' ? 'bg-emerald-500' : 'bg-red-500'"
-          />
+          <div class="flex items-center gap-3">
+            <span
+              class="h-2 w-2 rounded-full shrink-0"
+              :class="run.status === 'done' ? 'bg-emerald-500' : 'bg-red-500'"
+            />
 
-          <span class="text-sm text-white font-medium w-28 shrink-0 truncate">
-            {{ AGENT_LABELS[run.agent_name] ?? run.agent_name }}
-          </span>
+            <span class="text-sm text-white font-medium w-28 shrink-0 truncate">
+              {{ AGENT_LABELS[run.agent_name] ?? run.agent_name }}
+            </span>
 
-          <span class="text-xs text-gray-500 flex-1 truncate">
-            <template v-if="run.strategy_id">Strategie #{{ run.strategy_id }}</template>
-            <template v-else-if="run.plugin_id">Plugin #{{ run.plugin_id }}</template>
-            <template v-else>—</template>
-          </span>
+            <span class="text-xs text-gray-500 flex-1 truncate">
+              <template v-if="run.strategy_id">Strategie #{{ run.strategy_id }}</template>
+              <template v-else-if="run.plugin_id">Plugin #{{ run.plugin_id }}</template>
+              <template v-else>—</template>
+            </span>
 
-          <span class="text-xs text-gray-600 shrink-0 font-mono w-14 text-right">
-            {{ duration(run) }}
-          </span>
+            <span class="text-xs text-gray-600 shrink-0 font-mono w-14 text-right">
+              {{ duration(run) }}
+            </span>
 
-          <span class="text-xs text-gray-600 shrink-0 w-20 text-right">
-            {{ relativeTime(run.ended_at ?? run.started_at) }}
-          </span>
+            <span class="text-xs text-gray-600 shrink-0 w-20 text-right">
+              {{ relativeTime(run.ended_at ?? run.started_at) }}
+            </span>
 
-          <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs" class="shrink-0">
-            {{ run.status }}
-          </UBadge>
+            <UBadge :color="agentRunStatusColor(run.status)" variant="subtle" size="xs" class="shrink-0">
+              {{ run.status }}
+            </UBadge>
+          </div>
+
+          <p v-if="run.status !== 'done' && run.error" class="mt-1 ml-5 text-xs text-red-400/80 truncate" :title="run.error">
+            {{ run.error }}
+          </p>
         </div>
       </div>
     </div>
