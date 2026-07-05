@@ -43,7 +43,7 @@ async function handleDelete(filename: string) {
 // Convention: <base>__it<N>   e.g. "liquiditysweepfade__forex__001__it001"
 function parseIteration(name: string): { base: string; iteration: string | null } {
   const match = name.match(/^(.+)__(it\d+)$/);
-  return match ? { base: match[1], iteration: match[2] } : { base: name, iteration: null };
+  return match ? { base: match[1]!, iteration: match[2]! } : { base: name, iteration: null };
 }
 
 interface StrategyGroup {
