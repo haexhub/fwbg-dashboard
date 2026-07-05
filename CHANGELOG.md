@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.24.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.23.0...v1.24.0) (2026-07-05)
+
+
+### Features
+
+* **strategies:** accordion view grouped by strategy family ([89cbe60](https://github.com/haexhub/fwbg-dashboard/commit/89cbe603001f5da018547a1c2eb4ed01f978db1b))
+* **strategies:** accordion view grouped by strategy family ([0b964f7](https://github.com/haexhub/fwbg-dashboard/commit/0b964f78ab69e8336e9341a4fc1fcc4030bde7cb))
+
+
+### Bug Fixes
+
+* **strategy:** add non-null assertions for regex capture groups ([04fb8d5](https://github.com/haexhub/fwbg-dashboard/commit/04fb8d5f892b97e73687c19d620b39b3ef7b32c8))
+
 ## [1.23.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.22.0...v1.23.0) (2026-07-05)
 
 
