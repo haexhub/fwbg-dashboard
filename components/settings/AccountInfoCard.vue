@@ -157,7 +157,7 @@ const saveAccountInfo = async () => {
             variant="ghost"
             size="sm"
             :icon="showPassword ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
-            @click="showPassword = !showPassword"
+            @click="() => { showPassword = !showPassword }"
           >
             {{ showPassword ? "Verstecken" : "Anzeigen" }}
           </UButton>

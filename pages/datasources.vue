@@ -131,11 +131,11 @@ async function handleETLDone() {
           icon="i-heroicons-adjustments-horizontal"
           variant="outline"
           color="neutral"
-          @click="spreadsOpen = true"
+          @click="() => { spreadsOpen = true }"
         >
           Spreads
         </UButton>
-        <UButton icon="i-heroicons-plus" @click="slideoverOpen = true">
+        <UButton icon="i-heroicons-plus" @click="() => { slideoverOpen = true }">
           Hinzufügen
         </UButton>
       </div>

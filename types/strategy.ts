@@ -21,7 +21,7 @@ export interface ParamSchema {
   min?: number;
   max?: number;
   step?: number;
-  choices?: string[];
+  choices?: (string | number)[];
   choice_labels?: Record<string, string>;
   required?: boolean;
 }

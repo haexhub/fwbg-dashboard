@@ -178,7 +178,7 @@ const updateAsset = (assetName: string, asset: AssetConfig) => {
         <UButton
           icon="i-heroicons-plus"
           color="primary"
-          @click="showNewAccountModal = true"
+          @click="() => { showNewAccountModal = true }"
         >
           New Account
         </UButton>
@@ -239,13 +239,13 @@ const updateAsset = (assetName: string, asset: AssetConfig) => {
               <UButton
                 icon="i-heroicons-arrow-up-tray"
                 variant="outline"
-                @click="showBulkImportModal = true"
+                @click="() => { showBulkImportModal = true }"
               >
                 Import
               </UButton>
               <UButton
                 icon="i-heroicons-plus"
-                @click="showNewAssetForm = !showNewAssetForm"
+                @click="() => { showNewAssetForm = !showNewAssetForm }"
               >
                 Neues Asset
               </UButton>

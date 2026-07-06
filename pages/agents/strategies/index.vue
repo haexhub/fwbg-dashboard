@@ -99,7 +99,7 @@ function iterationLabel(group: StrategyGroup, s: AgentStrategySummary): string {
         <UButton icon="i-heroicons-arrow-path" variant="ghost" @click="refresh()">
           Refresh
         </UButton>
-        <UButton icon="i-heroicons-sparkles" color="primary" @click="showResearchModal = true">
+        <UButton icon="i-heroicons-sparkles" color="primary" @click="() => { showResearchModal = true }">
           New Research
         </UButton>
       </div>

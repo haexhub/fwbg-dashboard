@@ -167,7 +167,7 @@ function applySelected() {
         <p v-if="editError" class="text-xs text-red-400">{{ editError }}</p>
         <div class="flex gap-2">
           <UButton :loading="saving" @click="saveEdit">Speichern</UButton>
-          <UButton variant="ghost" @click="editMode = 'none'">Abbrechen</UButton>
+          <UButton variant="ghost" @click="() => { editMode = 'none' }">Abbrechen</UButton>
         </div>
       </template>
 
