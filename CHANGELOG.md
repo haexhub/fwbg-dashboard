@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.1...v1.24.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* **agents-ui:** show cancel button for all active agent runs ([d70e347](https://github.com/haexhub/fwbg-dashboard/commit/d70e34778cea47c0e3f97b2304cdb09c37c73068))
+* **agents-ui:** show cancel button for all active agent runs ([f149cf1](https://github.com/haexhub/fwbg-dashboard/commit/f149cf1259114a6c6613725e46e891e8b75c28f9))
+
 ## [1.24.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.0...v1.24.1) (2026-07-06)
 
 
