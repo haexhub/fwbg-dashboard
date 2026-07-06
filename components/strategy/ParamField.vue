@@ -46,7 +46,7 @@ const listString = computed({
 
 // Choices for select/choice fields
 const choiceItems = computed(() =>
-  (props.schema.choices ?? []).map((c: string) => ({ label: c, value: c }))
+  (props.schema.choices ?? []).map((c) => ({ label: String(c), value: String(c) }))
 );
 
 // Multi-select for list[int] with choices
@@ -56,8 +56,8 @@ const isMultiSelect = computed(() =>
 
 const selectedSet = computed(() => new Set((value.value as number[] | null) ?? []));
 
-function toggleOption(strVal: string) {
-  const num = parseInt(strVal, 10);
+function toggleOption(val: string | number) {
+  const num = Number(val);
   const current = new Set(selectedSet.value);
   if (current.has(num)) {
     current.delete(num);
@@ -66,13 +66,13 @@ function toggleOption(strVal: string) {
   }
   // Preserve order from choices array
   const ordered = (props.schema.choices ?? [])
-    .map((c) => parseInt(c, 10))
+    .map((c) => Number(c))
     .filter((n) => current.has(n));
   emit("update:modelValue", ordered);
 }
 
 function selectAll() {
-  const ordered = (props.schema.choices ?? []).map((c) => parseInt(c, 10));
+  const ordered = (props.schema.choices ?? []).map((c) => Number(c));
   emit("update:modelValue", ordered);
 }
 
@@ -82,8 +82,9 @@ function selectNone() {
 
 const selectedCount = computed(() => ((value.value as number[]) ?? []).length);
 
-function optionLabel(strVal: string): string {
-  return props.schema.choice_labels?.[strVal] ?? strVal;
+function optionLabel(val: string | number): string {
+  const key = String(val);
+  return props.schema.choice_labels?.[key] ?? key;
 }
 
 // ── Session ranges editor ──
@@ -197,12 +198,12 @@ const hourOptions = Array.from({ length: 24 }, (_, i) => ({
             >
               <span
                 class="text-sm flex-1"
-                :class="selectedSet.has(parseInt(choice, 10)) ? 'text-white' : 'text-gray-500'"
+                :class="selectedSet.has(Number(choice)) ? 'text-white' : 'text-gray-500'"
               >
                 {{ optionLabel(choice) }}
               </span>
               <USwitch
-                :model-value="selectedSet.has(parseInt(choice, 10))"
+                :model-value="selectedSet.has(Number(choice))"
                 size="sm"
                 @click.stop
                 @update:model-value="toggleOption(choice)"
