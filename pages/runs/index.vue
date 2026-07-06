@@ -182,7 +182,7 @@ const columns: TableColumn<RunSummary>[] = [
           icon="i-heroicons-trash"
           color="error"
           variant="ghost"
-          @click="bulkDeleteModalOpen = true"
+          @click="() => { bulkDeleteModalOpen = true }"
         >
           {{ selected.size }} löschen
         </UButton>
@@ -341,7 +341,7 @@ const columns: TableColumn<RunSummary>[] = [
               variant="ghost"
               color="error"
               size="xs"
-              @click.prevent="confirmDeleteId = row.original.run_id"
+              @click.prevent="() => { confirmDeleteId = row.original.run_id }"
             />
           </div>
         </template>
@@ -367,7 +367,7 @@ const columns: TableColumn<RunSummary>[] = [
             werden unwiderruflich von der Festplatte gelöscht.
           </p>
           <div class="flex justify-end gap-2 pt-2">
-            <UButton variant="ghost" @click="confirmDeleteId = null"
+            <UButton variant="ghost" @click="() => { confirmDeleteId = null }"
               >Abbrechen</UButton
             >
             <UButton color="error" :loading="deleting" @click="confirmDelete"
@@ -390,7 +390,7 @@ const columns: TableColumn<RunSummary>[] = [
             unwiderruflich von der Festplatte gelöscht.
           </p>
           <div class="flex justify-end gap-2 pt-2">
-            <UButton variant="ghost" @click="bulkDeleteModalOpen = false"
+            <UButton variant="ghost" @click="() => { bulkDeleteModalOpen = false }"
               >Abbrechen</UButton
             >
             <UButton color="error" :loading="deleting" @click="confirmDelete"
