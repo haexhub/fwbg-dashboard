@@ -286,7 +286,6 @@ const tabs = [
                 {{ run.status }}
               </UBadge>
               <UButton
-                v-if="run.agent_name === 'research_flow'"
                 size="xs"
                 color="error"
                 variant="ghost"
