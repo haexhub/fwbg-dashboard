@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.24.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.0...v1.24.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **types:** choices field supports number values for list[int] params ([70e3c6f](https://github.com/haexhub/fwbg-dashboard/commit/70e3c6f33d023df392d0ff305aef8e742a662895))
+* **types:** choices field supports number values for list[int] params ([1f472b9](https://github.com/haexhub/fwbg-dashboard/commit/1f472b96d3fe427c70f6b66f885443fa38907217))
+* **types:** void event handler return values for @types/node 26.1.0 ([14af53a](https://github.com/haexhub/fwbg-dashboard/commit/14af53ad9187869713feb1576a1f91905d2f917f))
+* **types:** void event handler return values in pages/ for @types/node 26.1.0 ([eba3e4b](https://github.com/haexhub/fwbg-dashboard/commit/eba3e4b1ae7bd681fdd4c3644d7a6ffe0415efcd))
+
 ## [1.24.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.23.0...v1.24.0) (2026-07-05)
 
 
