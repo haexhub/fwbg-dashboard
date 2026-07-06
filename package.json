@@ -42,6 +42,6 @@
     "happy-dom": "^20.3.7",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9",
-    "vue-tsc": "^3.3.5"
+    "vue-tsc": "^3.3.6"
   }
 }
