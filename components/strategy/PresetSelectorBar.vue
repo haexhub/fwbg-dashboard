@@ -293,7 +293,7 @@ async function confirmDeleteAll() {
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
-            <UButton variant="ghost" @click="createOpen = false">Abbrechen</UButton>
+            <UButton variant="ghost" @click="() => { createOpen = false }">Abbrechen</UButton>
             <UButton :loading="createBusy" @click="confirmCreate">Erstellen</UButton>
           </div>
         </template>
@@ -340,7 +340,7 @@ async function confirmDeleteAll() {
         </template>
         <template #footer>
           <div class="flex justify-end">
-            <UButton variant="ghost" @click="saveOpen = false">Abbrechen</UButton>
+            <UButton variant="ghost" @click="() => { saveOpen = false }">Abbrechen</UButton>
           </div>
         </template>
       </UModal>
@@ -374,7 +374,7 @@ async function confirmDeleteAll() {
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
-            <UButton variant="ghost" @click="editOpen = false">Abbrechen</UButton>
+            <UButton variant="ghost" @click="() => { editOpen = false }">Abbrechen</UButton>
             <UButton :loading="editBusy" @click="confirmEdit">Speichern</UButton>
           </div>
         </template>
@@ -419,7 +419,7 @@ async function confirmDeleteAll() {
         </template>
         <template #footer>
           <div class="flex justify-end">
-            <UButton variant="ghost" @click="deleteOpen = false">Abbrechen</UButton>
+            <UButton variant="ghost" @click="() => { deleteOpen = false }">Abbrechen</UButton>
           </div>
         </template>
       </UModal>

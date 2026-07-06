@@ -140,7 +140,7 @@ function formatDate(ts?: string): string {
             :icon="showForm ? 'i-heroicons-x-mark' : 'i-heroicons-plus'"
             size="sm"
             variant="soft"
-            @click="showForm = !showForm"
+            @click="() => { showForm = !showForm }"
           >
             {{ showForm ? "Abbrechen" : "Neue Analyse" }}
           </UButton>

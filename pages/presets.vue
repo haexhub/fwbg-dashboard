@@ -106,7 +106,7 @@ const previewJson = computed(() =>
         v-for="s in SECTIONS"
         :key="s.key"
         :variant="activeSection === s.key ? 'soft' : 'ghost'"
-        @click="activeSection = s.key"
+        @click="() => { activeSection = s.key }"
       >
         {{ s.label }}
       </UButton>
@@ -162,7 +162,7 @@ const previewJson = computed(() =>
               <p v-if="editError" class="text-xs text-red-400">{{ editError }}</p>
               <div class="flex gap-2">
                 <UButton :loading="saving" @click="saveEdit">Speichern</UButton>
-                <UButton variant="ghost" @click="editMode = 'none'">Abbrechen</UButton>
+                <UButton variant="ghost" @click="() => { editMode = 'none' }">Abbrechen</UButton>
               </div>
             </div>
           </UCard>

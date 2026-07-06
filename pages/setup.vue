@@ -161,7 +161,7 @@ async function handleBrokerCreated() {
             Lade CSV-Dateien hoch, binde eine REST-/URL-Quelle an oder hole dir
             (später) Dukascopy-Daten. Du kannst mehrere Quellen anlegen.
           </p>
-          <UButton icon="i-heroicons-plus" @click="sourceSlideover = true">
+          <UButton icon="i-heroicons-plus" @click="() => { sourceSlideover = true }">
             Datenquelle hinzufügen
           </UButton>
         </div>
@@ -181,7 +181,7 @@ async function handleBrokerCreated() {
             nötig, wenn Strategien echt traden sollen – zum reinen Backtesten
             kannst du diesen Schritt überspringen.
           </p>
-          <UButton icon="i-heroicons-plus" @click="brokerModalOpen = true">
+          <UButton icon="i-heroicons-plus" @click="() => { brokerModalOpen = true }">
             Broker-Account hinzufügen
           </UButton>
         </div>

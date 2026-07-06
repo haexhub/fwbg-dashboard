@@ -720,7 +720,7 @@ async function confirmAdd() {
                 variant="link"
                 color="neutral"
                 size="xs"
-                @click="search = ''"
+                @click="() => { search = '' }"
               />
             </template>
           </UInput>
@@ -732,20 +732,20 @@ async function confirmAdd() {
           <div class="flex gap-1.5">
             <UButton
               :variant="typeFilter === '' ? 'solid' : 'ghost'"
-              @click="typeFilter = ''"
+              @click="() => { typeFilter = '' }"
             >
               Alle
             </UButton>
             <UButton
               :variant="typeFilter === 'indicator' ? 'solid' : 'ghost'"
-              @click="typeFilter = 'indicator'"
+              @click="() => { typeFilter = 'indicator' }"
             >
               <UIcon name="i-lucide-line-chart" class="mr-1" />
               IND
             </UButton>
             <UButton
               :variant="typeFilter === 'signal' ? 'solid' : 'ghost'"
-              @click="typeFilter = 'signal'"
+              @click="() => { typeFilter = 'signal' }"
             >
               <UIcon name="i-lucide-zap" class="mr-1" />
               SIG

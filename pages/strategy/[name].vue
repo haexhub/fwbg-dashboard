@@ -275,7 +275,7 @@ onKeyStroke("y", (e) => {
             color="success"
             variant="soft"
             :disabled="!config"
-            @click="runModalOpen = true"
+            @click="() => { runModalOpen = true }"
           >
             Run
           </UButton>
@@ -339,7 +339,7 @@ onKeyStroke("y", (e) => {
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" color="neutral" @click="commitModalOpen = false">Abbrechen</UButton>
+          <UButton variant="ghost" color="neutral" @click="() => { commitModalOpen = false }">Abbrechen</UButton>
           <UButton :loading="saving" @click="handleCommit">Speichern</UButton>
         </div>
       </template>
@@ -371,7 +371,7 @@ onKeyStroke("y", (e) => {
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" color="neutral" @click="saveAsModalOpen = false">Abbrechen</UButton>
+          <UButton variant="ghost" color="neutral" @click="() => { saveAsModalOpen = false }">Abbrechen</UButton>
           <UButton :loading="saving" :disabled="!saveAsName.trim()" @click="handleSaveAs">
             Speichern
           </UButton>
