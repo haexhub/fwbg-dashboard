@@ -836,7 +836,7 @@ const opOptions = [
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton variant="ghost" color="neutral" @click="ruleForm = null">Abbrechen</UButton>
+          <UButton variant="ghost" color="neutral" @click="() => { ruleForm = null }">Abbrechen</UButton>
           <UButton
             :loading="saving"
             :disabled="!ruleForm?.directions.length"

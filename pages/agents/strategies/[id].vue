@@ -219,7 +219,7 @@ const showPromoteModal = ref(false);
             v-if="strategy.current_state === 'paper_trading'"
             icon="i-heroicons-exclamation-triangle"
             color="error"
-            @click="showPromoteModal = true"
+            @click="() => { showPromoteModal = true }"
           >
             Promote to Live
           </UButton>

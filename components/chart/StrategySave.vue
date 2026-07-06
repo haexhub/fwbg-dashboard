@@ -212,14 +212,14 @@ watch(
           <UButton
             :variant="isUpdateMode ? 'solid' : 'outline'"
             size="sm"
-            @click="isUpdateMode = true"
+            @click="() => { isUpdateMode = true }"
           >
             Aktualisieren
           </UButton>
           <UButton
             :variant="!isUpdateMode ? 'solid' : 'outline'"
             size="sm"
-            @click="isUpdateMode = false"
+            @click="() => { isUpdateMode = false }"
           >
             Neue Strategie
           </UButton>

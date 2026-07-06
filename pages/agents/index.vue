@@ -129,7 +129,7 @@ async function savePipelineMinProposed() {
         >
           Agenten konfigurieren
         </UButton>
-        <UButton icon="i-heroicons-sparkles" color="primary" @click="showResearchModal = true">
+        <UButton icon="i-heroicons-sparkles" color="primary" @click="() => { showResearchModal = true }">
           New Research
         </UButton>
       </div>

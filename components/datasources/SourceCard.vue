@@ -73,12 +73,12 @@ function formatDate(ts: number): string {
           size="xs"
           variant="ghost"
           color="error"
-          @click="confirmDelete = true"
+          @click="() => { confirmDelete = true }"
         />
         <template v-else>
           <span class="text-xs text-red-400">Löschen?</span>
           <UButton color="error" @click="emit('delete', source.name)">Ja</UButton>
-          <UButton variant="ghost" @click="confirmDelete = false">Nein</UButton>
+          <UButton variant="ghost" @click="() => { confirmDelete = false }">Nein</UButton>
         </template>
       </div>
 

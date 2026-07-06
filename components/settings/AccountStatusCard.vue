@@ -171,7 +171,7 @@ const restartBot = async () => {
             color="error"
             variant="solid"
             icon="i-heroicons-exclamation-triangle"
-            @click="showEmergencyConfirm = true"
+            @click="() => { showEmergencyConfirm = true }"
           >
             Notschalter
             <UIcon name="i-heroicons-information-circle" class="ml-1 w-4 h-4" />
@@ -182,7 +182,7 @@ const restartBot = async () => {
             color="warning"
             variant="soft"
             icon="i-heroicons-x-mark"
-            @click="showClosePositionsConfirm = true"
+            @click="() => { showClosePositionsConfirm = true }"
           >
             Positionen schließen
           </UButton>
@@ -192,7 +192,7 @@ const restartBot = async () => {
             color="neutral"
             variant="outline"
             icon="i-heroicons-arrow-path"
-            @click="showRestartConfirm = true"
+            @click="() => { showRestartConfirm = true }"
           >
             Bot neu starten
           </UButton>
@@ -225,7 +225,7 @@ const restartBot = async () => {
           <div class="flex justify-end gap-2">
             <UButton
               variant="ghost"
-              @click="showClosePositionsConfirm = false"
+              @click="() => { showClosePositionsConfirm = false }"
             >
               Abbrechen
             </UButton>
@@ -270,7 +270,7 @@ const restartBot = async () => {
           <div class="flex justify-end gap-2">
             <UButton
               variant="ghost"
-              @click="showEmergencyConfirm = false"
+              @click="() => { showEmergencyConfirm = false }"
             >
               Abbrechen
             </UButton>
@@ -316,7 +316,7 @@ const restartBot = async () => {
           <div class="flex justify-end gap-2">
             <UButton
               variant="ghost"
-              @click="showRestartConfirm = false"
+              @click="() => { showRestartConfirm = false }"
             >
               Abbrechen
             </UButton>
