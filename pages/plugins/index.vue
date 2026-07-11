@@ -13,6 +13,7 @@ pluginStore.load();
 
 const searchQuery = ref("");
 const selectedPhase = ref<PipelinePhase | "all">("all");
+const selectedNamespace = ref<string>("all");
 
 const filteredPlugins = computed(() => {
   let list = plugins.value ?? [];
@@ -21,13 +22,18 @@ const filteredPlugins = computed(() => {
     list = list.filter((p) => p.phase === selectedPhase.value);
   }
 
+  if (selectedNamespace.value !== "all") {
+    list = list.filter((p) => p.namespace === selectedNamespace.value);
+  }
+
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
     list = list.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
-        p.fqn.toLowerCase().includes(q)
+        p.fqn.toLowerCase().includes(q) ||
+        p.namespace.toLowerCase().includes(q)
     );
   }
 
@@ -41,6 +47,27 @@ const phaseOptions = computed(() => [
     value: phase,
   })),
 ]);
+
+// Source filter: namespaces derived dynamically from the loaded plugins, so a
+// new source (e.g. agent-authored) shows up automatically without hardcoding.
+const namespaceOptions = computed(() => {
+  const list = plugins.value ?? [];
+  const namespaces = [...new Set(list.map((p) => p.namespace))].sort();
+  return [
+    { label: `Alle Quellen (${list.length})`, value: "all" },
+    ...namespaces.map((ns) => ({
+      label: `${ns} (${list.filter((p) => p.namespace === ns).length})`,
+      value: ns,
+    })),
+  ];
+});
+
+/** agent-authored plugins get a distinct (violet) badge; other sources stay muted. */
+function namespaceClass(ns: string): string {
+  return ns === "agent-authored"
+    ? "text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400"
+    : "text-xs text-gray-500";
+}
 </script>
 
 <template>
@@ -53,6 +80,12 @@ const phaseOptions = computed(() => [
           icon="i-heroicons-magnifying-glass"
           placeholder="Search plugins..."
           class="w-64"
+        />
+        <USelect
+          v-model="selectedNamespace"
+          :items="namespaceOptions"
+          value-key="value"
+          class="w-48"
         />
         <USelect
           v-model="selectedPhase"
@@ -91,7 +124,7 @@ const phaseOptions = computed(() => [
               >
                 SIG
               </span>
-              <span class="text-xs text-gray-500">{{ plugin.namespace }}</span>
+              <span :class="namespaceClass(plugin.namespace)">{{ plugin.namespace }}</span>
             </div>
             <p v-if="plugin.description" class="text-sm text-gray-400 mt-1">
               {{ plugin.description }}
