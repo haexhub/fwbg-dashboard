@@ -179,6 +179,11 @@ useHead({ title: () => `Agent-Run #${runId.value}` });
                 :to="`/agents/plugins/${detail.plugin_id}`"
                 class="hover:text-gray-300"
               >Plugin #{{ detail.plugin_id }}</NuxtLink>
+              <NuxtLink
+                v-if="detail.parent_run_id"
+                :to="`/agents/runs/${detail.parent_run_id}`"
+                class="hover:text-gray-300"
+              >↑ Flow-Run #{{ detail.parent_run_id }}</NuxtLink>
               <span>Dauer {{ durationText() }}</span>
               <span v-if="detail.total_input_tokens || detail.total_output_tokens">
                 {{ detail.total_input_tokens }}→{{ detail.total_output_tokens }} Tokens
@@ -218,6 +223,27 @@ useHead({ title: () => `Agent-Run #${runId.value}` });
           >
             Zur Backtest-Übersicht{{ fwbgRunId ? ` (${fwbgRunId})` : "" }}
           </UButton>
+        </div>
+      </UCard>
+
+      <!-- Kind-Runs (Flow drill-down) -->
+      <UCard v-if="detail.children.length">
+        <p class="mb-2 text-xs font-medium text-gray-400 uppercase tracking-wide">
+          Kind-Runs
+        </p>
+        <div class="space-y-1">
+          <NuxtLink
+            v-for="child in detail.children"
+            :key="child.id"
+            :to="`/agents/runs/${child.id}`"
+            class="flex items-center gap-2 text-sm text-gray-300 hover:text-white"
+          >
+            <span class="text-gray-500">#{{ child.id }}</span>
+            <span>{{ agentLabel(child.agent_name) }}</span>
+            <UBadge :color="agentRunStatusColor(child.status)" variant="subtle" size="xs">
+              {{ child.status }}
+            </UBadge>
+          </NuxtLink>
         </div>
       </UCard>
 

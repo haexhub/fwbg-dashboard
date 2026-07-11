@@ -153,6 +153,7 @@ export interface AgentRun {
   status: AgentRunStatus;
   strategy_id: number | null;
   plugin_id: number | null;
+  parent_run_id: number | null;
   input_artifact_path: string | null;
   output_artifact_path: string | null;
   error: string | null;
@@ -195,6 +196,13 @@ export interface ArtifactInfo {
   size: number | null;
 }
 
+/** A child run spawned under a flow run (flow drill-down). */
+export interface AgentRunChild {
+  id: number;
+  agent_name: string;
+  status: AgentRunStatus;
+}
+
 /** Enriched detail (`GET /agents/runs/:id`) — additive over the flat AgentRun row. */
 export interface AgentRunDetail extends AgentRun {
   llm_calls: LlmCallSummary[];
@@ -202,6 +210,7 @@ export interface AgentRunDetail extends AgentRun {
   total_output_tokens: number;
   transcripts: TranscriptRound[];
   artifacts: ArtifactInfo[];
+  children: AgentRunChild[];
 }
 
 /** Text content of a run artifact (`GET /agents/runs/:id/artifact`). */
