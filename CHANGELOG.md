@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.25.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.2...v1.25.0) (2026-07-11)
+
+
+### Features
+
+* **agents:** agent-run detail view with live timeline + LLM session (Plan 006 frontend) ([e760797](https://github.com/haexhub/fwbg-dashboard/commit/e760797afdbe6f1f9fc97a50fff9620b2cdfbf84))
+* **agents:** flow drill-down on the run detail page (Plan 008 Schritt 5) ([2312b78](https://github.com/haexhub/fwbg-dashboard/commit/2312b7867e084627555babb29366e70eafcdfb67))
+* **agents:** flow drill-down on the run detail page (Plan 008 Schritt 5) ([63815d9](https://github.com/haexhub/fwbg-dashboard/commit/63815d9e14b6ebd6d244d1d61ddd7209006d2036))
+* **agents:** Plan 006 — agent-run detail view (frontend) ([93f799c](https://github.com/haexhub/fwbg-dashboard/commit/93f799ce2a922d66804398ffc2cba666ea18d8fb))
+* **plugins:** Plan 007 — source filter + search + agent-authored badge ([250f761](https://github.com/haexhub/fwbg-dashboard/commit/250f7611d6a778db8aeef0c89921e4764db2eaf9))
+* **plugins:** source (namespace) filter + search + agent-authored badge ([070eddd](https://github.com/haexhub/fwbg-dashboard/commit/070edddc29f988af2112cb6cbe4c9df95f89b988))
+
 ## [1.24.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.1...v1.24.2) (2026-07-06)
 
 
