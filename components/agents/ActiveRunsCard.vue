@@ -4,7 +4,7 @@ import type {
   ResearchSearchEvent,
 } from "~/composables/useAgentEvents";
 import type { AgentRun, AgentConfigListResponse } from "~/types/agents";
-import { agentRunStatusColor } from "~/types/agents";
+import { AGENT_LABELS, agentRunStatusColor } from "~/types/agents";
 
 interface ResearchProgress {
   queries: string[];
@@ -197,17 +197,11 @@ async function retryRun(run: AgentRun) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function openRun(id: number) {
+  navigateTo(`/agents/runs/${id}`);
+}
 
-const AGENT_LABELS: Record<string, string> = {
-  research_flow: "Research",
-  researcher: "Researcher",
-  runner: "Runner",
-  analyst: "Analyst",
-  paper_analyst: "Paper-Analyst",
-  promote_live: "Promote Live",
-  reiterate: "Reiterate",
-};
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function relativeTime(ts: string | null): string {
   if (!ts) return "—";
@@ -258,7 +252,8 @@ const tabs = [
         <div
           v-for="run in activeRuns"
           :key="run.id"
-          class="rounded-lg border border-gray-800 p-3 space-y-2"
+          class="rounded-lg border border-gray-800 p-3 space-y-2 cursor-pointer hover:border-gray-700"
+          @click="openRun(run.id)"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 flex-wrap">
@@ -290,7 +285,7 @@ const tabs = [
                 color="error"
                 variant="ghost"
                 :loading="actionLoading[run.id]"
-                @click="cancelRun(run)"
+                @click.stop="cancelRun(run)"
               >
                 Abbrechen
               </UButton>
@@ -335,6 +330,7 @@ const tabs = [
                     rel="noopener"
                     class="block text-xs text-blue-400 hover:text-blue-300 truncate"
                     :title="u.url"
+                    @click.stop
                   >
                     {{ u.title || u.url }}
                   </a>
@@ -359,7 +355,8 @@ const tabs = [
           <div
             v-for="run in recentFailed"
             :key="`failed-${run.id}`"
-            class="rounded-lg border border-gray-800 p-3 space-y-2"
+            class="rounded-lg border border-gray-800 p-3 space-y-2 cursor-pointer hover:border-gray-700"
+            @click="openRun(run.id)"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -378,7 +375,7 @@ const tabs = [
                   color="primary"
                   variant="ghost"
                   :loading="actionLoading[run.id]"
-                  @click="retryRun(run)"
+                  @click.stop="retryRun(run)"
                 >
                   Wiederholen
                 </UButton>
@@ -406,7 +403,8 @@ const tabs = [
         <div
           v-for="run in historyRuns"
           :key="run.id"
-          class="px-4 py-2.5"
+          class="px-4 py-2.5 cursor-pointer hover:bg-gray-900/50"
+          @click="openRun(run.id)"
         >
           <div class="flex items-center gap-3">
             <span

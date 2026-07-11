@@ -19,6 +19,11 @@ function summarize(event: AgentEvent): string {
   const { ts, type, ...rest } = event;
   return JSON.stringify(rest);
 }
+
+function runIdOf(event: AgentEvent): number | null {
+  const id = (event as { agent_run_id?: unknown }).agent_run_id;
+  return typeof id === "number" ? id : null;
+}
 </script>
 
 <template>
@@ -47,6 +52,13 @@ function summarize(event: AgentEvent): string {
           <div class="flex items-center gap-2">
             <span class="text-white font-medium">{{ event.type }}</span>
             <span class="text-xs text-gray-500">{{ relativeTime(event.ts) }}</span>
+            <NuxtLink
+              v-if="runIdOf(event) !== null"
+              :to="`/agents/runs/${runIdOf(event)}`"
+              class="text-xs text-blue-400 hover:text-blue-300"
+            >
+              Run #{{ runIdOf(event) }}
+            </NuxtLink>
           </div>
           <p class="text-xs text-gray-500 font-mono truncate">{{ summarize(event) }}</p>
         </div>

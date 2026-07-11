@@ -160,6 +160,60 @@ export interface AgentRun {
   ended_at: string | null;
 }
 
+/**
+ * One entry on a run's timeline (`GET /agents/runs/:id/events`, live SSE).
+ * `type` is the event kind (agent_run_started, research_search, llm_tool_call,
+ * backtest_submitted, …); the remaining keys are the event-specific payload,
+ * so the interface stays open. `seq` de-dupes backfill against live events.
+ */
+export interface AgentRunEvent {
+  seq: number;
+  ts: string;
+  type: string;
+  agent_run_id?: number;
+  [key: string]: unknown;
+}
+
+/** One LLM round-trip's token/latency telemetry (from `llm_call` rows). */
+export interface LlmCallSummary {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  latency_ms: number | null;
+  created_at: string | null;
+}
+
+export interface TranscriptRound {
+  round: number;
+  size: number;
+}
+
+export interface ArtifactInfo {
+  kind: "input" | "output";
+  path: string | null;
+  exists: boolean;
+  size: number | null;
+}
+
+/** Enriched detail (`GET /agents/runs/:id`) — additive over the flat AgentRun row. */
+export interface AgentRunDetail extends AgentRun {
+  llm_calls: LlmCallSummary[];
+  total_input_tokens: number;
+  total_output_tokens: number;
+  transcripts: TranscriptRound[];
+  artifacts: ArtifactInfo[];
+}
+
+/** Text content of a run artifact (`GET /agents/runs/:id/artifact`). */
+export interface ArtifactContent {
+  kind: string;
+  path: string;
+  suffix: string;
+  size: number;
+  truncated: boolean;
+  content: string;
+}
+
 export interface ResearchBriefInput {
   // Optional: omitted = asset-agnostic research (the strategy-first default).
   // When set, must be a value from fwbg's asset registry (/api/assets/classes),
@@ -314,6 +368,27 @@ export function agentRunStatusColor(status: AgentRunStatus | string): BadgeColor
     default:
       return "neutral";
   }
+}
+
+/** Human-readable labels for every agent_name the backend emits. */
+export const AGENT_LABELS: Record<string, string> = {
+  research_flow: "Research",
+  researcher: "Researcher",
+  runner: "Runner",
+  analyst: "Analyst",
+  paper_analyst: "Paper-Analyst",
+  promote_live: "Promote Live",
+  reiterate: "Reiterate",
+  translator: "Translator",
+  plugin_planner: "Plugin-Planner",
+  plugin_implementer: "Plugin-Implementer",
+  plugin_author_flow: "Plugin-Autor",
+  plugin_evaluator_flow: "Plugin-Evaluator",
+  translator_reiterate_flow: "Reiterate (Plugin)",
+};
+
+export function agentLabel(name: string): string {
+  return AGENT_LABELS[name] ?? name;
 }
 
 // ──────────────────────────────────────────────
