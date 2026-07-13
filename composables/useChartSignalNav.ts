@@ -151,8 +151,8 @@ export function useChartSignalNav(
       }
       chart.removeIndicator({ name: SIGNAL_MARKER_NAME });
       chart.createIndicator(
-        { name: SIGNAL_MARKER_NAME },
-        { isStack: true, pane: { id: "candle_pane" } },
+        { name: SIGNAL_MARKER_NAME, paneId: "candle_pane" },
+        true,
       );
     } else if (signalMarkerActive.value) {
       chart.removeIndicator({ name: SIGNAL_MARKER_NAME });
