@@ -55,7 +55,7 @@ async function loadDetail() {
     }
   } catch (e) {
     if ((e as { statusCode?: number }).statusCode === 404) {
-      await navigateTo("/agents/strategies");
+      await navigateTo("/agents/strategies", { replace: true });
     } else {
       throw e;
     }

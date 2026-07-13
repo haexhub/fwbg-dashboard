@@ -30,7 +30,7 @@ async function fetchDetail() {
     detail.value = await $fetch<AgentRunDetail>(`/api/agents/runs/${runId.value}`);
   } catch (e) {
     if ((e as { statusCode?: number }).statusCode === 404) {
-      await navigateTo("/agents");
+      await navigateTo("/agents", { replace: true });
     } else {
       loadError.value = "Run konnte nicht geladen werden.";
     }
