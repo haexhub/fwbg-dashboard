@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.25.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.25.0...v1.25.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* **agents:** redirect to list page on 404 instead of showing inline error ([f3c6886](https://github.com/haexhub/fwbg-dashboard/commit/f3c68860f66bb3e3d510679df37ba3e8002358d0))
+* **agents:** redirect to list page on 404 instead of showing inline error ([dfc00cd](https://github.com/haexhub/fwbg-dashboard/commit/dfc00cdb05913dce02578e973fb52ad78be813b2))
+* **agents:** use replace navigation on 404 redirects to avoid back-button loop ([78c6a6b](https://github.com/haexhub/fwbg-dashboard/commit/78c6a6b40171037ee952240e23273f3e05ac63ae))
+* bump klinecharts to stable 10.0.0 ([4b49faa](https://github.com/haexhub/fwbg-dashboard/commit/4b49faa8978deec29c1e580ca904b91090783882))
+* klinecharts 10.0.0 breaking changes, revert typescript to 6.0.3 ([4f825cb](https://github.com/haexhub/fwbg-dashboard/commit/4f825cb135d832ba0fd7eb8a40fdb7a92ac915ac))
+* klinecharts 10.0.0 breaking changes, revert typescript to 6.0.3 ([fd62816](https://github.com/haexhub/fwbg-dashboard/commit/fd62816ce19472c4643f73e464b6a0159740029b))
+* revert incompatible typescript/klinecharts bumps, fix RunStartModal type error ([0a99dba](https://github.com/haexhub/fwbg-dashboard/commit/0a99dba50d0d802232c55ae98ada10c547084154))
+
 ## [1.25.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.24.2...v1.25.0) (2026-07-11)
 
 
