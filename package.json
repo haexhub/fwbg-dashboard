@@ -40,7 +40,7 @@
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
     "happy-dom": "^20.3.7",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.7"
   }

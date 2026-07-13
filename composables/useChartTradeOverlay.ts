@@ -119,8 +119,9 @@ export function useChartTradeOverlay() {
             const colors: Record<string, string> = {};
             plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgIndicator(instanceId, response, plotCols, colors);
-            chart?.createIndicator({ name: instanceId }, { isStack: false, pane: { height: 120 } });
+            chart?.createIndicator({ name: instanceId }, false);
             const paneId = chart ? (chart.getIndicators({ name: instanceId })[0] as any)?.paneId ?? "" : "";
+            if (chart && paneId) chart.setPaneOptions({ id: paneId, height: 120 });
 
             // Add ORB range zone rectangles on candle pane (if indicator provides them)
             if (response.range_zones?.length && chart) {
@@ -135,7 +136,7 @@ export function useChartTradeOverlay() {
                 chart.removeIndicator({ name: ORB_ZONE_NAME });
                 if (hasOrbZones()) {
                   ensureOrbZoneRegistered();
-                  chart.createIndicator({ name: ORB_ZONE_NAME }, { isStack: true, pane: { id: "candle_pane" } });
+                  chart.createIndicator({ name: ORB_ZONE_NAME, paneId: "candle_pane" }, true);
                 }
               }
             }
@@ -148,8 +149,9 @@ export function useChartTradeOverlay() {
             const sigColors: Record<string, string> = {};
             sigCols.forEach((col, i) => { sigColors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgSignalIndicator(sigId, response, sigCols, sigColors);
-            chart?.createIndicator({ name: sigId }, { isStack: false, pane: { height: 80 } });
+            chart?.createIndicator({ name: sigId }, false);
             const paneId = chart ? (chart.getIndicators({ name: sigId })[0] as any)?.paneId ?? "" : "";
+            if (chart && paneId) chart.setPaneOptions({ id: paneId, height: 80 });
             const transitions = extractSignalTransitions(response, sigCols);
             ctx.addIndicator({ id: sigId, fqn: plugin.fqn, name: `${plugin.name} (signal)`, params: entry.params ?? plugin.defaults, columns: sigCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap });
           }
@@ -198,7 +200,7 @@ export function useChartTradeOverlay() {
       if (chart) {
         ensureTradeMarkerRegistered();
         chart.removeIndicator({ name: TRADE_MARKER_NAME });
-        chart.createIndicator({ name: TRADE_MARKER_NAME }, { isStack: true, pane: { id: "candle_pane" } });
+        chart.createIndicator({ name: TRADE_MARKER_NAME, paneId: "candle_pane" }, true);
         tradeOverlayActive.value = true;
 
         const first = markers.reduce<RunTradeMarker | null>(
