@@ -23,6 +23,14 @@ const assetClassOptions = [
   { label: "CRYPTO", value: "CRYPTO" },
 ];
 
+function toggleAssetClass(value: string) {
+  if (assetClasses.value.includes(value)) {
+    assetClasses.value = assetClasses.value.filter((c) => c !== value);
+  } else {
+    assetClasses.value.push(value);
+  }
+}
+
 async function handleStart() {
   starting.value = true;
   try {
@@ -83,11 +91,7 @@ async function handleStart() {
               :key="opt.value"
               :variant="assetClasses.includes(opt.value) ? 'solid' : 'outline'"
               size="sm"
-              @click="
-                assetClasses.includes(opt.value)
-                  ? (assetClasses = assetClasses.filter((c) => c !== opt.value))
-                  : assetClasses.push(opt.value)
-              "
+              @click="toggleAssetClass(opt.value)"
             >
               {{ opt.label }}
             </UButton>
