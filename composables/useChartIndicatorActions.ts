@@ -72,7 +72,7 @@ function refreshOrbZoneOverlay(chart: Chart | null) {
   chart.removeIndicator({ name: ORB_ZONE_NAME });
   if (hasOrbZones()) {
     ensureOrbZoneRegistered();
-    chart.createIndicator({ name: ORB_ZONE_NAME }, { isStack: true, pane: { id: "candle_pane" } });
+    chart.createIndicator({ name: ORB_ZONE_NAME, paneId: "candle_pane" }, true);
   }
 }
 
@@ -83,6 +83,14 @@ function refreshOrbZoneOverlay(chart: Chart | null) {
 function getIndicatorPaneId(chart: import("klinecharts").Chart, name: string): string {
   const inds = chart.getIndicators({ name });
   return (inds[0] as any)?.paneId ?? "";
+}
+
+/** Create a new (non-stacked) indicator pane and set its initial height. */
+function createIndicatorPane(chart: Chart, name: string, height: number): string {
+  chart.createIndicator({ name }, false);
+  const paneId = getIndicatorPaneId(chart, name);
+  if (paneId) chart.setPaneOptions({ id: paneId, height });
+  return paneId;
 }
 
 export function useChartIndicatorActions() {
@@ -130,11 +138,10 @@ export function useChartIndicatorActions() {
       let paneId = "";
       if (chart) {
         if (isMainOverlay) {
-          chart.createIndicator({ name: instanceId }, { isStack: true, pane: { id: "candle_pane" } });
+          chart.createIndicator({ name: instanceId, paneId: "candle_pane" }, true);
           paneId = "candle_pane";
         } else {
-          chart.createIndicator({ name: instanceId }, { isStack: false, pane: { height: 150 } });
-          paneId = getIndicatorPaneId(chart, instanceId);
+          paneId = createIndicatorPane(chart, instanceId, 150);
         }
       }
 
@@ -158,7 +165,7 @@ export function useChartIndicatorActions() {
           overlayColors[col] = LINE_COLORS[i % LINE_COLORS.length]!;
         });
         registerFwbgOverlayIndicator(overlayId, response, overlayCols, overlayColors);
-        chart.createIndicator({ name: overlayId }, { isStack: true, pane: { id: "candle_pane" } });
+        chart.createIndicator({ name: overlayId, paneId: "candle_pane" }, true);
       }
 
       ctx.addIndicator({
@@ -219,8 +226,7 @@ export function useChartIndicatorActions() {
       const chart = ctx.getChart();
       let paneId = "";
       if (chart) {
-        chart.createIndicator({ name: instanceId }, { isStack: false, pane: { height: 80 } });
-        paneId = getIndicatorPaneId(chart, instanceId);
+        paneId = createIndicatorPane(chart, instanceId, 80);
       }
 
       const transitions = extractSignalTransitions(response, validColumns);
@@ -278,8 +284,7 @@ export function useChartIndicatorActions() {
           const colors: Record<string, string> = {};
           plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
           registerFwbgIndicator(instanceId, response, plotCols, colors);
-          chart?.createIndicator({ name: instanceId }, { isStack: false, pane: { height: 120 } });
-          const paneId = chart ? getIndicatorPaneId(chart, instanceId) : "";
+          const paneId = chart ? createIndicatorPane(chart, instanceId, 120) : "";
           if (response.range_zones?.length) {
             const activeSessions = extractSessions(plotCols);
             const filtered = response.range_zones.filter(z => activeSessions.has(z.session));
@@ -293,7 +298,7 @@ export function useChartIndicatorActions() {
             const overlayColors: Record<string, string> = {};
             overlayCols.forEach((col, i) => { overlayColors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgOverlayIndicator(overlayId, response, overlayCols, overlayColors);
-            chart.createIndicator({ name: overlayId }, { isStack: true, pane: { id: "candle_pane" } });
+            chart.createIndicator({ name: overlayId, paneId: "candle_pane" }, true);
           }
           ctx.addIndicator({ id: instanceId, fqn: plugin.fqn, name: plugin.name, params: plugin.defaults, columns: plotCols, paneId, overlayId });
         }
@@ -303,8 +308,7 @@ export function useChartIndicatorActions() {
           const sigColors: Record<string, string> = {};
           sigCols.forEach((col, i) => { sigColors[col] = SIG_PALETTE[i % SIG_PALETTE.length]!; });
           registerFwbgSignalIndicator(sigId, response, sigCols, sigColors);
-          chart?.createIndicator({ name: sigId }, { isStack: false, pane: { height: 80 } });
-          const paneId = chart ? getIndicatorPaneId(chart, sigId) : "";
+          const paneId = chart ? createIndicatorPane(chart, sigId, 80) : "";
           const transitions = extractSignalTransitions(response, sigCols);
           ctx.addIndicator({ id: sigId, fqn: plugin.fqn, name: `${plugin.name} (signal)`, params: plugin.defaults, columns: sigCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap });
         }
@@ -379,8 +383,7 @@ export function useChartIndicatorActions() {
             const colors: Record<string, string> = {};
             plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgSignalIndicator(sigId, response, plotCols, colors);
-            chart?.createIndicator({ name: sigId }, { isStack: false, pane: { height: 80 } });
-            const paneId = chart ? getIndicatorPaneId(chart, sigId) : "";
+            const paneId = chart ? createIndicatorPane(chart, sigId, 80) : "";
             const transitions = extractSignalTransitions(response, plotCols);
             ctx.addIndicator({ id: sigId, fqn: entry.fqn, name: `${plugin.name} (signal)`, params: entry.params, columns: plotCols, paneId, isSignal: true, signalTimestamps: transitions.timestamps, signalValueMap: transitions.valueMap, indicatorTimeframe: entry.indicatorTimeframe });
           } else {
@@ -388,8 +391,7 @@ export function useChartIndicatorActions() {
             const colors: Record<string, string> = {};
             plotCols.forEach((col, i) => { colors[col] = LINE_COLORS[i % LINE_COLORS.length]!; });
             registerFwbgIndicator(instanceId, response, plotCols, colors);
-            chart?.createIndicator({ name: instanceId }, { isStack: false, pane: { height: 120 } });
-            const paneId = chart ? getIndicatorPaneId(chart, instanceId) : "";
+            const paneId = chart ? createIndicatorPane(chart, instanceId, 120) : "";
             if (response.range_zones?.length) {
               const activeSessions = extractSessions(plotCols);
               const filtered = response.range_zones.filter(z => activeSessions.has(z.session));
