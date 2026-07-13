@@ -25,6 +25,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # nuxi typecheck shells out to a real `node` process for vue-tsc (not
+      # Bun's runtime), so without this the runner's ambient system Node
+      # version is used - it drifts with the ubuntu-latest image and has
+      # caused non-deterministic type-check failures.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.1"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
