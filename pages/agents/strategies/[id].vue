@@ -26,7 +26,6 @@ const { pollRun } = useAgentRuns();
 
 const detail = ref<AgentStrategyDetail | null>(null);
 const loading = ref(true);
-const notFound = ref(false);
 const paperSummary = ref<PaperSummary | null>(null);
 const paperPositions = ref<PaperPosition[]>([]);
 
@@ -44,7 +43,6 @@ const showPaperTab = computed(
 
 async function loadDetail() {
   loading.value = true;
-  notFound.value = false;
   try {
     detail.value = await getStrategyDetail(strategyId.value);
     if (showPaperTab.value) {
@@ -57,7 +55,7 @@ async function loadDetail() {
     }
   } catch (e) {
     if ((e as { statusCode?: number }).statusCode === 404) {
-      notFound.value = true;
+      await navigateTo("/agents/strategies");
     } else {
       throw e;
     }
@@ -160,9 +158,6 @@ const showPromoteModal = ref(false);
       Lade Strategie...
     </div>
 
-    <div v-else-if="notFound" class="py-16 text-center text-gray-400">
-      Strategie nicht gefunden.
-    </div>
 
     <template v-else-if="strategy">
       <!-- Header -->

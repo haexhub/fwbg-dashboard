@@ -28,8 +28,12 @@ function ingest(e: AgentRunEvent) {
 async function fetchDetail() {
   try {
     detail.value = await $fetch<AgentRunDetail>(`/api/agents/runs/${runId.value}`);
-  } catch {
-    loadError.value = "Run konnte nicht geladen werden.";
+  } catch (e) {
+    if ((e as { statusCode?: number }).statusCode === 404) {
+      await navigateTo("/agents");
+    } else {
+      loadError.value = "Run konnte nicht geladen werden.";
+    }
   }
 }
 
