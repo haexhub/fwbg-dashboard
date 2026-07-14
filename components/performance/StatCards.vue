@@ -30,11 +30,25 @@ defineProps<{
       </div>
     </UCard>
 
-    <!-- Sharpe Ratio -->
+    <!-- Deflated Sharpe Ratio (falls back to plain Sharpe when the global
+         trial census isn't available, e.g. fwbg-agents unreachable or no
+         trial history yet) -->
     <UCard>
       <div class="text-center">
-        <p class="text-sm text-gray-400">Sharpe Ratio</p>
+        <p class="text-sm text-gray-400">
+          {{ data.dsr != null ? "Deflated Sharpe" : "Sharpe Ratio" }}
+        </p>
         <p
+          v-if="data.dsr != null"
+          :class="[
+            'text-2xl font-bold',
+            data.dsr >= 0.95 ? 'text-green-500' : 'text-white',
+          ]"
+        >
+          {{ formatNumber(data.dsr, 3) }}
+        </p>
+        <p
+          v-else
           :class="[
             'text-2xl font-bold',
             (data.sharpeRatio ?? 0) >= 1 ? 'text-green-500' : 'text-white',
@@ -44,7 +58,13 @@ defineProps<{
             data.sharpeRatio != null ? formatNumber(data.sharpeRatio, 2) : "-"
           }}
         </p>
-        <p class="text-xs text-gray-500">Risikoadjustiert</p>
+        <p class="text-xs text-gray-500">
+          {{
+            data.dsr != null
+              ? `Ggü. ${data.nTrials} Trials dedupliziert`
+              : "Risikoadjustiert"
+          }}
+        </p>
       </div>
     </UCard>
 
