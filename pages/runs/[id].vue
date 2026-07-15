@@ -138,7 +138,12 @@ const analysisSymbol = computed(() => {
       v-if="strategyName"
       class="flex items-center gap-3 text-sm text-gray-400"
     >
-      <span class="font-medium text-white">{{ strategyName }}</span>
+      <NuxtLink
+        :to="`/strategy/${strategyName}/pipeline`"
+        class="font-medium text-white hover:text-blue-400 transition-colors"
+      >
+        {{ strategyName }}
+      </NuxtLink>
       <span v-if="detail?.strategy?.description">
         — {{ detail.strategy.description }}
       </span>

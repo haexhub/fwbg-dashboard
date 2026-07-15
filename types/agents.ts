@@ -313,6 +313,12 @@ export interface CriteriaDetailResponse {
   path: string;
 }
 
+export interface TrialsSummary {
+  n_trials: number;
+  sr_variance_across_trials: number | null;
+  sr_variance_sample_size: number;
+}
+
 export interface CriteriaUpdateResponse {
   asset_class: string;
   path: string;

@@ -11,6 +11,8 @@ import type {
   TradeRecord,
   AssetPerformance,
 } from "~/types/performance";
+import type { TrialsSummary } from "~/types/agents";
+import { deflatedSharpeRatio, seriesMoments } from "~/utils/dsr";
 
 /**
  * Fetches run detail + grid details and aggregates into PerformanceData.
@@ -18,12 +20,26 @@ import type {
 export function useRunPerformance(runId: string) {
   const detail = ref<RunDetail | null>(null);
   const gridDetails = ref<GridDetail[]>([]);
+  const trialsSummary = ref<TrialsSummary | null>(null);
   const loading = ref(true);
   const error = ref<string | null>(null);
 
   async function load() {
     loading.value = true;
     error.value = null;
+
+    // DSR display degrades gracefully to plain Sharpe when fwbg-agents (a
+    // separate service) isn't reachable or has no trial history yet — this
+    // must never block or fail the main run view. Fired in parallel with the
+    // run fetch so the card doesn't render plain Sharpe first and then flip
+    // to DSR once the census arrives.
+    const trialsFetch = $fetch<TrialsSummary>("/api/agents/trials/summary")
+      .then((s) => {
+        trialsSummary.value = s;
+      })
+      .catch(() => {
+        trialsSummary.value = null;
+      });
 
     try {
       detail.value = await $fetch<RunDetail>(`/api/runs/${runId}`);
@@ -43,11 +59,13 @@ export function useRunPerformance(runId: string) {
     } finally {
       loading.value = false;
     }
+
+    await trialsFetch;
   }
 
   const performance = computed<PerformanceData | null>(() => {
     if (!gridDetails.value.length) return null;
-    return aggregatePerformance(gridDetails.value);
+    return aggregatePerformance(gridDetails.value, trialsSummary.value);
   });
 
   return { detail, gridDetails, performance, loading, error, load };
@@ -162,7 +180,10 @@ interface PreparedFold {
   testSize: number;
 }
 
-export function aggregatePerformance(details: GridDetail[]): PerformanceData {
+export function aggregatePerformance(
+  details: GridDetail[],
+  trialsSummary: TrialsSummary | null = null,
+): PerformanceData {
   const assetBreakdown: AssetPerformance[] = [];
 
   // Unified metrics that only the backend can compute
@@ -254,6 +275,10 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
   let totalLosses = 0;
   let grossProfit = 0;
   let grossLoss = 0;
+  // Old runs without pnl_raw fall back to synthetic ±(tp/sl × spread) trade
+  // values; their skew/kurtosis are artifacts of that reconstruction, so the
+  // DSR (a probability claim built on those moments) is skipped for them.
+  let allTradesHaveRealPnl = true;
 
   // Per-asset accumulators for breakdown
   const assetPnl = new Map<string, number>();
@@ -279,6 +304,7 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
           tradePnl = t.pnl;
         } else {
           tradePnl = t.result === 1 ? pf.winPnl : pf.lossPnl;
+          allTradesHaveRealPnl = false;
         }
 
         tradePnlValues.push(tradePnl);
@@ -399,6 +425,32 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     calmarRatio = Math.round(Math.min(10, totalReturn / Math.max(absoluteMaxDrawdown, 0.01)) * 100) / 100;
   }
 
+  // Deflated Sharpe Ratio: needs this run's own real trade series (skew/
+  // kurtosis/per-trade SR) plus the global trial census from fwbg-agents.
+  // Null when either side is missing or the P&L values are synthetic
+  // reconstructions — never a fabricated number.
+  let dsr: number | null = null;
+  const nTrials = trialsSummary?.n_trials ?? null;
+  if (
+    trialsSummary?.sr_variance_across_trials != null &&
+    tradePnlValues.length >= 2 &&
+    allTradesHaveRealPnl
+  ) {
+    const moments = seriesMoments(tradePnlValues);
+    if (moments) {
+      dsr = Math.round(
+        deflatedSharpeRatio(
+          moments.sr,
+          trialsSummary.sr_variance_across_trials,
+          Math.max(trialsSummary.n_trials, 1),
+          tradePnlValues.length,
+          moments.skew,
+          moments.kurtosis,
+        ) * 1000,
+      ) / 1000;
+    }
+  }
+
   return {
     totalTrades,
     winRate,
@@ -408,6 +460,8 @@ export function aggregatePerformance(details: GridDetail[]): PerformanceData {
     avgLoss,
     sharpeRatio,
     calmarRatio,
+    dsr,
+    nTrials,
     maxDrawdown: Math.round(absoluteMaxDrawdown * 100) / 100,
     maxDrawdownPct,
     annualReturn,
