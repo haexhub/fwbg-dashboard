@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.27.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.27.0...v1.27.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* bind runs pagination page via v-model ([e32b76d](https://github.com/haexhub/fwbg-dashboard/commit/e32b76d4b50d57039fcf3c6b61c3b356a6754535))
+* **pagination:** bind UPagination page via v-model:page ([130e068](https://github.com/haexhub/fwbg-dashboard/commit/130e06874899449afced4703c8cc2051d9b7cd64))
+* **pagination:** bind UPagination via v-model:page ([96ab41f](https://github.com/haexhub/fwbg-dashboard/commit/96ab41f19df1b9bd385a7efe0b678e2577290852))
+
 ## [1.27.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.26.0...v1.27.0) (2026-07-15)
 
 
