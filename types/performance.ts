@@ -12,6 +12,11 @@ export interface PerformanceData {
   avgLoss: number;
   sharpeRatio: number | null;
   calmarRatio: number | null;
+  /** Deflated Sharpe Ratio (Bailey/López de Prado 2014), 0-1 probability.
+   * Null when the global trial census is unavailable or too small to
+   * estimate cross-trial variance from — never a fabricated value. */
+  dsr: number | null;
+  nTrials: number | null;
   maxDrawdown: number;
   maxDrawdownPct: number; // percentage of peak equity
   annualReturn: number | null; // percentage, e.g. 12.5 = 12.5%
