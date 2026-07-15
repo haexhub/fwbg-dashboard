@@ -150,6 +150,8 @@ export function useLivePerformance(accountId: Ref<string>) {
       avgLoss: Math.round(avgLoss * 100) / 100,
       sharpeRatio: null,
       calmarRatio: null,
+      dsr: null,
+      nTrials: null,
       maxDrawdown: perf.maxDrawdown,
       maxDrawdownPct: Math.round(maxDdPct * 10) / 10,
       annualReturn: null,
