@@ -376,7 +376,7 @@ const columns: TableColumn<RunSummary>[] = [
       <span class="text-sm text-gray-500">
         {{ total }} Runs gesamt
       </span>
-      <UPagination v-model="page" :total="total" :items-per-page="20" />
+      <UPagination v-model:page="page" :total="total" :items-per-page="20" />
     </div>
 
     <!-- Single delete confirmation -->
