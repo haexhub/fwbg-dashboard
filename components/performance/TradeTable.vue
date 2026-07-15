@@ -158,7 +158,7 @@ const columns = computed<TableColumn<IndexedTrade>[]>(() => {
           />
         </div>
         <UPagination
-          v-model="page"
+          v-model:page="page"
           :total="trades.length"
           :items-per-page="pageSize"
         />
