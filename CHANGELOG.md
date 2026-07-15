@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.27.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.26.0...v1.27.0) (2026-07-15)
+
+
+### Features
+
+* **runs:** link strategy name to pipeline view ([caf1f08](https://github.com/haexhub/fwbg-dashboard/commit/caf1f08f20a8951c5fc8ad8358a74d3f7ba7e53c))
+* **runs:** link strategy name to pipeline view ([2c64ea5](https://github.com/haexhub/fwbg-dashboard/commit/2c64ea5edd9861560a1a54fe2ec0dccf229e4c2b))
+* **runs:** show run duration in runs overview ([ebc9068](https://github.com/haexhub/fwbg-dashboard/commit/ebc90687346a5579d0d2b45dc475fee59dccc35f))
+* **runs:** show run duration in runs overview ([d35bc83](https://github.com/haexhub/fwbg-dashboard/commit/d35bc83f4f019d4f85839c65d29d2e551f89c1fb))
+
+## [1.26.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.25.1...v1.26.0) (2026-07-15)
+
+
+### Features
+
+* **performance:** show Deflated Sharpe Ratio instead of Sharpe Ratio ([b36d0fb](https://github.com/haexhub/fwbg-dashboard/commit/b36d0fb8d1231242c49dd960085a3d91244bcf88))
+
+
+### Bug Fixes
+
+* **performance:** review fixes for DSR display ([ce872a9](https://github.com/haexhub/fwbg-dashboard/commit/ce872a9845e3d379d83818c0a8500c4767c1d81b))
+
 ## [1.25.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.25.0...v1.25.1) (2026-07-13)
 
 

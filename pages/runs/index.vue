@@ -98,6 +98,17 @@ function formatDate(ts?: string): string {
   });
 }
 
+function formatDuration(seconds?: number): string {
+  if (seconds == null) return "-";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 // ── Sortable header helper ──
 function sortableHeader(label: string) {
   return ({ column }: { column: { getIsSorted: () => false | "asc" | "desc"; toggleSorting: (desc: boolean) => void } }) => {
@@ -158,6 +169,11 @@ const columns: TableColumn<RunSummary>[] = [
     id: "timestamp",
     accessorFn: (row) => row.timestamp || row.started_at || "",
     header: sortableHeader("Datum"),
+  },
+  {
+    id: "duration",
+    accessorFn: (row) => row.duration_seconds ?? 0,
+    header: sortableHeader("Dauer"),
   },
   {
     id: "assets",
@@ -301,6 +317,13 @@ const columns: TableColumn<RunSummary>[] = [
         <template #timestamp-cell="{ row }">
           <span class="text-sm text-gray-400">
             {{ formatDate(row.original.timestamp || row.original.started_at) }}
+          </span>
+        </template>
+
+        <!-- Dauer -->
+        <template #duration-cell="{ row }">
+          <span class="text-sm text-gray-400 font-mono">
+            {{ formatDuration(row.original.duration_seconds) }}
           </span>
         </template>
 
