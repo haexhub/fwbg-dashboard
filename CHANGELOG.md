@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.26.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.25.1...v1.26.0) (2026-07-15)
+
+
+### Features
+
+* **performance:** show Deflated Sharpe Ratio instead of Sharpe Ratio ([b36d0fb](https://github.com/haexhub/fwbg-dashboard/commit/b36d0fb8d1231242c49dd960085a3d91244bcf88))
+
+
+### Bug Fixes
+
+* **performance:** review fixes for DSR display ([ce872a9](https://github.com/haexhub/fwbg-dashboard/commit/ce872a9845e3d379d83818c0a8500c4767c1d81b))
+
 ## [1.25.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.25.0...v1.25.1) (2026-07-13)
 
 
