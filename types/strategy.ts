@@ -291,6 +291,7 @@ export interface RunSummary {
   asset_count?: number;
   profitable_count?: number;
   is_active?: boolean;
+  duration_seconds?: number;
 }
 
 export interface WalkForwardSummary {
