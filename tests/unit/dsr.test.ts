@@ -52,10 +52,12 @@ describe("seriesMoments", () => {
   });
 
   it("computes sr/skew/kurtosis for a simple series", () => {
+    // Population moments of [1, -2, 3, -1, 2]: mean 0.6, m2 3.44,
+    // m3 -1.008, m4 17.8592 — same convention as orchestrator/trials.py.
     const moments = seriesMoments([1, -2, 3, -1, 2]);
     expect(moments).not.toBeNull();
-    expect(typeof moments!.sr).toBe("number");
-    expect(typeof moments!.skew).toBe("number");
-    expect(typeof moments!.kurtosis).toBe("number");
+    expect(moments!.sr).toBeCloseTo(0.3234983, 6);
+    expect(moments!.skew).toBeCloseTo(-0.1579876, 6);
+    expect(moments!.kurtosis).toBeCloseTo(1.5091942, 6);
   });
 });

@@ -61,7 +61,7 @@ defineProps<{
         <p class="text-xs text-gray-500">
           {{
             data.dsr != null
-              ? `Ggü. ${data.nTrials} Trials dedupliziert`
+              ? `Ggü. ${data.nTrials} Trials deflationiert`
               : "Risikoadjustiert"
           }}
         </p>
