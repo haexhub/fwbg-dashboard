@@ -11,7 +11,7 @@
         "@nuxt/ui": "^4.9.0",
         "@nuxtjs/mdc": "^0.22.1",
         "@pinia/nuxt": "0.11.3",
-        "@vue-dnd-kit/core": "^2.4.6",
+        "@vue-dnd-kit/core": "^2.4.7",
         "@vueuse/core": "^14.3.0",
         "ai": "^7.0.22",
         "echarts": "^6.1.0",
@@ -740,7 +740,7 @@
 
     "@volar/typescript": ["@volar/typescript@2.4.28", "", { "dependencies": { "@volar/language-core": "2.4.28", "path-browserify": "^1.0.1", "vscode-uri": "^3.0.8" } }, "sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw=="],
 
-    "@vue-dnd-kit/core": ["@vue-dnd-kit/core@2.4.6", "", { "peerDependencies": { "vue": "^3.5.13" } }, "sha512-MnfO05RTGyhxq0d0VmkPHoBbwa7U1Yt8MtE1s8ngnu9uyI3RC1t0IIi4/ULABDuTr6957IueYWHSdAt9hRZXqQ=="],
+    "@vue-dnd-kit/core": ["@vue-dnd-kit/core@2.4.7", "", { "peerDependencies": { "vue": "^3.5.13" } }, "sha512-v477XFegqzoAPwkl5dcfds/ySyPdSdg0q5vlqXgAQdbUI5SmhN/pb4Sr8gBU23b+1qYB5KBF/B1JAvuVGUUQwA=="],
 
     "@vue-macros/common": ["@vue-macros/common@3.1.2", "", { "dependencies": { "@vue/compiler-sfc": "^3.5.22", "ast-kit": "^2.1.2", "local-pkg": "^1.1.2", "magic-string-ast": "^1.0.2", "unplugin-utils": "^0.3.0" }, "peerDependencies": { "vue": "^2.7.0 || ^3.2.25" }, "optionalPeers": ["vue"] }, "sha512-h9t4ArDdniO9ekYHAD95t9AZcAbb19lEGK+26iAjUODOIJKmObDNBSe4+6ELQAA3vtYiFPPBtHh7+cQCKi3Dng=="],
 
