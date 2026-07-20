@@ -13,10 +13,17 @@ export type ClaudeProxySetupState =
   | "done"
   | "error";
 
+export interface ClaudeProxyAccountInfo {
+  organizationUuid: string | null;
+  subscriptionType: string | null;
+  emailAddress: string | null;
+}
+
 export interface ClaudeProxySetupStatus {
   state: ClaudeProxySetupState;
   oauthUrl: string | null;
   errorMessage: string | null;
   startedAt: string | null;
   credentialsExist: boolean;
+  accountInfo: ClaudeProxyAccountInfo | null;
 }
