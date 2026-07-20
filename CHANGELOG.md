@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.27.1...v1.28.0) (2026-07-20)
+
+
+### Features
+
+* show authenticated account info on the Claude connection card ([53afb7b](https://github.com/haexhub/fwbg-dashboard/commit/53afb7bad489c1b06a9f06c0311148b317886159))
+
 ## [1.27.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.27.0...v1.27.1) (2026-07-15)
 
 
