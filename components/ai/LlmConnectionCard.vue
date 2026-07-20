@@ -83,6 +83,20 @@ async function handleRetry() {
         <p class="text-sm text-gray-400">
           Claude ist über haex-claude-proxy verbunden. Sowohl die Agents (Researcher, Translator, ...) als auch der AI-Assistent unten nutzen diese eine Verbindung.
         </p>
+        <dl v-if="status?.accountInfo" class="text-sm space-y-1">
+          <div v-if="status.accountInfo.emailAddress" class="flex gap-2">
+            <dt class="text-gray-500">Account</dt>
+            <dd class="text-gray-300">{{ status.accountInfo.emailAddress }}</dd>
+          </div>
+          <div v-if="status.accountInfo.subscriptionType" class="flex gap-2">
+            <dt class="text-gray-500">Abo</dt>
+            <dd class="text-gray-300">{{ status.accountInfo.subscriptionType }}</dd>
+          </div>
+          <div v-if="status.accountInfo.organizationUuid" class="flex gap-2">
+            <dt class="text-gray-500">Organisation</dt>
+            <dd class="text-gray-300 font-mono text-xs">{{ status.accountInfo.organizationUuid }}</dd>
+          </div>
+        </dl>
         <UButton variant="outline" color="neutral" :loading="starting" @click="handleStart">
           Neu verbinden
         </UButton>
