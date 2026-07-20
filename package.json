@@ -21,7 +21,7 @@
     "@ai-sdk/openai": "^4.0.16",
     "@nuxt/ui": "^4.9.0",
     "@nuxtjs/mdc": "^0.22.2",
-    "@pinia/nuxt": "0.11.3",
+    "@pinia/nuxt": "1.0.1",
     "@vue-dnd-kit/core": "^2.4.7",
     "@vueuse/core": "^14.3.0",
     "ai": "^7.0.31",
