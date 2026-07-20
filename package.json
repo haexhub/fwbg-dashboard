@@ -39,7 +39,7 @@
     "@nuxt/test-utils": "^4.0.3",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
-    "happy-dom": "^20.3.7",
+    "happy-dom": "^20.11.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.7"
