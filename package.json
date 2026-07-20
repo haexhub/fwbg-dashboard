@@ -22,7 +22,7 @@
     "@nuxt/ui": "^4.9.0",
     "@nuxtjs/mdc": "^0.22.1",
     "@pinia/nuxt": "0.11.3",
-    "@vue-dnd-kit/core": "^2.4.6",
+    "@vue-dnd-kit/core": "^2.4.7",
     "@vueuse/core": "^14.3.0",
     "ai": "^7.0.22",
     "echarts": "^6.1.0",
