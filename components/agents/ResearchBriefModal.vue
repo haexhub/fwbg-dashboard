@@ -56,6 +56,8 @@ async function submit() {
     });
     emit("created");
     close();
+    // Open the run straight away so its live timeline/reasoning is visible.
+    await navigateTo(`/agents/runs/${result.agent_run_id}`);
   } catch (e) {
     const err = e as { statusMessage?: string; message?: string; data?: { detail?: string; message?: string } };
     errorMessage.value =
