@@ -7,13 +7,17 @@ export default defineEventHandler(async (event) => {
   const symbol = getRouterParam(event, "symbol");
 
   const apiUrl = process.env.FWBG_API_URL || "http://localhost:8420";
+  const apiKey = process.env.FWBG_API_KEY || "";
   const url = `${apiUrl}/api/runs/${id}/discovery/${symbol}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 300_000);
 
   try {
-    const upstream = await fetch(url, { signal: controller.signal });
+    const upstream = await fetch(url, {
+      signal: controller.signal,
+      headers: apiKey ? { "X-API-Key": apiKey } : undefined,
+    });
 
     if (!upstream.ok) {
       clearTimeout(timer);
