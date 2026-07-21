@@ -409,6 +409,7 @@ export function agentRunStatusColor(status: AgentRunStatus | string): BadgeColor
 export const AGENT_LABELS: Record<string, string> = {
   research_flow: "Research",
   researcher: "Researcher",
+  critic: "Critic",
   runner: "Runner",
   analyst: "Analyst",
   paper_analyst: "Paper-Analyst",
