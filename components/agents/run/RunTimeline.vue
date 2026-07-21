@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AgentRunEvent } from "~/types/agents";
+import { agentLabel } from "~/types/agents";
 
 const props = defineProps<{ events: AgentRunEvent[] }>();
 
@@ -47,18 +48,29 @@ function extraPayload(e: AgentRunEvent): Record<string, unknown> {
   <ol v-else class="space-y-2">
     <li
       v-for="e in props.events"
-      :key="e.seq"
+      :key="`${e.agent_run_id ?? 0}:${e.seq}`"
       class="rounded-lg border border-gray-800 p-3 text-xs"
       :class="e.type === 'implementer_round_failed' || e.type === 'agent_run_failed' ? 'border-red-900/60' : ''"
     >
       <div class="flex items-center gap-2 mb-1">
         <span class="font-mono text-gray-500 shrink-0">{{ time(e.ts) }}</span>
+        <span
+          v-if="e.agent_name"
+          class="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-gray-400"
+        >{{ agentLabel(e.agent_name as string) }}</span>
         <span class="font-medium text-gray-300">{{ e.type }}</span>
         <span v-if="e.round" class="text-gray-600">Runde {{ e.round }}</span>
       </div>
 
+      <!-- flow_phase -->
+      <div v-if="e.type === 'flow_phase'" class="flex items-center gap-2 text-gray-400">
+        <span class="text-gray-500">▸</span>
+        <span class="text-primary-400 font-medium">{{ e.phase }}</span>
+        <span v-if="e.title" class="text-gray-400 truncate">· {{ e.title }}</span>
+      </div>
+
       <!-- research_search -->
-      <div v-if="e.type === 'research_search'" class="flex items-center gap-2">
+      <div v-else-if="e.type === 'research_search'" class="flex items-center gap-2">
         <span class="text-gray-500">🔍</span>
         <span class="font-mono text-gray-300 break-all">{{ e.query }}</span>
       </div>
