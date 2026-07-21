@@ -145,7 +145,14 @@ export type AgentName =
   | "promote_live"
   | "research_flow"
   | "researcher"
-  | "reiterate";
+  | "reiterate"
+  | "translator"
+  | "critic"
+  | "plugin_planner"
+  | "plugin_implementer"
+  | "plugin_author_flow"
+  | "plugin_evaluator_flow"
+  | "translator_reiterate_flow";
 
 export interface AgentRun {
   id: number;
@@ -203,6 +210,18 @@ export interface AgentRunChild {
   status: AgentRunStatus;
 }
 
+/**
+ * A run anywhere in a flow's subtree (recursive, `descendants` on the detail
+ * endpoint). Carries `parent_run_id` so the client can render the tree and
+ * knows the full id set to filter the live SSE stream against.
+ */
+export interface AgentRunDescendant {
+  id: number;
+  agent_name: string;
+  status: AgentRunStatus;
+  parent_run_id: number | null;
+}
+
 /** Enriched detail (`GET /agents/runs/:id`) — additive over the flat AgentRun row. */
 export interface AgentRunDetail extends AgentRun {
   llm_calls: LlmCallSummary[];
@@ -211,6 +230,7 @@ export interface AgentRunDetail extends AgentRun {
   transcripts: TranscriptRound[];
   artifacts: ArtifactInfo[];
   children: AgentRunChild[];
+  descendants?: AgentRunDescendant[];
 }
 
 /** Text content of a run artifact (`GET /agents/runs/:id/artifact`). */
@@ -389,6 +409,7 @@ export function agentRunStatusColor(status: AgentRunStatus | string): BadgeColor
 export const AGENT_LABELS: Record<string, string> = {
   research_flow: "Research",
   researcher: "Researcher",
+  critic: "Critic",
   runner: "Runner",
   analyst: "Analyst",
   paper_analyst: "Paper-Analyst",

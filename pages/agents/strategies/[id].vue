@@ -22,7 +22,6 @@ const {
   analyzeStrategy,
   paperAnalyzeStrategy,
 } = useAgentStrategies();
-const { pollRun } = useAgentRuns();
 
 const detail = ref<AgentStrategyDetail | null>(null);
 const loading = ref(true);
@@ -127,16 +126,9 @@ async function handleAction(
   runningAction.value = action;
   try {
     const { agent_run_id } = await fn();
-    const { promise } = pollRun(agent_run_id);
-    const run = await promise;
-    toast.add({
-      title: run.status === "done" ? "Abgeschlossen" : "Fehlgeschlagen",
-      description: run.status === "done"
-        ? `Agent-Run #${run.id} erfolgreich abgeschlossen.`
-        : (run.error ?? `Agent-Run #${run.id} fehlgeschlagen.`),
-      color: run.status === "done" ? "success" : "error",
-    });
-    await loadDetail();
+    // Open the run instead of blocking on a poll+toast — the run detail view
+    // shows the live timeline/reasoning as it happens.
+    await navigateTo(`/agents/runs/${agent_run_id}`);
   } catch (e) {
     toast.add({ title: "Fehler", description: extractErrorMessage(e), color: "error" });
   } finally {
