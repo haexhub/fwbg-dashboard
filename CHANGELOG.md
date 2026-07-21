@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.0...v1.29.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* send X-API-Key header to fwbg API ([cbd2de5](https://github.com/haexhub/fwbg-dashboard/commit/cbd2de56c503064856dbf26c88d818bc170c6f7b))
+* send X-API-Key header to fwbg API ([ead0c22](https://github.com/haexhub/fwbg-dashboard/commit/ead0c227963d653effadd85a6cac9cbf050dc49f))
+
 ## [1.29.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.28.0...v1.29.0) (2026-07-21)
 
 
