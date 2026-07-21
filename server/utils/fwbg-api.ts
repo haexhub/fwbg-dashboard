@@ -6,6 +6,7 @@
  */
 
 const FWBG_API_URL = process.env.FWBG_API_URL || "http://localhost:8420";
+const FWBG_API_KEY = process.env.FWBG_API_KEY || "";
 
 /** Default timeout for fwbg API calls (ms). Indicator computation can be slow. */
 const DEFAULT_TIMEOUT = 120_000;
@@ -26,6 +27,7 @@ export async function fwbgFetch<T>(
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
+        ...(FWBG_API_KEY ? { "X-API-Key": FWBG_API_KEY } : {}),
         ...options?.headers,
       },
     });
