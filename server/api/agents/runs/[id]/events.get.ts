@@ -8,6 +8,9 @@ export default defineEventHandler(async (event) => {
   // Pass include_descendants through so the envelope view can aggregate the
   // whole flow subtree's events in one call.
   const { include_descendants } = getQuery(event);
-  const qs = include_descendants ? `?include_descendants=${include_descendants}` : "";
+  const raw = Array.isArray(include_descendants) ? include_descendants[0] : include_descendants;
+  const params = new URLSearchParams();
+  if (raw) params.set("include_descendants", String(raw));
+  const qs = params.toString() ? `?${params.toString()}` : "";
   return fwbgAgentsFetch<Array<Record<string, unknown>>>(`/agents/runs/${id}/events${qs}`);
 });

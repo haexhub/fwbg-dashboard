@@ -230,7 +230,7 @@ export interface AgentRunDetail extends AgentRun {
   transcripts: TranscriptRound[];
   artifacts: ArtifactInfo[];
   children: AgentRunChild[];
-  descendants: AgentRunDescendant[];
+  descendants?: AgentRunDescendant[];
 }
 
 /** Text content of a run artifact (`GET /agents/runs/:id/artifact`). */

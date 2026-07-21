@@ -47,6 +47,12 @@ function rebuildRunIndex() {
 const timeline = ref<AgentRunEvent[]>([]);
 const seen = new Set<string>();
 const lastActiveChildId = ref<number | null>(null);
+// Cap the timeline for long-running flows (mirrors useAgentEvents' MAX_EVENTS).
+const MAX_TIMELINE = 200;
+
+function eventOrder(a: AgentRunEvent, b: AgentRunEvent) {
+  return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.seq - b.seq;
+}
 
 // Live reasoning token stream (llm_delta — live-only, never persisted), keyed
 // by `${run}:${round}`. Feeds the reasoning panel, not the timeline.
@@ -96,8 +102,16 @@ function ingest(e: AgentRunEvent) {
   if (seen.has(k)) return;
   seen.add(k);
   if (!e.agent_name && runNames.value.has(src)) e.agent_name = runNames.value.get(src);
-  timeline.value.push(e);
-  timeline.value.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.seq - b.seq));
+  // Ordered insertion — events arrive close to time-order per source, so scan
+  // from the tail rather than re-sorting the whole array on every push.
+  const arr = timeline.value;
+  let i = arr.length;
+  for (let prev = arr[i - 1]; prev && eventOrder(prev, e) > 0; prev = arr[i - 1]) i--;
+  arr.splice(i, 0, e);
+  if (arr.length > MAX_TIMELINE) {
+    const dropped = arr.shift();
+    if (dropped) seen.delete(`${dropped.agent_run_id}:${dropped.seq}`);
+  }
   // Track the active child so the LLM-session tab + header follow it.
   if (
     src !== runId.value &&
@@ -163,8 +177,13 @@ watch(
       if (src === sessionRunId.value) loadSessionTranscripts();
       if (src === runId.value) fetchDetail(); // refresh token totals + transcript index
     }
-    // Any terminal child event → refresh statuses, tokens, descendants.
+    // Any terminal child event → drop the run's lingering live reasoning buffer
+    // (a run may terminate without a final llm_round_done) and refresh statuses,
+    // tokens, descendants.
     if (evt.type === "agent_run_done" || evt.type === "agent_run_failed") {
+      for (const r of reasoning.value.values()) {
+        if (r.runId === src) clearReasoning(src, r.round);
+      }
       fetchDetail();
     }
   },
@@ -229,12 +248,16 @@ function durationText(): string {
 // empty envelope (WP-F4). For a leaf run this is just runId. ─────────────────
 const sessionRunId = computed(() => lastActiveChildId.value ?? runId.value);
 const sessionTranscripts = ref<TranscriptRound[]>([]);
+// Guard against out-of-order responses: sessionRunId can change again before an
+// in-flight fetch resolves — only the latest request may write the result.
+let sessionRequestId = 0;
 async function loadSessionTranscripts() {
+  const reqId = ++sessionRequestId;
   try {
     const d = await $fetch<AgentRunDetail>(`/api/agents/runs/${sessionRunId.value}`);
-    sessionTranscripts.value = d.transcripts;
+    if (reqId === sessionRequestId) sessionTranscripts.value = d.transcripts;
   } catch {
-    sessionTranscripts.value = [];
+    if (reqId === sessionRequestId) sessionTranscripts.value = [];
   }
 }
 watch(sessionRunId, loadSessionTranscripts, { immediate: true });
