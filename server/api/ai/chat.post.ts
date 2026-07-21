@@ -62,16 +62,18 @@ function getAnthropicProxyModel(modelId: string) {
 function makeFwbgTools(fwbgApiUrl: string) {
   const base = fwbgApiUrl.replace(/\/?$/, "");
   const agentsBase = (process.env.FWBG_AGENTS_API_URL || "http://localhost:8421").replace(/\/?$/, "");
+  const apiKey = process.env.FWBG_API_KEY || "";
+  const apiKeyHeader: Record<string, string> = apiKey ? { "X-API-Key": apiKey } : {};
 
   const apiFetch = async (path: string) => {
-    const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(30_000) });
+    const res = await fetch(`${base}${path}`, { headers: apiKeyHeader, signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     return res.json();
   };
   const apiPut = async (path: string, body: unknown) => {
     const res = await fetch(`${base}${path}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...apiKeyHeader },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
@@ -81,7 +83,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
   const apiPost = async (path: string, body: unknown) => {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...apiKeyHeader },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
