@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.29.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.28.0...v1.29.0) (2026-07-21)
+
+
+### Features
+
+* live flow-run overview (aggregated timeline + reasoning stream) ([794efe8](https://github.com/haexhub/fwbg-dashboard/commit/794efe820700e655ef065f742249de5962d45965))
+* live flow-run overview (aggregated timeline + reasoning stream) ([a52c2b1](https://github.com/haexhub/fwbg-dashboard/commit/a52c2b12131e1e4d8f8b61f9490f509886188b1f))
+
+
+### Bug Fixes
+
+* add missing critic agent label ([3e351d6](https://github.com/haexhub/fwbg-dashboard/commit/3e351d6d4cc5fe209630691cc7909063958708e0))
+* address code review on flow-run overview ([b41966a](https://github.com/haexhub/fwbg-dashboard/commit/b41966adf7aea0260a74a82626ee781247f1aedc))
+
 ## [1.28.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.27.1...v1.28.0) (2026-07-20)
 
 
