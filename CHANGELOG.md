@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.1...v1.29.2) (2026-07-22)
+
+
+### Bug Fixes
+
+* skip transcript fetch for rounds with no data ([4b40026](https://github.com/haexhub/fwbg-dashboard/commit/4b40026473b9800939873cc67c0f42123036176d))
+* skip transcript fetch for rounds with no data ([5dbf50f](https://github.com/haexhub/fwbg-dashboard/commit/5dbf50ff9ab9f1d785fefb1df2ce7c120615a39d))
+
 ## [1.29.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.0...v1.29.1) (2026-07-21)
 
 
