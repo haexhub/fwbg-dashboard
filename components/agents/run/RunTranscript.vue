@@ -21,6 +21,10 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 async function load(round: number) {
+  // No transcript for this round yet (e.g. a flow-envelope run, which never
+  // has one, or a leaf run still mid-round) — skip the request instead of
+  // hitting the API for a 404 the template already renders around.
+  if (!props.transcripts.some((t) => t.round === round)) return;
   loading.value = true;
   error.value = null;
   try {
