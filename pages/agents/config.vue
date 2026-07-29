@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import type { AgentConfig, AgentConfigListResponse } from "~/types/agents";
-import { CONFIGURABLE_AGENT_LABELS } from "~/types/agents";
+import type {
+  AgentConfig,
+  AgentConfigListResponse,
+  AgentSecretKey,
+  AgentSecretsStatus,
+} from "~/types/agents";
+import { AGENT_SECRET_LABELS, CONFIGURABLE_AGENT_LABELS } from "~/types/agents";
 
 definePageMeta({ ssr: false });
 
@@ -10,6 +15,60 @@ const { data, refresh, status, error } = await useFetch<AgentConfigListResponse>
 );
 
 const availableModels = computed(() => data.value?.available_models ?? []);
+
+function extractError(e: unknown): string {
+  const err = e as { statusMessage?: string; data?: { detail?: string } };
+  return err?.data?.detail ?? err?.statusMessage ?? "Aktion fehlgeschlagen";
+}
+
+// ── Provider credentials (tavily/brave/google) ──────────────────────────
+// Values are never returned by the backend, only set/not-set — the input
+// fields are always write-only, seeded empty regardless of stored state.
+const SECRET_KEYS: AgentSecretKey[] = ["tavily", "brave", "google"];
+const { data: secretsData, refresh: refreshSecrets } =
+  await useFetch<AgentSecretsStatus>("/api/agents/secrets");
+
+const secretInputs = reactive<Record<AgentSecretKey, string>>({
+  tavily: "",
+  brave: "",
+  google: "",
+});
+const savingSecret = ref<AgentSecretKey | null>(null);
+
+function isSecretSet(key: AgentSecretKey): boolean {
+  return secretsData.value?.keys?.[key]?.set ?? false;
+}
+
+async function saveSecret(key: AgentSecretKey) {
+  const value = secretInputs[key];
+  if (!value) return;
+  savingSecret.value = key;
+  try {
+    await $fetch("/api/agents/secrets", { method: "PUT", body: { [key]: value } });
+    secretInputs[key] = "";
+    // A newly-set "google" key can change which models are selectable, so
+    // refresh both — not just the secrets status.
+    await Promise.all([refreshSecrets(), refresh()]);
+    toast.add({ title: `${AGENT_SECRET_LABELS[key]} gespeichert`, color: "success" });
+  } catch (err) {
+    toast.add({ title: "Fehler", description: extractError(err), color: "error" });
+  } finally {
+    savingSecret.value = null;
+  }
+}
+
+async function clearSecret(key: AgentSecretKey) {
+  savingSecret.value = key;
+  try {
+    await $fetch("/api/agents/secrets", { method: "PUT", body: { [key]: null } });
+    await Promise.all([refreshSecrets(), refresh()]);
+    toast.add({ title: `${AGENT_SECRET_LABELS[key]} entfernt`, color: "success" });
+  } catch (err) {
+    toast.add({ title: "Fehler", description: extractError(err), color: "error" });
+  } finally {
+    savingSecret.value = null;
+  }
+}
 
 // Per-agent editable copy (model + prompt), keyed by agent name. Seeded from
 // the server's effective values; user edits are preserved across refreshes.
@@ -34,11 +93,6 @@ const savingName = ref<string | null>(null);
 function isDirty(a: AgentConfig): boolean {
   const e = edits[a.name];
   return !!e && (e.model !== a.model || e.prompt !== a.prompt);
-}
-
-function extractError(e: unknown): string {
-  const err = e as { statusMessage?: string; data?: { detail?: string } };
-  return err?.data?.detail ?? err?.statusMessage ?? "Aktion fehlgeschlagen";
 }
 
 async function save(a: AgentConfig) {
@@ -90,12 +144,61 @@ async function resetToDefault(a: AgentConfig) {
       <h2 class="text-xl font-semibold text-white">Agenten konfigurieren</h2>
     </div>
 
+    <UCard>
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-heroicons-key" class="w-5 h-5 text-primary" />
+          <span class="text-base font-semibold text-white">Provider-Zugangsdaten</span>
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <p class="text-xs text-gray-500">
+          Werte werden nur geschrieben, nie wieder angezeigt. Ein leeres Feld ändert nichts;
+          "Entfernen" löscht den gespeicherten Wert (Fallback auf die entsprechende
+          Umgebungsvariable, falls gesetzt).
+        </p>
+        <div v-for="key in SECRET_KEYS" :key="key" class="flex items-center gap-3">
+          <div class="w-56 shrink-0 flex items-center gap-2">
+            <span class="text-sm text-gray-300">{{ AGENT_SECRET_LABELS[key] }}</span>
+            <UBadge :color="isSecretSet(key) ? 'success' : 'neutral'" variant="subtle" size="xs">
+              {{ isSecretSet(key) ? "gesetzt" : "nicht gesetzt" }}
+            </UBadge>
+          </div>
+          <UInput
+            v-model="secretInputs[key]"
+            type="password"
+            placeholder="Neuen Wert setzen…"
+            class="flex-1"
+          />
+          <UButton
+            color="primary"
+            variant="soft"
+            :loading="savingSecret === key"
+            :disabled="!secretInputs[key]"
+            @click="saveSecret(key)"
+          >
+            Speichern
+          </UButton>
+          <UButton
+            v-if="isSecretSet(key)"
+            color="neutral"
+            variant="ghost"
+            :loading="savingSecret === key"
+            @click="clearSecret(key)"
+          >
+            Entfernen
+          </UButton>
+        </div>
+      </div>
+    </UCard>
+
     <UAlert
       color="info"
       variant="subtle"
       icon="i-heroicons-information-circle"
       title="Modell & Persona pro Agent"
-      description="Wähle pro Agent ein Claude-Modell und passe optional den System-Prompt (Persona) an. Platzhalter wie {{ asset_class }} müssen erhalten bleiben. Änderungen greifen beim nächsten Agent-Run."
+      description="Wähle pro Agent ein Modell (Claude oder — sofern ein Google-Gemini-Key hinterlegt ist — Gemini) und passe optional den System-Prompt (Persona) an. Platzhalter wie {{ asset_class }} müssen erhalten bleiben. Änderungen greifen beim nächsten Agent-Run."
     />
 
     <div v-if="error" class="py-12 flex flex-col items-center gap-4 text-center">
