@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.30.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.2...v1.30.0) (2026-07-29)
+
+
+### Features
+
+* add provider credentials card to agent config page ([b5d1fa4](https://github.com/haexhub/fwbg-dashboard/commit/b5d1fa425c21e8637b33665dcee4f5758b461857))
+* add provider credentials card to agent config page ([5bbe626](https://github.com/haexhub/fwbg-dashboard/commit/5bbe6262d89b1d83505ebe663b1de72f24be72eb))
+
+
+### Bug Fixes
+
+* address CodeRabbit findings on the provider credentials card ([70f437b](https://github.com/haexhub/fwbg-dashboard/commit/70f437b450030ddb2ddd2c917ed7689e5595ffab))
+
 ## [1.29.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.1...v1.29.2) (2026-07-22)
 
 
