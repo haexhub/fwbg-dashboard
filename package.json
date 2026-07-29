@@ -42,7 +42,7 @@
     "happy-dom": "^20.11.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.8"
   },
   "overrides": {
     "@unhead/vue": "3.2.1"
