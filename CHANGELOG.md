@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.30.0...v1.30.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **api:** show the agents API's reason instead of raw JSON ([455d6bb](https://github.com/haexhub/fwbg-dashboard/commit/455d6bbe87735a8ad658e775a4e091a5de70e25e))
+* **api:** show the agents API's reason instead of raw JSON ([faa08b3](https://github.com/haexhub/fwbg-dashboard/commit/faa08b3916f8798920406458ed71091ed3b56c3f))
+
 ## [1.30.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.29.2...v1.30.0) (2026-07-29)
 
 
