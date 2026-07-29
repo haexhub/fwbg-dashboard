@@ -25,8 +25,12 @@ function extractError(e: unknown): string {
 // Values are never returned by the backend, only set/not-set — the input
 // fields are always write-only, seeded empty regardless of stored state.
 const SECRET_KEYS: AgentSecretKey[] = ["tavily", "brave", "google"];
-const { data: secretsData, refresh: refreshSecrets } =
-  await useFetch<AgentSecretsStatus>("/api/agents/secrets");
+const {
+  data: secretsData,
+  refresh: refreshSecrets,
+  status: secretsStatus,
+  error: secretsError,
+} = await useFetch<AgentSecretsStatus>("/api/agents/secrets");
 
 const secretInputs = reactive<Record<AgentSecretKey, string>>({
   tavily: "",
@@ -158,38 +162,59 @@ async function resetToDefault(a: AgentConfig) {
           "Entfernen" löscht den gespeicherten Wert (Fallback auf die entsprechende
           Umgebungsvariable, falls gesetzt).
         </p>
-        <div v-for="key in SECRET_KEYS" :key="key" class="flex items-center gap-3">
-          <div class="w-56 shrink-0 flex items-center gap-2">
-            <span class="text-sm text-gray-300">{{ AGENT_SECRET_LABELS[key] }}</span>
-            <UBadge :color="isSecretSet(key) ? 'success' : 'neutral'" variant="subtle" size="xs">
-              {{ isSecretSet(key) ? "gesetzt" : "nicht gesetzt" }}
-            </UBadge>
-          </div>
-          <UInput
-            v-model="secretInputs[key]"
-            type="password"
-            placeholder="Neuen Wert setzen…"
-            class="flex-1"
-          />
+        <div
+          v-if="secretsError"
+          class="flex items-center justify-between gap-3 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2"
+        >
+          <span class="text-sm text-red-300">Zugangsdaten-Status konnte nicht geladen werden.</span>
           <UButton
-            color="primary"
-            variant="soft"
-            :loading="savingSecret === key"
-            :disabled="!secretInputs[key]"
-            @click="saveSecret(key)"
-          >
-            Speichern
-          </UButton>
-          <UButton
-            v-if="isSecretSet(key)"
+            size="xs"
+            variant="outline"
             color="neutral"
-            variant="ghost"
-            :loading="savingSecret === key"
-            @click="clearSecret(key)"
+            :loading="secretsStatus === 'pending'"
+            @click="refreshSecrets()"
           >
-            Entfernen
+            Erneut versuchen
           </UButton>
         </div>
+        <p v-else-if="secretsStatus === 'pending'" class="text-sm text-gray-400">
+          Lade Zugangsdaten-Status…
+        </p>
+        <template v-else>
+          <div v-for="key in SECRET_KEYS" :key="key" class="flex items-center gap-3">
+            <div class="w-56 shrink-0 flex items-center gap-2">
+              <span class="text-sm text-gray-300">{{ AGENT_SECRET_LABELS[key] }}</span>
+              <UBadge :color="isSecretSet(key) ? 'success' : 'neutral'" variant="subtle" size="xs">
+                {{ isSecretSet(key) ? "gesetzt" : "nicht gesetzt" }}
+              </UBadge>
+            </div>
+            <UInput
+              v-model="secretInputs[key]"
+              type="password"
+              :aria-label="AGENT_SECRET_LABELS[key]"
+              placeholder="Neuen Wert setzen…"
+              class="flex-1"
+            />
+            <UButton
+              color="primary"
+              variant="soft"
+              :loading="savingSecret === key"
+              :disabled="!secretInputs[key]"
+              @click="saveSecret(key)"
+            >
+              Speichern
+            </UButton>
+            <UButton
+              v-if="isSecretSet(key)"
+              color="neutral"
+              variant="ghost"
+              :loading="savingSecret === key"
+              @click="clearSecret(key)"
+            >
+              Entfernen
+            </UButton>
+          </div>
+        </template>
       </div>
     </UCard>
 
