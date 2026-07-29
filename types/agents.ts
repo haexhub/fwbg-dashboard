@@ -462,3 +462,29 @@ export const CONFIGURABLE_AGENT_LABELS: Record<string, string> = {
   plugin_planner: "Plugin-Planner",
   plugin_implementer: "Plugin-Implementer",
 };
+
+// ──────────────────────────────────────────────
+// Provider credentials (GET/PUT /agents/secrets)
+//
+// Values are never returned by the backend, only whether each key is
+// configured (file-backed or via its env-var fallback). Mirrors
+// fwbg_agents.tools.secrets.KNOWN_KEYS.
+// ──────────────────────────────────────────────
+
+export type AgentSecretKey = "tavily" | "brave" | "google";
+
+export interface AgentSecretsStatus {
+  keys: Record<AgentSecretKey, { set: boolean }>;
+}
+
+export interface AgentSecretsUpdate {
+  tavily?: string | null;
+  brave?: string | null;
+  google?: string | null;
+}
+
+export const AGENT_SECRET_LABELS: Record<AgentSecretKey, string> = {
+  tavily: "Tavily (Web-Recherche)",
+  brave: "Brave Search (Web-Recherche)",
+  google: "Google Gemini (LLM-Modelle)",
+};
