@@ -16,8 +16,8 @@ function buildSavePayload(config: StrategyConfig): Record<string, unknown> {
 
   const simpleSections = ["pipeline", "model", "validation", "filters", "resources", "risk_params"] as const;
   for (const key of simpleSections) {
-    const ref = refs[key as keyof typeof refs] as string | undefined;
-    if (ref) payload[key] = ref;
+    const presetRef = refs[key as keyof typeof refs] as string | undefined;
+    if (presetRef) payload[key] = presetRef;
   }
 
   return payload;
