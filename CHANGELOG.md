@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.30.1...v1.30.2) (2026-08-01)
+
+
+### Bug Fixes
+
+* rename shadowing local var in buildSavePayload to unbreak prod build ([fd92067](https://github.com/haexhub/fwbg-dashboard/commit/fd920677b44dc77568bd8cbdc4c1cee457f38516))
+* strategy page 500 error (ref is not defined) in production ([7117de4](https://github.com/haexhub/fwbg-dashboard/commit/7117de4d6bec513727400bb45fb8c4764e79d4a6))
+
 ## [1.30.1](https://github.com/haexhub/fwbg-dashboard/compare/v1.30.0...v1.30.1) (2026-07-29)
 
 
