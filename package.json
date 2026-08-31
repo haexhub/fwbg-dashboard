@@ -36,12 +36,12 @@
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.123",
-    "@nuxt/test-utils": "^4.1.0",
+    "@nuxt/test-utils": "^4.2.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.4.0",
     "happy-dom": "^20.11.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11"
   },
   "overrides": {
