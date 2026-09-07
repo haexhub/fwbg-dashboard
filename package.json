@@ -38,7 +38,7 @@
     "@iconify-json/lucide": "^1.2.126",
     "@nuxt/test-utils": "^4.2.0",
     "@playwright/test": "^1.62.1",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "happy-dom": "^20.11.12",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11",
