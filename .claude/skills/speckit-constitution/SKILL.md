@@ -128,6 +128,10 @@ Follow this execution flow:
 
 6. Write the completed constitution back to `.specify/memory/constitution.md` (overwrite).
 
+   After the review is complete, remove the temporary Sync Impact Report HTML comment from
+   `.specify/memory/constitution.md` before committing the amended constitution. Keep the report
+   in place while the draft is being reviewed after Step 6.
+
 7. Output a final summary to the user with:
    - New version and bump rationale.
    - Any TODO placeholders or deferred items requiring manual follow-up.

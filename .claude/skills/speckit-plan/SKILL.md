@@ -142,8 +142,9 @@ Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated 
    - Validation rules from requirements
    - State transitions if applicable
 
-2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
+2. **Define interface contracts** (if project has external interfaces) → `contracts/`:
    - Identify what interfaces the project exposes to users or other systems
+   - Write contract files under `FEATURE_DIR/contracts/` and refer to them as `contracts/` in project-relative documentation
    - Document the contract format appropriate for the project type
    - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
    - Skip if project is purely internal (build scripts, one-off tools, etc.)

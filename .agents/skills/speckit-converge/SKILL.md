@@ -215,8 +215,12 @@ Append to the **end** of `tasks.md`, per the append contract:
    zero-padded IDs `T{M+1:03d}, T{M+2:03d}, …`:
 
    ```markdown
-   - [ ] T042 <imperative description> per <source-ref> (<gap-type>)
+   - [ ] T042 <imperative description> in <exact/file/path> per <source-ref> (<gap-type>)
    ```
+
+   Every task description MUST name the exact file path where the work belongs, including
+   `unrequested` findings. The `<source-ref>` identifies the finding's origin; it does not replace
+   the required file path.
 
    `<source-ref>` traces the task to its origin: e.g. `FR-003`, `SC-002`,
    `US1/AC2`, `plan: storage decision`, `Constitution II`.
