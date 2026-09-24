@@ -8,3 +8,8 @@ Rules:
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 - One-time setup after cloning: `graphify hook install` to wire the post-commit/post-checkout rebuild. Without it, the graph only refreshes when you call `graphify update .` manually.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
