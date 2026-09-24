@@ -160,6 +160,8 @@ _persist_feature_json() {
     fi
 }
 
+# Print shell-quoted paths for the selected feature, resolving its directory
+# from an override or feature.json. Use --no-persist to avoid updating state.
 get_feature_paths() {
     # Read-only callers (e.g. check-prerequisites.sh --paths-only) pass
     # --no-persist so pure path resolution never writes .specify/feature.json,
@@ -242,6 +244,8 @@ has_jq() {
     command -v jq >/dev/null 2>&1
 }
 
+# Return the active integration's command separator ("." or "-").
+# Cache the result by repository root for subsequent command formatting.
 get_invoke_separator() {
     local repo_root="${1:-$(get_repo_root)}"
     if [[ "${_SPECIFY_INVOKE_SEPARATOR_CACHE_REPO_ROOT:-}" == "$repo_root" && -n "${_SPECIFY_INVOKE_SEPARATOR_CACHE_VALUE:-}" ]]; then
@@ -354,6 +358,7 @@ PY
     printf '%s\n' "$separator"
 }
 
+# Format a command name with the active integration's invocation separator.
 format_speckit_command() {
     local command_name="$1"
     local repo_root="${2:-$(get_repo_root)}"
@@ -402,9 +407,13 @@ json_escape() {
     done
 }
 
+# Print a labeled status mark indicating whether the given file exists.
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
+
+# Print a labeled status mark indicating whether the directory is nonempty.
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 
+# Print an available Python 3 command, or return failure if none works.
 _python3_command() {
     if command -v python3 >/dev/null 2>&1 &&
         python3 -c 'import sys; raise SystemExit(sys.version_info.major != 3)' >/dev/null 2>&1; then
@@ -420,6 +429,8 @@ _python3_command() {
     fi
 }
 
+# Print valid extension IDs in registry priority order, falling back to
+# directory order when no registry is present.
 _sorted_extension_ids() {
     local ext_dir="$1"
     local python_spec

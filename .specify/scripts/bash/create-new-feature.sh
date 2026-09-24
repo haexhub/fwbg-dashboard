@@ -97,6 +97,8 @@ fi
 MAX_FEATURE_NUMBER=9223372036854775807
 MAX_BRANCH_LENGTH=244
 
+# Return success if a decimal feature number fits in the supported integer range.
+# Compare digit strings to avoid overflowing shell arithmetic.
 is_feature_number_in_range() {
     local value="$1"
     local normalized="${value#"${value%%[!0]*}"}"
