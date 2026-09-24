@@ -1,7 +1,7 @@
 ---
 name: "speckit-taskstoissues"
 description: "Convert existing tasks into actionable, dependency-ordered GitHub issues for the feature based on available design artifacts."
-argument-hint: "Optional filter or label for GitHub issues"
+argument-hint: "Optional context for this conversion"
 compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
