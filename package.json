@@ -16,33 +16,33 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.21",
-    "@ai-sdk/google": "^4.0.24",
-    "@ai-sdk/openai": "^4.0.20",
-    "@nuxt/ui": "^4.10.0",
-    "@nuxtjs/mdc": "^0.22.2",
-    "@pinia/nuxt": "1.0.1",
+    "@ai-sdk/anthropic": "^4.0.52",
+    "@ai-sdk/google": "^4.0.67",
+    "@ai-sdk/openai": "^4.0.65",
+    "@nuxt/ui": "^4.11.1",
+    "@nuxtjs/mdc": "^0.23.1",
+    "@pinia/nuxt": "1.0.2",
     "@vue-dnd-kit/core": "^2.4.7",
-    "@vueuse/core": "^14.3.0",
-    "ai": "^7.0.37",
+    "@vueuse/core": "^15.0.0",
+    "ai": "^7.0.97",
     "echarts": "^6.1.0",
-    "klinecharts": "^10.0.0",
-    "nuxt": "^4.5.0",
+    "klinecharts": "^10.0.3",
+    "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3",
-    "vue": "^3.5.40",
-    "vue-router": "5.2.0",
-    "zod": "^4.4.3"
+    "vue": "^3.5.43",
+    "vue-router": "5.3.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.3",
-    "@iconify-json/lucide": "^1.2.120",
-    "@nuxt/test-utils": "^4.0.3",
-    "@playwright/test": "^1.62.0",
-    "@types/node": "^26.1.1",
-    "happy-dom": "^20.11.1",
+    "@iconify-json/lucide": "^1.2.133",
+    "@nuxt/test-utils": "^4.3.2",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.1",
+    "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10",
-    "vue-tsc": "^3.3.8"
+    "vitest": "^5.0.1",
+    "vue-tsc": "^3.3.11"
   },
   "overrides": {
     "@unhead/vue": "3.2.1"
