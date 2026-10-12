@@ -36,8 +36,8 @@
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.138",
-    "@nuxt/test-utils": "^4.3.2",
-    "@playwright/test": "^1.63.0",
+    "@nuxt/test-utils": "^4.3.3",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.4",
     "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
