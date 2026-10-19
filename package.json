@@ -29,7 +29,7 @@
     "klinecharts": "^10.0.3",
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.3",
-    "vue": "^3.5.43",
+    "vue": "^3.5.44",
     "vue-router": "5.4.0",
     "zod": "^4.6.5"
   },
@@ -42,7 +42,7 @@
     "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3",
-    "vue-tsc": "^3.3.12"
+    "vue-tsc": "^3.3.13"
   },
   "overrides": {
     "@unhead/vue": "3.2.1"
