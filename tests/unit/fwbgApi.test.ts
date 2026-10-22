@@ -1,7 +1,7 @@
 import { createError } from "h3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fwbgFetch } from "~/server/utils/fwbg-api";
+import { fwbgErrorMessage, fwbgFetch } from "~/server/utils/fwbg-api";
 
 function respondWith(body: string, status: number, statusText: string) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status, statusText })));
@@ -119,5 +119,43 @@ describe("fwbgFetch when fwbg does not answer", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(failure)));
 
     await expect(fwbgFetch("/api/runs")).rejects.toBe(failure);
+  });
+});
+
+describe("fwbgErrorMessage for a tool that calls fwbg directly", () => {
+  it("shows one line per gate denial after the status", () => {
+    const body = {
+      detail: {
+        message: "research gate refused the run",
+        denials: [
+          { code: "duplicate_fingerprint", status: 409, message: "same config as an earlier trial" },
+          { code: "holdout_repeat", status: 409, message: "holdout already used" },
+        ],
+      },
+    };
+    expect(fwbgErrorMessage(409, JSON.stringify(body))).toBe(
+      "409 duplicate_fingerprint: same config as an earlier trial\nholdout_repeat: holdout already used",
+    );
+  });
+
+  it("shows a failed preflight's message and output lines", () => {
+    const body = { detail: { message: "research preflight failed", output: "line one\n\nline two\n" } };
+    expect(fwbgErrorMessage(422, JSON.stringify(body))).toBe(
+      "422 research preflight failed\nline one\nline two",
+    );
+  });
+
+  it("shows a text detail as it is", () => {
+    expect(fwbgErrorMessage(504, JSON.stringify({ detail: "research preflight timed out" }))).toBe(
+      "504 research preflight timed out",
+    );
+  });
+
+  it.each([
+    ["a body that is not JSON", "Internal Server Error"],
+    ["a JSON body without a readable detail", JSON.stringify({ error: "x" })],
+    ["an empty body", ""],
+  ])("keeps %s unchanged", (_, body) => {
+    expect(fwbgErrorMessage(500, body)).toBe(`500 ${body}`);
   });
 });

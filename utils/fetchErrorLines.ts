@@ -47,8 +47,9 @@ function fastApiIssueLine(value: unknown): string | undefined {
 /**
  * fwbg's `detail`: gate denials, a failed preflight's message and output,
  * FastAPI's request validation items, or a text.
+ * Also used on the server, where the chat's tools read fwbg's body directly.
  */
-function fwbgDetailLines(detail: unknown): string[] | undefined {
+export function fwbgDetailLines(detail: unknown): string[] | undefined {
   const detailText = text(detail);
   if (detailText) return [detailText];
   if (Array.isArray(detail)) {

@@ -4,6 +4,7 @@
  * Proxies requests from the Nuxt server to the fwbg FastAPI backend.
  * Configured via FWBG_API_URL environment variable.
  */
+import { fwbgDetailLines } from "~/utils/fetchErrorLines";
 
 const FWBG_API_URL = process.env.FWBG_API_URL || "http://localhost:8420";
 const FWBG_API_KEY = process.env.FWBG_API_KEY || "";
@@ -17,6 +18,18 @@ function parseJsonBody(body: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * An fwbg error response as one text: the status, then fwbg's `detail` as
+ * display lines (gate denials, preflight output, a text), or the raw body when
+ * the detail is not readable.
+ */
+export function fwbgErrorMessage(status: number, body: string): string {
+  const parsed = parseJsonBody(body);
+  const detail = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
+  const lines = fwbgDetailLines(detail);
+  return `${status} ${lines ? lines.join("\n") : body}`;
 }
 
 export async function fwbgFetch<T>(

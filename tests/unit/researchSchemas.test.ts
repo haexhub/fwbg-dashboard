@@ -1,9 +1,11 @@
+import { asSchema } from "ai";
 import { describe, expect, it } from "vitest";
 
 import {
   newResearchCardSchema,
   researchListQuerySchema,
   runStartBodySchema,
+  startRunToolInputSchema,
 } from "~/server/utils/research-schemas";
 
 const validStart = {
@@ -62,6 +64,43 @@ describe("runStartBodySchema", () => {
       expect(runStartBodySchema.safeParse({ ...validStart, note: `note${boundary}` }).success).toBe(false);
     },
   );
+});
+
+describe("startRunToolInputSchema", () => {
+  it("accepts the research fields the chat tool sends", () => {
+    const input = {
+      ...validStart,
+      assets: ["NAS100"],
+      description: "",
+      reason: "rerun after a data fix",
+      holdout: true,
+    };
+    expect(startRunToolInputSchema.parse(input)).toEqual(input);
+  });
+
+  it.each([
+    ["a missing research id", { research_id: undefined }],
+    ["a research id without four digits", { research_id: "S-12" }],
+    ["a missing note", { note: undefined }],
+    ["a blank note", { note: "  " }],
+    ["a note on two lines", { note: "first\nsecond" }],
+    ["a blank reason", { reason: " " }],
+    ["a holdout flag that is not a boolean", { holdout: "yes" }],
+    ["asset classes, which the tool does not offer", { asset_classes: ["indices"] }],
+  ])("rejects %s", (_, override) => {
+    expect(startRunToolInputSchema.safeParse({ ...validStart, ...override }).success).toBe(false);
+  });
+
+  it("tells the model which fields are required and describes the research fields", async () => {
+    const schema = (await asSchema(startRunToolInputSchema).jsonSchema) as {
+      required?: string[];
+      properties: Record<string, { description?: string }>;
+    };
+    expect(schema.required?.sort()).toEqual(["note", "research_id", "strategy_name"]);
+    for (const field of ["research_id", "note", "reason", "holdout"]) {
+      expect(schema.properties[field]?.description).toBeTruthy();
+    }
+  });
 });
 
 const validCard = {

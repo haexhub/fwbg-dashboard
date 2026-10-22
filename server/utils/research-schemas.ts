@@ -46,3 +46,36 @@ export const researchListQuerySchema = z.object({
   status: z.enum(["active", "parked", "rejected", "candidate"]).optional(),
   tag: nonBlank.optional(),
 });
+
+/**
+ * The chat's `start_run` tool input: the run-start body without asset classes,
+ * with descriptions that tell the model where each research field comes from.
+ */
+export const startRunToolInputSchema = runStartBodySchema
+  .pick({
+    strategy_name: true,
+    assets: true,
+    description: true,
+    research_id: true,
+    note: true,
+    reason: true,
+    holdout: true,
+  })
+  .extend({
+    assets: runStartBodySchema.shape.assets.describe(
+      "Optional asset filter override, e.g. ['NAS100', 'DAX']",
+    ),
+    description: runStartBodySchema.shape.description.describe("Optional description of this run"),
+    research_id: runStartBodySchema.shape.research_id.describe(
+      "Research card id (S- followed by four digits) the run is a trial of. Ask the user when unknown.",
+    ),
+    note: runStartBodySchema.shape.note.describe(
+      "One line from the user: what changed in this run and why. Ask the user when unknown.",
+    ),
+    reason: runStartBodySchema.shape.reason.describe(
+      "Only for a deliberate repeat the user asked for: why the same run is repeated. Never invent one.",
+    ),
+    holdout: runStartBodySchema.shape.holdout.describe(
+      "true only when the user explicitly asks for the card's one-time holdout look.",
+    ),
+  });

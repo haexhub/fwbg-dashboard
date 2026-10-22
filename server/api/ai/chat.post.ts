@@ -21,6 +21,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
+import { fwbgErrorMessage } from "~/server/utils/fwbg-api";
+import { startRunToolInputSchema } from "~/server/utils/research-schemas";
+
 // ---------------------------------------------------------------------------
 // Provider factory
 // ---------------------------------------------------------------------------
@@ -80,14 +83,14 @@ function makeFwbgTools(fwbgApiUrl: string) {
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     return res.json();
   };
-  const apiPost = async (path: string, body: unknown) => {
+  const apiPost = async (path: string, body: unknown, timeoutMs = 30_000) => {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...apiKeyHeader },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
   const agentsFetch = async (path: string) => {
@@ -143,22 +146,16 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
     start_run: tool({
       description:
-        "Start a strategy optimization run in the background. Returns run_id immediately. " +
-        "Use get_run_status to track progress.",
-      inputSchema: z.object({
-        strategy_name: z.string(),
-        assets: z
-          .array(z.string())
-          .optional()
-          .describe("Optional asset filter override, e.g. ['NAS100', 'DAX']"),
-        description: z.string().optional().describe("Optional note for this run"),
-      }),
-      execute: async ({ strategy_name, assets, description }) => {
-        const body: Record<string, unknown> = { strategy_name };
-        if (assets) body.assets = assets;
-        if (description) body.description = description;
-        return JSON.stringify(await apiPost("/api/runs/start", body));
-      },
+        "Start a strategy optimization run in the background. Returns run_id once fwbg's research " +
+        "gate accepted the run (its preflight can take up to two minutes). Use get_run_status to track progress. " +
+        "Every run is a trial of a research card: ask the user for the card (research_id) and the note " +
+        "(what changed and why) unless both are already known from the conversation. " +
+        "Never invent a reason: it is only for a deliberate repeat the user asked for. " +
+        "Set holdout only when the user explicitly asks for a holdout look. " +
+        "A refusal lists the gate's denials; show them to the user.",
+      inputSchema: startRunToolInputSchema,
+      // fwbg answers after its research preflight, which takes up to 120 s.
+      execute: async (input) => JSON.stringify(await apiPost("/api/runs/start", input, 150_000)),
     }),
 
     get_run_status: tool({
