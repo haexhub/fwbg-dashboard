@@ -58,3 +58,43 @@ describe("fwbgFetch on a non-2xx response", () => {
     expect(err.data).toBeUndefined();
   });
 });
+
+describe("fwbgFetch when fwbg does not answer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("createError", createError);
+    // fwbg never answers; the request ends only when its signal aborts.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_, reject) => {
+            init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+          }),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("answers 504 with the timeout in the message and keeps the abort as cause", async () => {
+    const pending = rejectionOf(fwbgFetch("/api/runs/start", { method: "POST", timeout: 150_000 }));
+
+    await vi.advanceTimersByTimeAsync(150_000);
+    const err = (await pending) as { statusCode?: number; statusMessage?: string; cause?: unknown };
+
+    expect(err.statusCode).toBe(504);
+    expect(err.statusMessage).toBe("fwbg did not answer within 150 s");
+    expect((err.cause as Error).name).toBe("AbortError");
+  });
+
+  it("passes other network errors on unchanged", async () => {
+    const failure = new TypeError("fetch failed");
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(failure)));
+
+    await expect(fwbgFetch("/api/runs")).rejects.toBe(failure);
+  });
+});

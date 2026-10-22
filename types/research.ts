@@ -7,11 +7,11 @@
 
 export type ResearchStatus = "active" | "parked" | "rejected" | "candidate";
 
-/** The card's best ranked result; a `no_edge` symbol's sharpe is null. */
+/** The card's best ranked result: fwbg ranks only a numeric sharpe, other metrics may be null. */
 export interface ResearchBest {
   trial: string;
   symbol: string;
-  metrics: Record<string, number | null>;
+  metrics: { sharpe: number } & Record<string, number | null>;
 }
 
 export interface ResearchCardSummary {

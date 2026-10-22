@@ -50,6 +50,14 @@ export async function fwbgFetch<T>(
     }
 
     return res.json() as Promise<T>;
+  } catch (err) {
+    // Only this function's timer aborts the controller; the caller's signal is replaced.
+    if (!controller.signal.aborted || !(err instanceof Error) || err.name !== "AbortError") throw err;
+    throw createError({
+      statusCode: 504,
+      statusMessage: `fwbg did not answer within ${timeout / 1000} s`,
+      cause: err,
+    });
   } finally {
     clearTimeout(timer);
   }

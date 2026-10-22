@@ -27,7 +27,10 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
-/** fwbg answers the proxied request with this status and body. */
+/**
+ * fwbg answers the proxied request with this status and body. Each test that
+ * reaches fwbg calls this first: the stub is replaced per test, not reset.
+ */
 function fwbgResponds(status: number, body: string) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status })));
 }
@@ -35,6 +38,8 @@ function fwbgResponds(status: number, body: string) {
 /**
  * The error the browser's $fetch throws for a run start: the real route, behind
  * an h3 app with nitro's production error handler, called through ofetch.
+ * Nuxt's own error handler steps aside for JSON requests (every /api/ path), so
+ * nitro's production handler builds the envelope the browser receives.
  */
 async function startRunError(body: Record<string, unknown>): Promise<unknown> {
   const app = h3.createApp({ onError: nitroErrorHandler });
@@ -69,6 +74,53 @@ describe("fetchErrorLines for a refused run start", () => {
     expect(fetchErrorLines(await startRunError(validStart), FALLBACK)).toEqual([
       "duplicate_fingerprint: this config already ran",
       "after_cutoff: the window reaches past the cutoff",
+    ]);
+  });
+
+  it("skips malformed denials and keeps the valid ones", async () => {
+    fwbgResponds(
+      409,
+      JSON.stringify({
+        detail: {
+          message: "research gate refused the run",
+          denials: [null, "holdout_repeat", { code: 7 }, { code: "holdout_repeat", status: 409, message: "seen" }],
+        },
+      }),
+    );
+
+    expect(fetchErrorLines(await startRunError(validStart), FALLBACK)).toEqual(["holdout_repeat: seen"]);
+  });
+
+  it("shows the refusal message when no denial is readable", async () => {
+    fwbgResponds(
+      409,
+      JSON.stringify({ detail: { message: "research gate refused the run", denials: [{ code: "x" }, 3] } }),
+    );
+
+    expect(fetchErrorLines(await startRunError(validStart), FALLBACK)).toEqual([
+      "research gate refused the run",
+    ]);
+  });
+
+  it("shows fwbg's request validation errors per field", async () => {
+    fwbgResponds(
+      422,
+      JSON.stringify({
+        detail: [
+          { loc: ["body", "note"], msg: "Field required", type: "missing" },
+          { loc: ["body", "tags", 0], msg: "String should have at least 1 character", type: "string_too_short" },
+          { loc: ["query", "status"], msg: "Input should be 'active'", type: "enum" },
+          { msg: "Value error, bad window", type: "value_error" },
+          { loc: ["body"], type: "missing" },
+        ],
+      }),
+    );
+
+    expect(fetchErrorLines(await startRunError(validStart), FALLBACK)).toEqual([
+      "note: Field required",
+      "tags.0: String should have at least 1 character",
+      "query.status: Input should be 'active'",
+      "Value error, bad window",
     ]);
   });
 
@@ -150,6 +202,8 @@ describe("fetchErrorLines for a refused run start", () => {
 
   it.each([
     ["nothing", undefined],
+    ["a string", "boom"],
+    ["an array", [{ data: { detail: "not allowed" } }]],
     ["an error without text", { data: { message: "" }, statusMessage: "  " }],
   ])("falls back to the given text for %s", (_, err) => {
     expect(fetchErrorLines(err, FALLBACK)).toEqual([FALLBACK]);

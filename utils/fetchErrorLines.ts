@@ -25,10 +25,36 @@ function isDenial(value: unknown): value is Pick<GateDenial, "code" | "message">
   return typeof denial?.code === "string" && typeof denial.message === "string";
 }
 
-/** fwbg's `detail`: gate denials, a failed preflight's message and output, or a text. */
+function isLine(line: string | undefined): line is string {
+  return line !== undefined;
+}
+
+/** `<path>: <message>` for a validation issue, or the message alone without a path. */
+function issueLine(path: unknown, message: unknown): string | undefined {
+  const messageText = text(message);
+  if (!messageText) return undefined;
+  const where = Array.isArray(path) ? path.join(".") : "";
+  return where ? `${where}: ${messageText}` : messageText;
+}
+
+/** A FastAPI validation item `{loc, msg, type}`; a body field's loc starts with "body". */
+function fastApiIssueLine(value: unknown): string | undefined {
+  const issue = fields(value);
+  const loc = Array.isArray(issue?.loc) ? issue.loc : [];
+  return issueLine(loc[0] === "body" ? loc.slice(1) : loc, issue?.msg);
+}
+
+/**
+ * fwbg's `detail`: gate denials, a failed preflight's message and output,
+ * FastAPI's request validation items, or a text.
+ */
 function fwbgDetailLines(detail: unknown): string[] | undefined {
   const detailText = text(detail);
   if (detailText) return [detailText];
+  if (Array.isArray(detail)) {
+    const lines = detail.map(fastApiIssueLine).filter(isLine);
+    return lines.length ? lines : undefined;
+  }
   const body = fields(detail);
   if (!body) return undefined;
   if (Array.isArray(body.denials)) {
@@ -41,12 +67,9 @@ function fwbgDetailLines(detail: unknown): string[] | undefined {
   return [message, ...output.filter((line) => line.trim() !== "")];
 }
 
-function issueLine(value: unknown): string | undefined {
+function zodIssueLine(value: unknown): string | undefined {
   const issue = fields(value);
-  const message = text(issue?.message);
-  if (!message) return undefined;
-  const path = Array.isArray(issue?.path) ? issue.path.join(".") : "";
-  return path ? `${path}: ${message}` : message;
+  return issueLine(issue?.path, issue?.message);
 }
 
 function validationLines(envelope: Fields | undefined): string[] | undefined {
@@ -60,7 +83,7 @@ function validationLines(envelope: Fields | undefined): string[] | undefined {
     return [message];
   }
   const lines = Array.isArray(issues)
-    ? issues.map(issueLine).filter((line): line is string => line !== undefined)
+    ? issues.map(zodIssueLine).filter(isLine)
     : [];
   return lines.length ? lines : [message];
 }
