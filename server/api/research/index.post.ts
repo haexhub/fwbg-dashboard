@@ -6,8 +6,10 @@
  */
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, newResearchCardSchema.parse);
-  return fwbgFetch<unknown>("/api/research", {
+  const result = await fwbgFetch<unknown>("/api/research", {
     method: "POST",
     body: JSON.stringify(body),
   });
+  setResponseStatus(event, 201);
+  return result;
 });

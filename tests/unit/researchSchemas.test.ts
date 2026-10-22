@@ -39,8 +39,17 @@ describe("runStartBodySchema", () => {
     ["a blank reason", { reason: "" }],
     ["a holdout flag that is not a boolean", { holdout: "yes" }],
     ["assets that are not strings", { assets: [1] }],
-    ["a field fwbg would not honour", { end_date: "2026-01-01" }],
+    ["a field the dashboard does not send", { end_date: "2026-01-01" }],
   ])("rejects %s", (_, override) => {
+    expect(runStartBodySchema.safeParse({ ...validStart, ...override }).success).toBe(false);
+  });
+
+  // fwbg passes these as CLI arguments, and an argument with a NUL cannot be built.
+  it.each([
+    ["note", { note: "first\0look" }],
+    ["reason", { reason: "rerun\0" }],
+    ["description", { description: "\0" }],
+  ])("rejects a %s containing NUL", (_, override) => {
     expect(runStartBodySchema.safeParse({ ...validStart, ...override }).success).toBe(false);
   });
 
