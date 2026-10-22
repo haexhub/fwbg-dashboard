@@ -43,12 +43,18 @@ pages); the chat's `start_run` tool gets the research fields.
   a GET proxy slower than 10 s was cut ("request timed out after 10 seconds"); a POST with a
   body waited 15 s unharmed, but that is not documented behaviour. The Dockerfile sets
   `NITRO_BUN_IDLE_TIMEOUT=180` (above the 150 s fwbg timeout, below Bun's 255 s maximum).
-- **D2 client:** `types/research.ts` (card summary, new card input/response, gate denial),
-  `composables/useResearch.ts` (list active cards, create card). `useRuns.startRun` takes the
-  typed body. One pure function turns a fetch error into display lines: denials →
-  `<code>: <message>` per denial, preflight failure → message + output, 504 → timeout text,
-  anything else → the existing error chain (`data.detail ?? data.message ?? statusMessage ??
-  message`).
+- **D2 client:** `types/research.ts` (card summary, list entries as a union with the unreadable
+  `{id, error}` entry, new card input/response, gate denial, run start body),
+  `composables/useResearch.ts` (`listCards`, active by default; `createCard`). `useRuns.startRun`
+  takes the typed body. One pure function, `utils/fetchErrorLines.ts` (auto-imported), turns a
+  `$fetch` error into display lines. `err.data` is nitro's error envelope `{statusCode,
+  statusMessage, message, data}`, so fwbg's body is at `err.data.data` and its refusal at
+  `err.data.data.detail`: denials → `<code>: <message>` per denial, preflight failure →
+  message and output lines, a text `detail` (504 timeout, 409 cancelled, 404 strategy) → that text. The
+  dashboard's own 400 (`statusMessage: "Validation Error"`, `message` = zod's issues as JSON) →
+  `<path>: <message>` per issue, or the message if it does not parse. Anything else → the
+  existing error chain (`data.detail ?? data.message ?? statusMessage ?? message`, blank text
+  skipped) and then the caller's fallback text.
 - **D3 modal:** `RunStartModal.vue` gets a card select (active cards, label `S-NNNN · title`,
   required), a "Neue Karte" button opening `NewCardModal.vue` (title, tags, hypothesis,
   mechanism; optional cutoff) that selects the new card afterwards, a required single-line note,

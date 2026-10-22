@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { RunStartBody } from "~/types/research";
+
 const props = defineProps<{
   open: boolean;
   strategyName: string;
@@ -58,7 +60,8 @@ async function handleStart() {
       opts.description = description.value.trim();
     }
 
-    const result = await startRun(opts);
+    // Until the modal asks for a research card and a note, the server refuses this start.
+    const result = await startRun(opts as RunStartBody);
     emit("started", result.job_id);
     emit("update:open", false);
   } finally {
