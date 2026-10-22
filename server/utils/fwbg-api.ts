@@ -49,7 +49,8 @@ export async function fwbgFetch<T>(
       });
     }
 
-    return res.json() as Promise<T>;
+    // Awaited inside the try: the timeout also covers the body read.
+    return (await res.json()) as T;
   } catch (err) {
     // Only this function's timer aborts the controller; the caller's signal is replaced.
     if (!controller.signal.aborted || !(err instanceof Error) || err.name !== "AbortError") throw err;

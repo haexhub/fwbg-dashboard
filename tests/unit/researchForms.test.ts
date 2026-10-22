@@ -4,6 +4,8 @@ import { newResearchCardSchema, runStartBodySchema } from "~/server/utils/resear
 import {
   buildNewCardInput,
   buildRunStartBody,
+  cardSelection,
+  formAfterStart,
   researchCardItem,
   type NewCardForm,
   type RunStartForm,
@@ -84,6 +86,23 @@ describe("buildRunStartBody", () => {
   });
 });
 
+describe("formAfterStart", () => {
+  it("clears note, reason and holdout so the next start asks for them again", () => {
+    const form = { ...runForm, reason: "second look", holdout: true, assetClasses: ["FOREX"] };
+
+    expect(formAfterStart(form)).toEqual({
+      ...form,
+      note: "",
+      reason: "",
+      holdout: false,
+    });
+  });
+
+  it("keeps the card, so the next run is another trial of it", () => {
+    expect(formAfterStart(runForm).researchId).toBe("S-9999");
+  });
+});
+
 const cardForm: NewCardForm = {
   title: "Example idea",
   tags: ["example"],
@@ -111,7 +130,17 @@ describe("buildNewCardInput", () => {
   });
 
   it("sends the cutoff date when one is set", () => {
-    expect(buildNewCardInput({ ...cardForm, cutoff: "2025-01-01" })?.cutoff).toBe("2025-01-01");
+    const input = buildNewCardInput({ ...cardForm, cutoff: "2025-01-01" });
+
+    expect(input?.cutoff).toBe("2025-01-01");
+    expect(newResearchCardSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("sends each tag once", () => {
+    expect(buildNewCardInput({ ...cardForm, tags: ["fx", " fx ", "trend", "fx"] })?.tags).toEqual([
+      "fx",
+      "trend",
+    ]);
   });
 
   it.each([
@@ -139,5 +168,34 @@ describe("researchCardItem", () => {
       value: "S-9998",
       disabled: true,
     });
+  });
+});
+
+describe("cardSelection", () => {
+  const listed = { label: "S-9001 · Example idea", value: "S-9001" };
+  const unreadable = { label: "S-9002 · unreadable: x", value: "S-9002", disabled: true };
+  const created = { label: "S-9003 · New idea", value: "S-9003" };
+
+  it("keeps a selected card that is listed", () => {
+    expect(cardSelection([listed], [], "S-9001")).toEqual({ items: [listed], researchId: "S-9001" });
+  });
+
+  it("clears a selection that is no longer listed, so the start disables", () => {
+    expect(cardSelection([listed], [], "S-9004").researchId).toBeUndefined();
+  });
+
+  it("clears a selection of a card that became unreadable", () => {
+    expect(cardSelection([listed, unreadable], [], "S-9002").researchId).toBeUndefined();
+  });
+
+  it("adds a card created here that a list fetched before its creation lacks", () => {
+    expect(cardSelection([listed], [created], "S-9003")).toEqual({
+      items: [listed, created],
+      researchId: "S-9003",
+    });
+  });
+
+  it("lists a created card once when the list already has it", () => {
+    expect(cardSelection([listed, created], [created], "S-9003").items).toEqual([listed, created]);
   });
 });

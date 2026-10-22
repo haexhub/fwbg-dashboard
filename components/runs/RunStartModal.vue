@@ -25,6 +25,10 @@ const form = reactive<RunStartForm>({
   description: "",
 });
 const cardItems = ref<ResearchCardItem[]>([]);
+// Cards created in this modal: a list requested before their creation lacks them.
+const createdItems = ref<ResearchCardItem[]>([]);
+// Only the latest list request may update the select; an older answer is dropped.
+let latestLoad = 0;
 const loadingCards = ref(false);
 const newCardOpen = ref(false);
 const starting = ref(false);
@@ -48,17 +52,22 @@ function toggleAssetClass(value: string) {
 }
 
 async function loadCards() {
+  const load = ++latestLoad;
   loadingCards.value = true;
   try {
     const { cards } = await listCards();
-    cardItems.value = cards.map(researchCardItem);
+    if (load !== latestLoad) return;
+    const selection = cardSelection(cards.map(researchCardItem), createdItems.value, form.researchId);
+    cardItems.value = selection.items;
+    form.researchId = selection.researchId;
   } catch (err) {
+    if (load !== latestLoad) return;
     error.value = {
       title: "Cards not loaded",
       lines: fetchErrorLines(err, "Could not load the research cards"),
     };
   } finally {
-    loadingCards.value = false;
+    if (load === latestLoad) loadingCards.value = false;
   }
 }
 
@@ -74,10 +83,10 @@ watch(
 );
 
 function selectCreatedCard(card: ResearchCard) {
-  if (!cardItems.value.some((item) => item.value === card.id)) {
-    cardItems.value = [...cardItems.value, researchCardItem(card)];
-  }
-  form.researchId = card.id;
+  createdItems.value = [...createdItems.value, researchCardItem(card)];
+  const selection = cardSelection(cardItems.value, createdItems.value, card.id);
+  cardItems.value = selection.items;
+  form.researchId = selection.researchId;
 }
 
 async function handleStart() {
@@ -86,6 +95,7 @@ async function handleStart() {
   error.value = undefined;
   try {
     const result = await startRun(body.value);
+    Object.assign(form, formAfterStart(form));
     emit("started", result.job_id);
     emit("update:open", false);
   } catch (err) {

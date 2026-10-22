@@ -176,6 +176,19 @@ describe("fetchErrorLines for a refused run start", () => {
     expect(fetchErrorLines(err, FALLBACK)).toEqual(["Validation Error"]);
   });
 
+  it("shows the dashboard's own timeout when fwbg does not answer", () => {
+    const err = {
+      data: {
+        statusCode: 504,
+        statusMessage: "fwbg did not answer within 150 s",
+        message: "fwbg did not answer within 150 s",
+      },
+      statusMessage: "fwbg did not answer within 150 s",
+    };
+
+    expect(fetchErrorLines(err, FALLBACK)).toEqual(["fwbg did not answer within 150 s"]);
+  });
+
   it("shows a text body from fwbg as it is", async () => {
     fwbgResponds(502, "upstream down");
 

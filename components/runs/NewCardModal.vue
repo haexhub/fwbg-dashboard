@@ -2,7 +2,7 @@
 import type { ResearchCard } from "~/types/research";
 import type { NewCardForm } from "~/utils/researchForms";
 
-defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
   created: [card: ResearchCard];
@@ -20,6 +20,13 @@ const creating = ref(false);
 const errorLines = ref<string[]>([]);
 
 const input = computed(() => buildNewCardInput(form));
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) errorLines.value = [];
+  },
+);
 
 async function create() {
   const body = input.value;

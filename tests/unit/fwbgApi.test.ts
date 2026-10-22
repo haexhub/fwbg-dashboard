@@ -91,6 +91,29 @@ describe("fwbgFetch when fwbg does not answer", () => {
     expect((err.cause as Error).name).toBe("AbortError");
   });
 
+  it("answers 504 when the response body does not arrive in time", async () => {
+    // Headers arrive, the body stream stalls until the request's signal aborts.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = new ReadableStream({
+          start(stream) {
+            init.signal?.addEventListener("abort", () => stream.error(init.signal?.reason));
+          },
+        });
+        return new Response(body, { status: 200 });
+      }),
+    );
+    const settled = fwbgFetch("/api/research", { timeout: 1_000 }).then(
+      () => "resolved",
+      (e: { statusCode?: number }) => e.statusCode,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(await Promise.race([settled, Promise.resolve("still pending")])).toBe(504);
+  });
+
   it("passes other network errors on unchanged", async () => {
     const failure = new TypeError("fetch failed");
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(failure)));
