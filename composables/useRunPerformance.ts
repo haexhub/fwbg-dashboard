@@ -180,6 +180,23 @@ interface PreparedFold {
   testSize: number;
 }
 
+/**
+ * The run's Sharpe from fwbg: the mean over the assets with a Sharpe.
+ * "no_edge" when fwbg reported a null Sharpe (no edge) and no asset has one;
+ * a Sharpe computed in the frontend must not replace that verdict.
+ * null when fwbg reported none: older runs without the key, and zeros, which
+ * older runs also wrote for no edge; only then the caller falls back to the trades.
+ */
+function backendRunSharpe(details: GridDetail[]): number | "no_edge" | null {
+  const sharpes = details
+    .map((d) => d.sharpe)
+    .filter((sharpe): sharpe is number => sharpe != null && sharpe !== 0);
+  if (sharpes.length) {
+    return Math.round((sharpes.reduce((a, b) => a + b, 0) / sharpes.length) * 100) / 100;
+  }
+  return details.some((d) => d.sharpe === null) ? "no_edge" : null;
+}
+
 export function aggregatePerformance(
   details: GridDetail[],
   trialsSummary: TrialsSummary | null = null,
@@ -187,8 +204,6 @@ export function aggregatePerformance(
   const assetBreakdown: AssetPerformance[] = [];
 
   // Unified metrics that only the backend can compute
-  let sumSharpe = 0;
-  let countSharpe = 0;
   let sumCalmar = 0;
   let countCalmar = 0;
   let sumAnnualReturn = 0;
@@ -207,10 +222,8 @@ export function aggregatePerformance(
     const config = getAssetConfig(d);
 
     // Backend-only metrics (can't be computed from fold traces)
-    const sharpe = d.sharpe ?? null;
     const calmar = d.calmar ?? null;
 
-    if (sharpe != null && sharpe !== 0) { sumSharpe += sharpe; countSharpe++; }
     if (calmar != null && calmar !== 0) { sumCalmar += calmar; countCalmar++; }
     if (d.annual_return != null) { sumAnnualReturn += d.annual_return; countAnnualReturn++; }
     if (d.max_drawdown != null) { sumMaxDdPct += d.max_drawdown * 100; countMaxDd++; }
@@ -404,14 +417,14 @@ export function aggregatePerformance(
     : null;
 
   // Sharpe/Calmar: prefer backend values, fallback to frontend computation
-  let sharpeRatio: number | null = countSharpe > 0
-    ? Math.round((sumSharpe / countSharpe) * 100) / 100
-    : null;
+  const backendSharpe = backendRunSharpe(details);
+  const noEdge = backendSharpe === "no_edge";
+  let sharpeRatio = typeof backendSharpe === "number" ? backendSharpe : null;
   let calmarRatio: number | null = countCalmar > 0
     ? Math.round((sumCalmar / countCalmar) * 100) / 100
     : null;
 
-  if (sharpeRatio == null && tradePnlValues.length >= 2) {
+  if (backendSharpe === null && tradePnlValues.length >= 2) {
     const mean = tradePnlValues.reduce((a, b) => a + b, 0) / tradePnlValues.length;
     const variance = tradePnlValues.reduce((a, v) => a + (v - mean) ** 2, 0) / tradePnlValues.length;
     const std = Math.sqrt(variance);
@@ -432,6 +445,7 @@ export function aggregatePerformance(
   let dsr: number | null = null;
   const nTrials = trialsSummary?.n_trials ?? null;
   if (
+    !noEdge &&
     trialsSummary?.sr_variance_across_trials != null &&
     tradePnlValues.length >= 2 &&
     allTradesHaveRealPnl
@@ -459,6 +473,7 @@ export function aggregatePerformance(
     avgWin,
     avgLoss,
     sharpeRatio,
+    noEdge,
     calmarRatio,
     dsr,
     nTrials,

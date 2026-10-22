@@ -149,6 +149,7 @@ export function useLivePerformance(accountId: Ref<string>) {
       avgWin: Math.round(avgWin * 100) / 100,
       avgLoss: Math.round(avgLoss * 100) / 100,
       sharpeRatio: null,
+      noEdge: false,
       calmarRatio: null,
       dsr: null,
       nTrials: null,

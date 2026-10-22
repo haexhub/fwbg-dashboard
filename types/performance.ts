@@ -11,6 +11,8 @@ export interface PerformanceData {
   avgWin: number;
   avgLoss: number;
   sharpeRatio: number | null;
+  /** fwbg found no edge (Sharpe null) and no asset has a Sharpe: shown instead of one. */
+  noEdge: boolean;
   calmarRatio: number | null;
   /** Deflated Sharpe Ratio (Bailey/López de Prado 2014), 0-1 probability.
    * Null when the global trial census is unavailable or too small to
