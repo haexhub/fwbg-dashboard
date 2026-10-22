@@ -45,6 +45,6 @@
     "vue-tsc": "^3.3.13"
   },
   "overrides": {
-    "@unhead/vue": "3.2.1"
+    "@unhead/vue": "3.4.2"
   }
 }
