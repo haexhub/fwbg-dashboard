@@ -364,6 +364,7 @@ Wichtige Regeln für Strategiekonfigurationen:
 - Kombinations-Limit: exit × CT × regime × indicator_grid ≤ 50 (gegen Overfitting)
 - datasource: "dukascopy" für Index-Strategien
 - Wenn ein Run gestartet wird: dem User mitteilen dass er je nach Strategie 15-90 Minuten dauern kann
+- Jeder Run braucht eine Research-Karte (research_id) und eine Notiz vom User – nie raten oder erfinden; einen reason nur, wenn der User ausdrücklich eine Wiederholung will; holdout nur auf ausdrückliche Bitte
 
 Wenn der User fragt ob ein Run noch läuft: get_run_status aufrufen.
 Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).
