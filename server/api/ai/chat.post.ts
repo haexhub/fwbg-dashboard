@@ -21,6 +21,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
+import { fwbgErrorMessage } from "~/server/utils/fwbg-api";
+import { startRunToolInputSchema } from "~/server/utils/research-schemas";
+
 // ---------------------------------------------------------------------------
 // Provider factory
 // ---------------------------------------------------------------------------
@@ -67,7 +70,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
   const apiFetch = async (path: string) => {
     const res = await fetch(`${base}${path}`, { headers: apiKeyHeader, signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
   const apiPut = async (path: string, body: unknown) => {
@@ -77,17 +80,17 @@ function makeFwbgTools(fwbgApiUrl: string) {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
-  const apiPost = async (path: string, body: unknown) => {
+  const apiPost = async (path: string, body: unknown, timeoutMs = 30_000) => {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...apiKeyHeader },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
   const agentsFetch = async (path: string) => {
@@ -143,22 +146,16 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
     start_run: tool({
       description:
-        "Start a strategy optimization run in the background. Returns run_id immediately. " +
-        "Use get_run_status to track progress.",
-      inputSchema: z.object({
-        strategy_name: z.string(),
-        assets: z
-          .array(z.string())
-          .optional()
-          .describe("Optional asset filter override, e.g. ['NAS100', 'DAX']"),
-        description: z.string().optional().describe("Optional note for this run"),
-      }),
-      execute: async ({ strategy_name, assets, description }) => {
-        const body: Record<string, unknown> = { strategy_name };
-        if (assets) body.assets = assets;
-        if (description) body.description = description;
-        return JSON.stringify(await apiPost("/api/runs/start", body));
-      },
+        "Start a strategy optimization run in the background. Returns run_id once fwbg's research " +
+        "gate accepted the run (its preflight can take up to two minutes). Use get_run_status to track progress. " +
+        "Every run is a trial of a research card: ask the user for the card (research_id) and the note " +
+        "(what changed and why) unless both are already known from the conversation. " +
+        "Never invent a reason: it is only for a deliberate repeat the user asked for. " +
+        "Set holdout only when the user explicitly asks for a holdout look. " +
+        "A refusal lists the gate's denials; show them to the user.",
+      inputSchema: startRunToolInputSchema,
+      // fwbg answers after its research preflight, which takes up to 120 s.
+      execute: async (input) => JSON.stringify(await apiPost("/api/runs/start", input, 150_000)),
     }),
 
     get_run_status: tool({
@@ -367,6 +364,7 @@ Wichtige Regeln für Strategiekonfigurationen:
 - Kombinations-Limit: exit × CT × regime × indicator_grid ≤ 50 (gegen Overfitting)
 - datasource: "dukascopy" für Index-Strategien
 - Wenn ein Run gestartet wird: dem User mitteilen dass er je nach Strategie 15-90 Minuten dauern kann
+- Jeder Run braucht eine Research-Karte (research_id) und eine Notiz vom User – nie raten oder erfinden; einen reason nur, wenn der User ausdrücklich eine Wiederholung will; holdout nur auf ausdrückliche Bitte
 
 Wenn der User fragt ob ein Run noch läuft: get_run_status aufrufen.
 Wenn der User Ergebnisse sehen will: get_run_results aufrufen und Key-KPIs erklären (PF, WR, fold_stability, CAGR).

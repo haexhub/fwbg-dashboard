@@ -494,7 +494,10 @@ function clearChat() {
                     }"
                   />
                   <span>{{ toolLabels[part.name] ?? part.name }}</span>
-                  <span v-if="part.status === 'error'" class="text-red-400 ml-1">{{ part.error }}</span>
+                  <span v-if="part.name === 'start_run' && startRunSummary(part.input)" class="text-gray-400 break-words">
+                    {{ startRunSummary(part.input) }}
+                  </span>
+                  <span v-if="part.status === 'error'" class="text-red-400 ml-1 whitespace-pre-line">{{ part.error }}</span>
                 </div>
               </template>
 

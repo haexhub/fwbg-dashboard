@@ -1,3 +1,4 @@
+import type { RunStartBody } from "~/types/research";
 import type { RunSummary, RunDetail } from "~/types/strategy";
 
 interface PaginatedRuns {
@@ -38,17 +39,14 @@ export function useRuns(pageSize = 20) {
     return $fetch<RunDetail>(`/api/runs/${runId}`);
   }
 
-  async function startRun(opts: {
-    strategy_name: string;
-    assets?: string[];
-    asset_classes?: string[];
-    description?: string;
-  }): Promise<{ job_id: string; status: string }> {
+  async function startRun(
+    body: RunStartBody,
+  ): Promise<{ job_id: string; status: string }> {
     const result = await $fetch<{ job_id: string; status: string }>(
       "/api/runs/start",
       {
         method: "POST",
-        body: opts,
+        body,
       },
     );
     await refresh();
