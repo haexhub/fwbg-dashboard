@@ -70,7 +70,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
 
   const apiFetch = async (path: string) => {
     const res = await fetch(`${base}${path}`, { headers: apiKeyHeader, signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
   const apiPut = async (path: string, body: unknown) => {
@@ -80,7 +80,7 @@ function makeFwbgTools(fwbgApiUrl: string) {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(fwbgErrorMessage(res.status, await res.text()));
     return res.json();
   };
   const apiPost = async (path: string, body: unknown, timeoutMs = 30_000) => {
