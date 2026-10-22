@@ -33,6 +33,7 @@ const loadingCards = ref(false);
 const newCardOpen = ref(false);
 const starting = ref(false);
 const error = ref<{ title: string; lines: string[] }>();
+const warning = ref<string>();
 
 const body = computed(() => buildRunStartBody(props.strategyName, form));
 
@@ -55,8 +56,9 @@ async function loadCards() {
   const load = ++latestLoad;
   loadingCards.value = true;
   try {
-    const { cards } = await listCards();
+    const { cards, pending_error } = await listCards();
     if (load !== latestLoad) return;
+    warning.value = pending_error ?? undefined;
     const selection = cardSelection(cards.map(researchCardItem), createdItems.value, form.researchId);
     cardItems.value = selection.items;
     form.researchId = selection.researchId;
@@ -76,6 +78,7 @@ watch(
   (open) => {
     if (!open) return;
     error.value = undefined;
+    warning.value = undefined;
     // loadCards reports its own errors in the alert.
     void loadCards();
   },
@@ -193,6 +196,9 @@ async function handleStart() {
               <p v-for="(line, i) in error.lines" :key="i" class="break-words">{{ line }}</p>
             </div>
           </template>
+        </UAlert>
+        <UAlert v-if="warning" color="warning" variant="subtle" title="Card status incomplete">
+          <template #description>{{ warning }}</template>
         </UAlert>
       </div>
 

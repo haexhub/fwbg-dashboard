@@ -420,7 +420,7 @@ export function aggregatePerformance(
   const backendSharpe = backendRunSharpe(details);
   const noEdge = backendSharpe === "no_edge";
   let sharpeRatio = typeof backendSharpe === "number" ? backendSharpe : null;
-  let calmarRatio: number | null = countCalmar > 0
+  let calmarRatio: number | null = !noEdge && countCalmar > 0
     ? Math.round((sumCalmar / countCalmar) * 100) / 100
     : null;
 

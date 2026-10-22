@@ -39,8 +39,8 @@ const trials: TrialsSummary = { n_trials: 10, sr_variance_across_trials: 0.1, sr
 
 describe("aggregatePerformance Sharpe", () => {
   it("shows no edge instead of a frontend Sharpe when fwbg reported a null Sharpe", () => {
-    // fwbg writes calmar 0 for a symbol without an edge.
-    const perf = aggregatePerformance([asset("AAA", { status: "no_edge", sharpe: null, calmar: 0 })], trials);
+    // A no-edge response must hide even a stale/non-zero Calmar value.
+    const perf = aggregatePerformance([asset("AAA", { status: "no_edge", sharpe: null, calmar: 2.5 })], trials);
 
     expect(perf.sharpeRatio).toBeNull();
     expect(perf.noEdge).toBe(true);
