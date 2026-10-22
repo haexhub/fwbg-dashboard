@@ -38,7 +38,11 @@ pages); the chat's `start_run` tool gets the research fields.
   optional non-blank, holdout optional bool) and uses a 150 s timeout (preflight 120 s +
   margin, comment says why). Verify that the production server (nitro bun preset) does not cut a
   request that idles longer than 120 s; if it does, configure the preset's idle timeout and say
-  so in the plan.
+  so in the plan. Result: it does. The preset passes `NITRO_BUN_IDLE_TIMEOUT` to
+  `Bun.serve({ idleTimeout })` and Bun's default is 10 s. Against the built server (Bun 1.3.13)
+  a GET proxy slower than 10 s was cut ("request timed out after 10 seconds"); a POST with a
+  body waited 15 s unharmed, but that is not documented behaviour. The Dockerfile sets
+  `NITRO_BUN_IDLE_TIMEOUT=180` (above the 150 s fwbg timeout, below Bun's 255 s maximum).
 - **D2 client:** `types/research.ts` (card summary, new card input/response, gate denial),
   `composables/useResearch.ts` (list active cards, create card). `useRuns.startRun` takes the
   typed body. One pure function turns a fetch error into display lines: denials →

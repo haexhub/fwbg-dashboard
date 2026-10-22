@@ -11,6 +11,14 @@ const FWBG_API_KEY = process.env.FWBG_API_KEY || "";
 /** Default timeout for fwbg API calls (ms). Indicator computation can be slow. */
 const DEFAULT_TIMEOUT = 120_000;
 
+function parseJsonBody(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function fwbgFetch<T>(
   path: string,
   options?: RequestInit & { timeout?: number }
@@ -37,6 +45,7 @@ export async function fwbgFetch<T>(
       throw createError({
         statusCode: res.status,
         statusMessage: body || res.statusText,
+        data: parseJsonBody(body),
       });
     }
 
