@@ -117,4 +117,7 @@ docs, tests or commits.
 
 Move the pure `aggregatePerformance` and its helpers to `utils/` (`useRunPerformance.ts` is
 about 490 lines); a tool approval step for the chat's `start_run`; a "Kein Edge: k/n Assets"
-subtitle for runs where only some assets have no edge.
+subtitle for runs where only some assets have no edge. The existing `AiChat.vue` remains above
+the 500-line boundary for this focused feature change; split provider/key state, stream parsing,
+and message rendering in a follow-up so each module has one change reason and stays below that
+boundary.
