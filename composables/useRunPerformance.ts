@@ -433,7 +433,7 @@ export function aggregatePerformance(
     }
   }
 
-  if (calmarRatio == null && tradePnlValues.length > 0 && absoluteMaxDrawdown > 0) {
+  if (!noEdge && calmarRatio == null && tradePnlValues.length > 0 && absoluteMaxDrawdown > 0) {
     const totalReturn = tradePnlValues.reduce((a, b) => a + b, 0);
     calmarRatio = Math.round(Math.min(10, totalReturn / Math.max(absoluteMaxDrawdown, 0.01)) * 100) / 100;
   }

@@ -39,13 +39,25 @@ const trials: TrialsSummary = { n_trials: 10, sr_variance_across_trials: 0.1, sr
 
 describe("aggregatePerformance Sharpe", () => {
   it("shows no edge instead of a frontend Sharpe when fwbg reported a null Sharpe", () => {
-    const perf = aggregatePerformance([asset("AAA", { status: "no_edge", sharpe: null })], trials);
+    // fwbg writes calmar 0 for a symbol without an edge.
+    const perf = aggregatePerformance([asset("AAA", { status: "no_edge", sharpe: null, calmar: 0 })], trials);
 
     expect(perf.sharpeRatio).toBeNull();
     expect(perf.noEdge).toBe(true);
-    // The deflated Sharpe would be a frontend Sharpe as well.
+    // The deflated Sharpe and the Calmar would be computed in the frontend as well.
     expect(perf.dsr).toBeNull();
+    expect(perf.calmarRatio).toBeNull();
     expect(perf.assetBreakdown[0]?.sharpeRatio).toBeNull();
+  });
+
+  it("shows no edge for a null Sharpe next to a zero one", () => {
+    const perf = aggregatePerformance([
+      asset("AAA", { status: "no_edge", sharpe: null }),
+      asset("BBB", { sharpe: 0 }),
+    ]);
+
+    expect(perf.sharpeRatio).toBeNull();
+    expect(perf.noEdge).toBe(true);
   });
 
   // Older runs wrote no key, or a 0 for no edge.
