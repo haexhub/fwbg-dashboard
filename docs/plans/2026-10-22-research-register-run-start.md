@@ -31,7 +31,8 @@ pages); the chat's `start_run` tool gets the research fields.
 
 - **D1 proxy:** `fwbgFetch` errors carry fwbg's parsed JSON body as `data` (in addition to the
   current `statusMessage`), so the client reads structured `detail` instead of re-parsing a
-  string; non-JSON bodies keep today's behaviour. New server routes `GET /api/research`
+  string; non-JSON bodies keep today's behaviour. When fwbg does not answer within the
+  timeout (the body read included), the dashboard answers 504 itself. New server routes `GET /api/research`
   (status/tag query passed through) and `POST /api/research`, validated with zod at the
   boundary. `POST /api/runs/start` validates its body with zod (strategy_name, assets,
   asset_classes, description, research_id `^S-\d{4}$`, note single-line non-blank, reason
@@ -50,13 +51,15 @@ pages); the chat's `start_run` tool gets the research fields.
   `$fetch` error into display lines. `err.data` is nitro's error envelope `{statusCode,
   statusMessage, message, data}`, so fwbg's body is at `err.data.data` and its refusal at
   `err.data.data.detail`: denials → `<code>: <message>` per denial, preflight failure →
-  message and output lines, a text `detail` (504 timeout, 409 cancelled, 404 strategy) → that text. The
+  message and output lines, FastAPI's request validation array (`[{loc, msg}]`) → `<field>: <msg>`
+  per item (the leading `body` of `loc` dropped), a text `detail` (504 timeout, 409 cancelled,
+  404 strategy) → that text. The
   dashboard's own 400 (`statusMessage: "Validation Error"`, `message` = zod's issues as JSON) →
   `<path>: <message>` per issue, or the message if it does not parse. Anything else → the
   existing error chain (`data.detail ?? data.message ?? statusMessage ?? message`, blank text
   skipped) and then the caller's fallback text.
 - **D3 modal:** `RunStartModal.vue` gets a card select (active cards, label `S-NNNN · title`,
-  required), a "Neue Karte" button opening `NewCardModal.vue` (title, tags, hypothesis,
+  required), a "New Card" button opening `NewCardModal.vue` (title, tags, hypothesis,
   mechanism; optional cutoff) that selects the new card afterwards, a required single-line note,
   an optional reason, and a holdout checkbox with a one-line explanation. Start stays disabled
   until card and note are set. Errors show in an inline `UAlert` (the denial lines), the modal
@@ -85,3 +88,33 @@ pages); the chat's `start_run` tool gets the research fields.
 Final: `bun run nuxi typecheck`, `bun run test:run`, `bun run build`; whole-branch review. Both
 repos are public: no data from the private research register (card contents, real ids) in code,
 docs, tests or commits.
+
+## Decisions during execution
+
+- After a start the form keeps the card; note, reason and holdout are reset, so a reason given
+  for one deliberate repeat never carries over.
+- Cards created in the modal stay in the select even when the list was fetched before their
+  creation; an unreadable card (`{id, error}`) is listed disabled; a selection that is no longer
+  listed is cleared, so the start disables.
+- A Sharpe of 0 counts as legacy (older runs wrote 0 for no edge) and keeps the frontend
+  fallback from the trades; only fwbg's `null` means no edge.
+- A run with some no-edge assets averages the assets that have a Sharpe; DSR and Calmar are
+  hidden only when the whole run has no edge.
+- The chat's `start_run` tool omits `asset_classes`, as it did before.
+- The chat shows card, note, reason and holdout of every `start_run` call, and its GET/PUT/POST
+  calls to fwbg turn fwbg's `detail` into readable lines.
+
+## Deployment
+
+- Deploy fwbg with the research register first: watchtower updates the dashboard image
+  automatically, and a dashboard that sends `research_id`/`note` needs an fwbg that accepts them.
+- `NITRO_BUN_IDLE_TIMEOUT=180` (Dockerfile) must stay above the 150 s run-start timeout and at
+  most 255 (Bun's maximum); it also covers the chat's SSE stream, which is silent while
+  `start_run` waits for the preflight.
+- Any reverse proxy in front of the dashboard must allow a read timeout of at least 180 s.
+
+## Follow-ups
+
+Move the pure `aggregatePerformance` and its helpers to `utils/` (`useRunPerformance.ts` is
+about 490 lines); a tool approval step for the chat's `start_run`; a "Kein Edge: k/n Assets"
+subtitle for runs where only some assets have no edge.
