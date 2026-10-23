@@ -9,6 +9,10 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
+  // The components are styled for a dark surface only (text-white, no dark:
+  // variants), so a light OS preference must not switch the UI to light.
+  colorMode: { preference: "dark", fallback: "dark" },
+
   runtimeConfig: {
     dataPath: process.env.DATA_PATH || "./data",
     accountsPath: process.env.ACCOUNTS_PATH || "/app/accounts",
