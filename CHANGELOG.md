@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.31.0](https://github.com/haexhub/fwbg-dashboard/compare/v1.30.2...v1.31.0) (2026-10-23)
+
+
+### Features
+
+* **runs:** start runs through fwbg's research register ([#261](https://github.com/haexhub/fwbg-dashboard/issues/261)) ([998e5f6](https://github.com/haexhub/fwbg-dashboard/commit/998e5f6b9ed461d2577d359b53000a121f81ab72))
+
+
+### Bug Fixes
+
+* reapply local Spec Kit skill patches the CLI refresh dropped ([502c5f7](https://github.com/haexhub/fwbg-dashboard/commit/502c5f774f9e085be6df51d10192b4f86a285b85))
+* refresh Spec Kit bootstrap and bundled workflow with current specify-cli ([d23ec89](https://github.com/haexhub/fwbg-dashboard/commit/d23ec89215b87dd419be6e036919635d0ce8c1a0))
+* stop advertising unimplemented filter/label args on speckit-taskstoissues ([95e4cb7](https://github.com/haexhub/fwbg-dashboard/commit/95e4cb79bf32abd5099e9f670a19b1600c0553d6))
+
 ## [1.30.2](https://github.com/haexhub/fwbg-dashboard/compare/v1.30.1...v1.30.2) (2026-08-01)
 
 
