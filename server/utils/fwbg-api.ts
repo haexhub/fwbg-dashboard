@@ -4,12 +4,33 @@
  * Proxies requests from the Nuxt server to the fwbg FastAPI backend.
  * Configured via FWBG_API_URL environment variable.
  */
+import { fwbgDetailLines } from "~/utils/fetchErrorLines";
 
 const FWBG_API_URL = process.env.FWBG_API_URL || "http://localhost:8420";
 const FWBG_API_KEY = process.env.FWBG_API_KEY || "";
 
 /** Default timeout for fwbg API calls (ms). Indicator computation can be slow. */
 const DEFAULT_TIMEOUT = 120_000;
+
+function parseJsonBody(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * An fwbg error response as one text: the status, then fwbg's `detail` as
+ * display lines (gate denials, preflight output, a text), or the raw body when
+ * the detail is not readable.
+ */
+export function fwbgErrorMessage(status: number, body: string): string {
+  const parsed = parseJsonBody(body);
+  const detail = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
+  const lines = fwbgDetailLines(detail);
+  return `${status} ${lines ? lines.join("\n") : body}`;
+}
 
 export async function fwbgFetch<T>(
   path: string,
@@ -37,10 +58,20 @@ export async function fwbgFetch<T>(
       throw createError({
         statusCode: res.status,
         statusMessage: body || res.statusText,
+        data: parseJsonBody(body),
       });
     }
 
-    return res.json() as Promise<T>;
+    // Awaited inside the try: the timeout also covers the body read.
+    return (await res.json()) as T;
+  } catch (err) {
+    // Only this function's timer aborts the controller; the caller's signal is replaced.
+    if (!controller.signal.aborted || !(err instanceof Error) || err.name !== "AbortError") throw err;
+    throw createError({
+      statusCode: 504,
+      statusMessage: `fwbg did not answer within ${timeout / 1000} s`,
+      cause: err,
+    });
   } finally {
     clearTimeout(timer);
   }

@@ -15,7 +15,8 @@ export interface GridDetail {
   pnl?: number;
   win_rate?: number;
   rrr?: number;
-  sharpe?: number;
+  /** null: no edge (fwbg sizes no trades, so there is no Sharpe); absent in older runs. */
+  sharpe?: number | null;
   calmar?: number;
   trades?: number;
   annual_return?: number;

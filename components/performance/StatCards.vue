@@ -62,7 +62,9 @@ defineProps<{
           {{
             data.dsr != null
               ? `Ggü. ${data.nTrials} Trials deflationiert`
-              : "Risikoadjustiert"
+              : data.noEdge
+                ? "Kein Edge"
+                : "Risikoadjustiert"
           }}
         </p>
       </div>
