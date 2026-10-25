@@ -140,6 +140,12 @@ const handleRun = () => handleAction("run", () => runBacktest(strategyId.value))
 const handleAnalyze = () => handleAction("analyze", () => analyzeStrategy(strategyId.value));
 const handlePaperAnalyze = () => handleAction("paper_analyze", () => paperAnalyzeStrategy(strategyId.value));
 
+// ── Attach a register card (lineage root without one) ──
+const showAttachModal = ref(false);
+const canAttachCard = computed(
+  () => strategy.value !== null && strategy.value.parent_strategy_id === null && !strategy.value.research_id,
+);
+
 // ── Promote to Live ──
 const showPromoteModal = ref(false);
 </script>
@@ -162,6 +168,9 @@ const showPromoteModal = ref(false);
           <UBadge :color="agentStrategyStateColor(strategy.current_state)" variant="subtle">
             {{ strategy.current_state }}
           </UBadge>
+          <UBadge v-if="strategy.research_id" color="neutral" variant="outline" class="font-mono">
+            {{ strategy.research_id }}
+          </UBadge>
         </div>
         <div class="flex items-center gap-2">
           <UButton
@@ -172,6 +181,15 @@ const showPromoteModal = ref(false);
             color="neutral"
           >
             In fwbg öffnen
+          </UButton>
+          <UButton
+            v-if="canAttachCard"
+            icon="i-heroicons-link"
+            variant="outline"
+            color="neutral"
+            @click="() => { showAttachModal = true }"
+          >
+            Karte zuordnen
           </UButton>
           <UButton
             v-if="strategy.current_state === 'proposed'"
@@ -480,6 +498,13 @@ const showPromoteModal = ref(false);
       </UCard>
     </template>
 
+    <AgentsAttachCardModal
+      v-if="strategy"
+      v-model:open="showAttachModal"
+      :strategy-id="strategy.id"
+      :strategy-slug="strategy.slug"
+      @attached="loadDetail"
+    />
     <AgentsPromoteLiveModal
       v-if="strategy"
       v-model:open="showPromoteModal"
