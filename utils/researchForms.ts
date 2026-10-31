@@ -54,6 +54,7 @@ function researchBody(
     : { research_id: form.researchId, note };
 }
 
+/** Build a gated run request, or return undefined until its card and note are complete. */
 export function buildRunStartBody(
   strategyName: string,
   form: RunStartForm,
