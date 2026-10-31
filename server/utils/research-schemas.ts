@@ -34,6 +34,10 @@ export const runStartBodySchema = z.strictObject({
   holdout: z.boolean().optional(),
 });
 
+export const attachCardBodySchema = z.strictObject({
+  research_id: z.string().regex(/^S-\d{4}$/, "must be S- followed by four digits"),
+});
+
 export const newResearchCardSchema = z.strictObject({
   title: nonBlank,
   tags: z.array(nonBlank).min(1),

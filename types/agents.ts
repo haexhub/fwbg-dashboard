@@ -42,6 +42,8 @@ export interface AgentStrategySummary {
   // fwbg filename once the strategy was published into fwbg (research flow
   // or runner) — links to /strategy/<name>. Null until first publish.
   fwbg_strategy_name: string | null;
+  // Register card of the lineage (S-NNNN); only the lineage root carries one.
+  research_id: string | null;
   tags: string[];
   created_at: string | null;
   updated_at: string | null;

@@ -2,6 +2,7 @@ import { asSchema } from "ai";
 import { describe, expect, it } from "vitest";
 
 import {
+  attachCardBodySchema,
   newResearchCardSchema,
   researchListQuerySchema,
   runStartBodySchema,
@@ -146,5 +147,15 @@ describe("researchListQuerySchema", () => {
     ["a blank tag", { tag: "" }],
   ])("rejects %s", (_, query) => {
     expect(researchListQuerySchema.safeParse(query).success).toBe(false);
+  });
+});
+
+describe("attachCardBodySchema", () => {
+  it("accepts a card id", () => {
+    expect(attachCardBodySchema.parse({ research_id: "S-0007" })).toEqual({ research_id: "S-0007" });
+  });
+
+  it.each([{}, { research_id: "S-7" }, { research_id: "S-0007", extra: 1 }])("rejects %j", (body) => {
+    expect(() => attachCardBodySchema.parse(body)).toThrow();
   });
 });

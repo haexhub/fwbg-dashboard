@@ -49,6 +49,17 @@ export function useAgentStrategies() {
     return $fetch<PaperPosition[]>(`/api/agents/strategies/${id}/paper-positions`);
   }
 
+  /** Attach an existing register card to a lineage root that has none. */
+  async function attachResearchCard(
+    id: number,
+    researchId: string
+  ): Promise<{ strategy_id: number; research_id: string }> {
+    return $fetch<{ strategy_id: number; research_id: string }>(
+      `/api/agents/strategies/${id}/research`,
+      { method: "PUT", body: { research_id: researchId } }
+    );
+  }
+
   async function runBacktest(
     id: number
   ): Promise<{ strategy_id: number; agent_run_id: number; status: string }> {
@@ -100,5 +111,6 @@ export function useAgentStrategies() {
     analyzeStrategy,
     paperAnalyzeStrategy,
     promoteLive,
+    attachResearchCard,
   };
 }
