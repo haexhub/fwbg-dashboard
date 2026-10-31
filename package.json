@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.2.3",
-    "@iconify-json/lucide": "^1.2.144",
+    "@iconify-json/lucide": "^1.2.147",
     "@nuxt/test-utils": "^4.3.3",
     "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
