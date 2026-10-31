@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { newResearchCardSchema, runStartBodySchema } from "~/server/utils/research-schemas";
 import {
+  exitOptimizationBodySchema,
+  newResearchCardSchema,
+  runStartBodySchema,
+} from "~/server/utils/research-schemas";
+import {
+  buildExitOptimizationBody,
   buildNewCardInput,
   buildRunStartBody,
   cardSelection,
@@ -22,6 +27,39 @@ const runForm: RunStartForm = {
   customAssets: "",
   description: "",
 };
+
+const analysis = { source: "dukascopy", symbol: "NAS100", timeframe: "MINUTE_15", max_bars: 48 };
+const researchFields = { researchId: "S-9999", note: "TP/SL ranges", reason: "" };
+
+describe("buildExitOptimizationBody", () => {
+  it("sends the asset, the card and the note, which the server accepts", () => {
+    const body = buildExitOptimizationBody(analysis, researchFields);
+
+    expect(body).toEqual({ ...analysis, research_id: "S-9999", note: "TP/SL ranges" });
+    expect(exitOptimizationBodySchema.safeParse(body).success).toBe(true);
+  });
+
+  it.each([
+    ["no card", {}, { researchId: undefined }],
+    ["a blank note", {}, { note: "  " }],
+    ["no symbol", { symbol: "" }, {}],
+    ["no timeframe", { timeframe: "" }, {}],
+  ])("builds nothing with %s, so the analysis stays disabled", (_, asset, fields) => {
+    expect(
+      buildExitOptimizationBody({ ...analysis, ...asset }, { ...researchFields, ...fields }),
+    ).toBeUndefined();
+  });
+
+  it("sends a trimmed reason and a single-line note", () => {
+    const body = buildExitOptimizationBody(analysis, {
+      ...researchFields,
+      note: "a\nb",
+      reason: " repeat ",
+    });
+
+    expect(body).toMatchObject({ note: "a b", reason: "repeat" });
+  });
+});
 
 describe("buildRunStartBody", () => {
   it("sends the strategy, the card and the note when only those are set", () => {

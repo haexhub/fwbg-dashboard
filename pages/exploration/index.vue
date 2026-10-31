@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChartSource, ChartSymbol } from "~/types/chart";
 import { TIMEFRAME_LABELS } from "~/types/chart";
+import type { ResearchCardItem, ResearchFields } from "~/utils/researchForms";
 
 const {
   exitOptimizations,
@@ -86,23 +87,58 @@ const assetFilename = computed(() => {
 const showForm = ref(false);
 const exitStrategy = ref("atr_based");
 const maxBars = ref(48);
-const error = ref("");
+const error = ref<string[]>([]);
 
-async function submit() {
-  if (!selectedSymbol.value || !selectedTimeframe.value) return;
-  error.value = "";
+// The research register records every analysis; fwbg reads only data before the card's cutoff.
+const { listCards } = useResearch();
+const research = reactive<ResearchFields>({ researchId: undefined, note: "", reason: "" });
+const cardItems = ref<ResearchCardItem[]>([]);
+const loadingCards = ref(false);
+
+async function loadCards() {
+  loadingCards.value = true;
   try {
-    const result = await runExitOptimization({
+    const { cards } = await listCards();
+    cardItems.value = cards.map(researchCardItem);
+    const selected = cardItems.value.find((item) => item.value === research.researchId);
+    if (!selected || selected.disabled) research.researchId = undefined;
+  } catch (e) {
+    error.value = fetchErrorLines(e, "Research-Karten konnten nicht geladen werden");
+  } finally {
+    loadingCards.value = false;
+  }
+}
+
+watch(showForm, (open) => {
+  if (!open) return;
+  error.value = [];
+  void loadCards();
+});
+
+const body = computed(() =>
+  buildExitOptimizationBody(
+    {
       source: selectedSource.value,
       symbol: selectedSymbol.value,
       timeframe: selectedTimeframe.value,
       exit_strategy: exitStrategy.value,
       max_bars: maxBars.value,
-    });
+    },
+    research,
+  )
+);
+
+async function submit() {
+  if (!body.value) return;
+  error.value = [];
+  try {
+    const result = await runExitOptimization(body.value);
+    // A reason covers one deliberate repeat; note and reason are asked again next time.
+    Object.assign(research, { note: "", reason: "" });
     showForm.value = false;
     navigateTo(`/exploration/asset/${result.symbol}`);
-  } catch (e: any) {
-    error.value = e?.data?.message || e?.message || "Exit-Optimization fehlgeschlagen";
+  } catch (e) {
+    error.value = fetchErrorLines(e, "Exit-Optimization fehlgeschlagen");
   }
 }
 
@@ -178,6 +214,33 @@ function formatDate(ts?: string): string {
             />
           </UFormField>
         </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_3fr]">
+          <UFormField label="Research-Karte" required>
+            <USelectMenu
+              v-model="research.researchId"
+              :items="cardItems"
+              value-key="value"
+              :loading="loadingCards"
+              placeholder="Aktive Karte wählen..."
+              class="w-full"
+              :disabled="running"
+            />
+            <template #help>Analysiert nur Daten vor dem Cutoff der Karte.</template>
+          </UFormField>
+          <UFormField label="Notiz" required>
+            <UInput
+              v-model="research.note"
+              placeholder="Wofür ist die Analyse?"
+              class="w-full"
+              :disabled="running"
+            />
+            <template #help>Eine Zeile; Zeilenumbrüche werden zu Leerzeichen.</template>
+          </UFormField>
+        </div>
+        <UFormField label="Begründung (optional)">
+          <UInput v-model="research.reason" class="w-full" :disabled="running" />
+          <template #help>Nur für eine bewusste Wiederholung derselben Analyse.</template>
+        </UFormField>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr_auto]">
           <UFormField label="Exit-Strategie">
             <UInput
@@ -201,7 +264,7 @@ function formatDate(ts?: string): string {
             <UButton
               icon="i-heroicons-play"
               :loading="running"
-              :disabled="!selectedSymbol || !selectedTimeframe"
+              :disabled="!body"
               class="w-full"
               @click="submit"
             >
@@ -213,7 +276,9 @@ function formatDate(ts?: string): string {
         <div v-if="assetFilename" class="text-sm text-gray-500 font-mono">
           {{ assetFilename }}
         </div>
-        <div v-if="error" class="text-sm text-red-400">{{ error }}</div>
+        <div v-if="error.length" class="text-sm text-red-400">
+          <p v-for="(line, i) in error" :key="i" class="break-words">{{ line }}</p>
+        </div>
       </div>
 
       <!-- Results list -->
