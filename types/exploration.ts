@@ -49,4 +49,10 @@ export interface ExitOptimizationRequest {
   exit_strategy?: string;
   exit_params?: Record<string, unknown>;
   max_bars?: number;
+  /** The card the analysis serves; fwbg reads only data before its cutoff. */
+  research_id: string;
+  /** Single line, non-blank: what the analysis is for. */
+  note: string;
+  /** Only for a deliberate repeat of an identical analysis. */
+  reason?: string;
 }

@@ -21,21 +21,39 @@ const NUL_MESSAGE = "must not contain a NUL character";
 // Python's str.splitlines() boundaries; fwbg requires note.splitlines() == [note].
 const LINE_BOUNDARY = /[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/;
 
+// The research fields every gated request carries (run start, exit analysis).
+const researchId = z.string().regex(/^S-\d{4}$/, "must be S- followed by four digits");
+const note = nonBlank
+  .regex(NO_NUL, NUL_MESSAGE)
+  .refine((value) => !LINE_BOUNDARY.test(value), "must be a single line");
+const reason = nonBlank.regex(NO_NUL, NUL_MESSAGE).optional();
+
 export const runStartBodySchema = z.strictObject({
   strategy_name: nonBlank,
   assets: z.array(z.string()).optional(),
   asset_classes: z.array(z.string()).optional(),
   description: z.string().regex(NO_NUL, NUL_MESSAGE).optional(),
-  research_id: z.string().regex(/^S-\d{4}$/, "must be S- followed by four digits"),
-  note: nonBlank
-    .regex(NO_NUL, NUL_MESSAGE)
-    .refine((note) => !LINE_BOUNDARY.test(note), "must be a single line"),
-  reason: nonBlank.regex(NO_NUL, NUL_MESSAGE).optional(),
+  research_id: researchId,
+  note,
+  reason,
   holdout: z.boolean().optional(),
 });
 
+/** An MFE/MAE exit analysis: recorded in the register like a run (fwbg gates it). */
+export const exitOptimizationBodySchema = z.strictObject({
+  source: nonBlank,
+  symbol: nonBlank,
+  timeframe: nonBlank.optional(),
+  exit_strategy: nonBlank.optional(),
+  exit_params: z.record(z.string(), z.unknown()).optional(),
+  max_bars: z.number().int().positive().optional(),
+  research_id: researchId,
+  note,
+  reason,
+});
+
 export const attachCardBodySchema = z.strictObject({
-  research_id: z.string().regex(/^S-\d{4}$/, "must be S- followed by four digits"),
+  research_id: researchId,
 });
 
 export const newResearchCardSchema = z.strictObject({

@@ -3,6 +3,7 @@
  * undefined while a required field is missing, so the form keeps its submit
  * button disabled; the server validates the body again (server/utils/research-schemas.ts).
  */
+import type { ExitOptimizationRequest } from "~/types/exploration";
 import type {
   NewResearchCardInput,
   RunStartBody,
@@ -18,6 +19,9 @@ export interface RunStartForm {
   customAssets: string;
   description: string;
 }
+
+/** The research fields of a gated request; the analysis form asks only these. */
+export type ResearchFields = Pick<RunStartForm, "researchId" | "note" | "reason">;
 
 export interface NewCardForm {
   title: string;
@@ -38,16 +42,27 @@ export interface ResearchCardItem {
 // single-line note, so a pasted line break becomes a space instead of a refusal.
 const LINE_BREAKS = /[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]+/g;
 
+/** research_id, note and reason as fwbg takes them, or undefined while one is missing. */
+function researchBody(
+  form: ResearchFields,
+): Pick<RunStartBody, "research_id" | "note" | "reason"> | undefined {
+  const note = form.note.replace(LINE_BREAKS, " ").trim();
+  if (!form.researchId || !note) return undefined;
+  const reason = form.reason.trim();
+  return reason
+    ? { research_id: form.researchId, note, reason }
+    : { research_id: form.researchId, note };
+}
+
+/** Build a gated run request, or return undefined until its card and note are complete. */
 export function buildRunStartBody(
   strategyName: string,
   form: RunStartForm,
 ): RunStartBody | undefined {
-  const note = form.note.replace(LINE_BREAKS, " ").trim();
-  if (!form.researchId || !note) return undefined;
+  const research = researchBody(form);
+  if (!research) return undefined;
 
-  const body: RunStartBody = { strategy_name: strategyName, research_id: form.researchId, note };
-  const reason = form.reason.trim();
-  if (reason) body.reason = reason;
+  const body: RunStartBody = { strategy_name: strategyName, ...research };
   if (form.holdout) body.holdout = true;
   if (form.assetClasses.length) body.asset_classes = [...form.assetClasses];
   const assets = form.customAssets
@@ -66,6 +81,16 @@ export function buildRunStartBody(
  */
 export function formAfterStart(form: RunStartForm): RunStartForm {
   return { ...form, note: "", reason: "", holdout: false };
+}
+
+/** An exit analysis request, or undefined while the asset or a research field is missing. */
+export function buildExitOptimizationBody(
+  analysis: Omit<ExitOptimizationRequest, "research_id" | "note" | "reason">,
+  form: ResearchFields,
+): ExitOptimizationRequest | undefined {
+  const research = researchBody(form);
+  if (!research || !analysis.source || !analysis.symbol || !analysis.timeframe) return undefined;
+  return { ...analysis, ...research };
 }
 
 export function buildNewCardInput(form: NewCardForm): NewResearchCardInput | undefined {

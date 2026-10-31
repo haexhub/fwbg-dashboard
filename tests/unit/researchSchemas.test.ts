@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   attachCardBodySchema,
+  exitOptimizationBodySchema,
   newResearchCardSchema,
   researchListQuerySchema,
   runStartBodySchema,
@@ -14,6 +15,27 @@ const validStart = {
   research_id: "S-9999",
   note: "first look at the idea",
 };
+
+describe("exitOptimizationBodySchema", () => {
+  const valid = { source: "dukascopy", symbol: "NAS100", research_id: "S-9999", note: "ranges" };
+
+  it("accepts an analysis with its research fields", () => {
+    const body = { ...valid, timeframe: "HOUR", exit_params: { atr_period: 14 }, reason: "again" };
+    expect(exitOptimizationBodySchema.parse(body)).toEqual(body);
+  });
+
+  it.each([
+    ["a missing research id", { research_id: undefined }],
+    ["a missing note", { note: undefined }],
+    ["a note over two lines", { note: "a\nb" }],
+    ["a blank reason", { reason: " " }],
+    ["a blank symbol", { symbol: "" }],
+    ["max bars that are not a positive integer", { max_bars: 0 }],
+    ["a field fwbg does not take", { end_date: "2026-01-01" }],
+  ])("rejects %s", (_, override) => {
+    expect(exitOptimizationBodySchema.safeParse({ ...valid, ...override }).success).toBe(false);
+  });
+});
 
 describe("runStartBodySchema", () => {
   it("accepts the minimal research fields", () => {
