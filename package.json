@@ -37,11 +37,11 @@
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.151",
     "@nuxt/test-utils": "^4.3.4",
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@types/node": "^26.6.6",
     "happy-dom": "^21.0.4",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "vue-tsc": "^3.3.13"
   },
   "overrides": {
