@@ -5,15 +5,15 @@
     "": {
       "name": "fwbg-dashboard",
       "dependencies": {
-        "@ai-sdk/anthropic": "^4.0.87",
-        "@ai-sdk/google": "^4.0.104",
-        "@ai-sdk/openai": "^4.0.101",
+        "@ai-sdk/anthropic": "^4.0.97",
+        "@ai-sdk/google": "^4.0.112",
+        "@ai-sdk/openai": "^4.0.109",
         "@nuxt/ui": "^4.12.0",
         "@nuxtjs/mdc": "^0.23.2",
         "@pinia/nuxt": "1.0.3",
         "@vue-dnd-kit/core": "^2.4.7",
         "@vueuse/core": "^15.0.0",
-        "ai": "^7.0.150",
+        "ai": "^7.0.163",
         "echarts": "^6.1.0",
         "klinecharts": "^10.1.0",
         "nuxt": "^4.6.4",
@@ -39,17 +39,17 @@
     "@unhead/vue": "3.4.2",
   },
   "packages": {
-    "@ai-sdk/anthropic": ["@ai-sdk/anthropic@4.0.94", "", { "dependencies": { "@ai-sdk/provider": "4.0.35", "@ai-sdk/provider-utils": "5.0.72" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-gD0KmsUZTRuhiYleM2SdMrY0c7m+VeRckLX2VVPnEAlQmaKqSw8+noHiK5ED+SHy4tuDf9VQqcHxlGeObzMNyw=="],
+    "@ai-sdk/anthropic": ["@ai-sdk/anthropic@4.0.97", "", { "dependencies": { "@ai-sdk/provider": "4.0.36", "@ai-sdk/provider-utils": "5.0.75" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-LqCxnaKd4FsKChgBiS26Dgu1kC35jVeuH9OclhRJ6/Hg56kmJSbKlwu6Om6cfCmLgDUiIbn2r3w4um6bz7BivQ=="],
 
-    "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.132", "", { "dependencies": { "@ai-sdk/provider": "4.0.35", "@ai-sdk/provider-utils": "5.0.72", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-ppStDEz96g+JEuxGiVTP29OKBjPyYZXRxs38wnq3427U2QbZtxe6TukrgSAAq0n4yaHvSvVAWJY9kBlW8XudYg=="],
+    "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.136", "", { "dependencies": { "@ai-sdk/provider": "4.0.36", "@ai-sdk/provider-utils": "5.0.75", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-P851NL80P85Ee6MhblRuuCzNlQdOYU5rKmdt/Wuo5dMtkzvIHhyVZY9wtfKG3wBJUUoxHxWKsI2aR6O75o8diA=="],
 
-    "@ai-sdk/google": ["@ai-sdk/google@4.0.109", "", { "dependencies": { "@ai-sdk/provider": "4.0.35", "@ai-sdk/provider-utils": "5.0.72" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-BZd6F2vI53t1xb1Qtzfr6zDkUR7unzmKpI3UhDp9TxDl+JLw2DLRiTGWBeaqLJEdjt5myS4yqzjIhI9cDC9bfw=="],
+    "@ai-sdk/google": ["@ai-sdk/google@4.0.112", "", { "dependencies": { "@ai-sdk/provider": "4.0.36", "@ai-sdk/provider-utils": "5.0.75" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-z6w+Nlbwrc4/gQ9SDdUc26aFh4/L4DsFrtF3vycOaAd5SpZkbvq07E9aFe5KNMJVXM01VD+uiz6Hrm8G8wfghw=="],
 
-    "@ai-sdk/openai": ["@ai-sdk/openai@4.0.106", "", { "dependencies": { "@ai-sdk/provider": "4.0.35", "@ai-sdk/provider-utils": "5.0.72" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-xBhSJCrgeTMZ4kCKABX8BJFtp5ZIJSS2qxvGMALA34TMyR6OVMe93cpU0mGWPFaVwPsWy2DWKb5+x7gkJ9SJ8w=="],
+    "@ai-sdk/openai": ["@ai-sdk/openai@4.0.109", "", { "dependencies": { "@ai-sdk/provider": "4.0.36", "@ai-sdk/provider-utils": "5.0.75" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-N20L44ztSicqEWpB0LfV54Ee1iq6IjGfOFTcRfeTD/bRH0v/VDI1uHve7RFOhP2oi1eAluliBhgmurplaOBuVw=="],
 
-    "@ai-sdk/provider": ["@ai-sdk/provider@4.0.35", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-yBz6fmLS8MSCIzy7NiHEUAq56ZLD4ZA1GR6bpXBxgbwUacP1La7LuwAr/xy9jSzthem4F8Xu2OrhvU/JrE9fYA=="],
+    "@ai-sdk/provider": ["@ai-sdk/provider@4.0.36", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-GqvWZSZdBelCGughlBdOoupT258rgM3YMbaLAS9WSZJ0vlt8c9vm3My+ZT31mYhiReMCMCF2qF2axnGbILpk1A=="],
 
-    "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@5.0.72", "", { "dependencies": { "@ai-sdk/provider": "4.0.35", "@standard-schema/spec": "^1.1.0", "@workflow/serde": "4.1.0", "eventsource-parser": "^3.0.8", "undici": "^7.29.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-M6QAztI84jWumQSvKcGOL91DxhChsWxn3D3gYtV0/7E1TPQg9BmLdIerOolUC/jghQbMlQrHyzp0hqdIhUZ2Rw=="],
+    "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@5.0.75", "", { "dependencies": { "@ai-sdk/provider": "4.0.36", "@standard-schema/spec": "^1.1.0", "@workflow/serde": "4.1.0", "eventsource-parser": "^3.0.8", "undici": "^7.29.1" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-k4yAsFliGZwoTpyTpm3ptxwIeaPvRh5vGh/UWoqDiLLXKoyz4zuBGS7p3ygf8to5Bh4fAOHynotLBsWLIYdu2A=="],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
@@ -639,7 +639,7 @@
 
     "agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
 
-    "ai": ["ai@7.0.159", "", { "dependencies": { "@ai-sdk/gateway": "4.0.132", "@ai-sdk/provider": "4.0.35", "@ai-sdk/provider-utils": "5.0.72" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-4e/BwDoKJlMNYZaqERcTbGte+4TwroN9qKnCprog/XVfD9InzVPlhCviDhN452JIRrRsYg9BT0WsQ2C3Ds2mVQ=="],
+    "ai": ["ai@7.0.163", "", { "dependencies": { "@ai-sdk/gateway": "4.0.136", "@ai-sdk/provider": "4.0.36", "@ai-sdk/provider-utils": "5.0.75" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-nm8+qn36NQXO4Hjfj7SlbcNRhUyNXKtdoS9xhXr/z92lvdGFuPkzHmA2tFzhaUQy13IitNYrcw2QSNpEJC/iSA=="],
 
     "alien-signals": ["alien-signals@3.2.1", "", {}, "sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g=="],
 
@@ -1799,7 +1799,7 @@
 
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
 
-    "@ai-sdk/provider-utils/undici": ["undici@7.29.0", "", {}, "sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw=="],
+    "@ai-sdk/provider-utils/undici": ["undici@7.30.2", "", {}, "sha512-mLyPQnHwUxaM/rideoK/+KL8DaAJLRl4aBCfmX444aCSLnIaomqPLtNRe2jdCYcsk5wZzXrDIQC8ZeYNRAYyIA=="],
 
     "@antfu/install-pkg/package-manager-detector": ["package-manager-detector@1.6.0", "", {}, "sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA=="],
 
