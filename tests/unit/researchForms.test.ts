@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   exitOptimizationBodySchema,
   newResearchCardSchema,
+  previewBodySchema,
   runStartBodySchema,
 } from "~/server/utils/research-schemas";
 import {
   buildExitOptimizationBody,
   buildNewCardInput,
+  buildPreviewBody,
   buildRunStartBody,
   cardSelection,
   formAfterStart,
@@ -57,6 +59,42 @@ describe("buildExitOptimizationBody", () => {
       reason: " repeat ",
     });
 
+    expect(body).toMatchObject({ note: "a b", reason: "repeat" });
+  });
+});
+
+describe("buildPreviewBody", () => {
+  it("sends the asset, the card and the note, which the server accepts", () => {
+    const body = buildPreviewBody(STRATEGY, "NAS100", 10000, researchFields);
+
+    expect(body).toEqual({
+      strategy_name: STRATEGY,
+      asset: "NAS100",
+      last_n_bars: 10000,
+      research_id: "S-9999",
+      note: "TP/SL ranges",
+    });
+    expect(previewBodySchema.safeParse(body).success).toBe(true);
+  });
+
+  it.each([
+    ["no card", "NAS100", { researchId: undefined }],
+    ["a blank note", "NAS100", { note: "  " }],
+    ["no asset", "", {}],
+  ])("builds nothing with %s, so the preview stays disabled", (_, asset, fields) => {
+    expect(
+      buildPreviewBody(STRATEGY, asset, undefined, { ...researchFields, ...fields }),
+    ).toBeUndefined();
+  });
+
+  it("leaves out an unset bar count and sends a trimmed reason and a single-line note", () => {
+    const body = buildPreviewBody(STRATEGY, "NAS100", undefined, {
+      ...researchFields,
+      note: "a\nb",
+      reason: " repeat ",
+    });
+
+    expect(body).not.toHaveProperty("last_n_bars");
     expect(body).toMatchObject({ note: "a b", reason: "repeat" });
   });
 });

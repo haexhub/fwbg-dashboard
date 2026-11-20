@@ -6,6 +6,7 @@
 import type { ExitOptimizationRequest } from "~/types/exploration";
 import type {
   NewResearchCardInput,
+  PreviewBody,
   RunStartBody,
   UnreadableResearchCard,
 } from "~/types/research";
@@ -91,6 +92,20 @@ export function buildExitOptimizationBody(
   const research = researchBody(form);
   if (!research || !analysis.source || !analysis.symbol || !analysis.timeframe) return undefined;
   return { ...analysis, ...research };
+}
+
+/** A signal preview request, or undefined while the asset, the card or the note is missing. */
+export function buildPreviewBody(
+  strategyName: string,
+  asset: string,
+  lastNBars: number | undefined,
+  form: ResearchFields,
+): PreviewBody | undefined {
+  const research = researchBody(form);
+  if (!research || !asset) return undefined;
+  const body: PreviewBody = { strategy_name: strategyName, asset, ...research };
+  if (lastNBars) body.last_n_bars = lastNBars;
+  return body;
 }
 
 export function buildNewCardInput(form: NewCardForm): NewResearchCardInput | undefined {

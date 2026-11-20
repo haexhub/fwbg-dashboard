@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ResearchCardItem, ResearchFields } from "~/utils/researchForms";
+
 const props = defineProps<{
   open: boolean;
   strategyName: string;
@@ -40,8 +42,37 @@ const selectedAsset = ref(props.availableAssets[0] ?? "");
 const lastNBars = ref(10000);
 const panelStatus = ref<PanelStatus>("idle");
 const trades = ref<TradeEntry[]>([]);
-const errorMessage = ref("");
+const errorLines = ref<string[]>([]);
 const previewMeta = ref<{ symbol?: string; timeframe?: string; totalBars?: number; tp?: number; sl?: number }>({});
+
+// The research register records every preview; fwbg reads only data before the card's cutoff.
+const { listCards } = useResearch();
+const research = reactive<ResearchFields>({ researchId: undefined, note: "", reason: "" });
+const cardItems = ref<ResearchCardItem[]>([]);
+const loadingCards = ref(false);
+
+async function loadCards() {
+  loadingCards.value = true;
+  try {
+    const { cards } = await listCards();
+    cardItems.value = cards.map(researchCardItem);
+    const selected = cardItems.value.find((item) => item.value === research.researchId);
+    if (!selected || selected.disabled) research.researchId = undefined;
+  } catch (e) {
+    panelStatus.value = "error";
+    errorLines.value = fetchErrorLines(e, "Research-Karten konnten nicht geladen werden");
+  } finally {
+    loadingCards.value = false;
+  }
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) void loadCards();
+  },
+  { immediate: true },
+);
 
 // Keep selectedAsset in sync when the available list changes
 watch(
@@ -57,6 +88,10 @@ watch(
 // ── Computed ──
 
 const effectiveAsset = computed(() => selectedAsset.value);
+
+const body = computed(() =>
+  buildPreviewBody(props.strategyName, effectiveAsset.value, lastNBars.value || undefined, research),
+);
 
 const assetItems = computed(() =>
   props.availableAssets.map((a) => ({ label: a, value: a })),
@@ -121,12 +156,11 @@ function openInChart() {
 // ── Preview logic ──
 
 async function startPreview() {
-  const asset = effectiveAsset.value;
-  if (!asset) return;
+  if (!body.value) return;
 
   panelStatus.value = "running";
   trades.value = [];
-  errorMessage.value = "";
+  errorLines.value = [];
   previewMeta.value = {};
 
   try {
@@ -134,11 +168,7 @@ async function startPreview() {
       "/api/strategy/preview",
       {
         method: "POST",
-        body: {
-          strategy_name: props.strategyName,
-          asset,
-          last_n_bars: lastNBars.value || undefined,
-        },
+        body: body.value,
       },
     );
 
@@ -155,12 +185,12 @@ async function startPreview() {
       sl: res.sl_used,
     };
 
+    // A reason covers one deliberate repeat; note and reason are asked again next time.
+    Object.assign(research, { note: "", reason: "" });
     panelStatus.value = "done";
   } catch (e: unknown) {
     panelStatus.value = "error";
-    const err = e as { statusMessage?: string; message?: string; data?: { detail?: string } };
-    errorMessage.value =
-      err?.data?.detail ?? err?.statusMessage ?? err?.message ?? "Vorschau konnte nicht gestartet werden";
+    errorLines.value = fetchErrorLines(e, "Vorschau konnte nicht gestartet werden");
   }
 }
 </script>
@@ -204,10 +234,39 @@ async function startPreview() {
           />
         </UFormField>
 
+        <!-- Research register -->
+        <UFormField label="Research-Karte" required>
+          <USelectMenu
+            v-model="research.researchId"
+            :items="cardItems"
+            value-key="value"
+            :loading="loadingCards"
+            placeholder="Aktive Karte wählen..."
+            :disabled="panelStatus === 'running'"
+            class="w-full"
+          />
+          <template #help>Jede Vorschau zählt als Versuch der Karte und nutzt nur Daten vor ihrem Cutoff.</template>
+        </UFormField>
+
+        <UFormField label="Notiz" required>
+          <UInput
+            v-model="research.note"
+            placeholder="Wofür ist die Vorschau?"
+            :disabled="panelStatus === 'running'"
+            class="w-full"
+          />
+          <template #help>Eine Zeile; Zeilenumbrüche werden zu Leerzeichen.</template>
+        </UFormField>
+
+        <UFormField label="Begründung (optional)">
+          <UInput v-model="research.reason" :disabled="panelStatus === 'running'" class="w-full" />
+          <template #help>Nur für eine bewusste Wiederholung derselben Vorschau.</template>
+        </UFormField>
+
         <!-- Action -->
         <UButton
           :loading="panelStatus === 'running'"
-          :disabled="!effectiveAsset || panelStatus === 'running'"
+          :disabled="!body || panelStatus === 'running'"
           icon="i-lucide-play"
           @click="startPreview"
         >
@@ -230,7 +289,7 @@ async function startPreview() {
         <!-- Error -->
         <template v-if="panelStatus === 'error'">
           <div class="rounded-md bg-red-900/30 border border-red-700/40 p-3">
-            <p class="text-sm text-red-300">{{ errorMessage }}</p>
+            <p v-for="(line, i) in errorLines" :key="i" class="text-sm text-red-300 break-words">{{ line }}</p>
           </div>
         </template>
 

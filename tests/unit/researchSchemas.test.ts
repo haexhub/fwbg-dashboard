@@ -5,6 +5,7 @@ import {
   attachCardBodySchema,
   exitOptimizationBodySchema,
   newResearchCardSchema,
+  previewBodySchema,
   researchListQuerySchema,
   runStartBodySchema,
   startRunToolInputSchema,
@@ -34,6 +35,34 @@ describe("exitOptimizationBodySchema", () => {
     ["a field fwbg does not take", { end_date: "2026-01-01" }],
   ])("rejects %s", (_, override) => {
     expect(exitOptimizationBodySchema.safeParse({ ...valid, ...override }).success).toBe(false);
+  });
+});
+
+describe("previewBodySchema", () => {
+  const valid = {
+    strategy_name: "example_strategy",
+    asset: "NAS100",
+    research_id: "S-9999",
+    note: "signal check",
+  };
+
+  it("accepts a preview with its research fields", () => {
+    const body = { ...valid, last_n_bars: 5000, reason: "again" };
+    expect(previewBodySchema.parse(body)).toEqual(body);
+  });
+
+  it.each([
+    ["a missing research id", { research_id: undefined }],
+    ["a malformed research id", { research_id: "S-1" }],
+    ["a missing note", { note: undefined }],
+    ["a blank note", { note: "  " }],
+    ["a note over two lines", { note: "a\nb" }],
+    ["a blank reason", { reason: " " }],
+    ["a blank asset", { asset: "" }],
+    ["bars that are not a positive integer", { last_n_bars: 0 }],
+    ["a field fwbg does not take", { tp: 1 }],
+  ])("rejects %s", (_, override) => {
+    expect(previewBodySchema.safeParse({ ...valid, ...override }).success).toBe(false);
   });
 });
 

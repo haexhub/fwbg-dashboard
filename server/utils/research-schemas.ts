@@ -21,7 +21,7 @@ const NUL_MESSAGE = "must not contain a NUL character";
 // Python's str.splitlines() boundaries; fwbg requires note.splitlines() == [note].
 const LINE_BOUNDARY = /[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/;
 
-// The research fields every gated request carries (run start, exit analysis).
+// The research fields every gated request carries (run start, exit analysis, preview).
 const researchId = z.string().regex(/^S-\d{4}$/, "must be S- followed by four digits");
 const note = nonBlank
   .regex(NO_NUL, NUL_MESSAGE)
@@ -37,6 +37,16 @@ export const runStartBodySchema = z.strictObject({
   note,
   reason,
   holdout: z.boolean().optional(),
+});
+
+/** A signal preview: simulates trades on market data, so fwbg gates it like a run. */
+export const previewBodySchema = z.strictObject({
+  strategy_name: nonBlank,
+  asset: nonBlank,
+  last_n_bars: z.number().int().positive().optional(),
+  research_id: researchId,
+  note,
+  reason,
 });
 
 /** An MFE/MAE exit analysis: recorded in the register like a run (fwbg gates it). */
