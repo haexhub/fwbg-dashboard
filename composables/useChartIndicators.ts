@@ -1,5 +1,6 @@
 import { registerIndicator } from "klinecharts";
 import type { IndicatorResponse } from "~/types/chart";
+import { discreteSignalColumns } from "~/utils/signalColumns";
 
 // Distinct colors for indicator lines (dark-bg friendly)
 export const LINE_COLORS = [
@@ -265,8 +266,9 @@ export function registerFwbgOverlayIndicator(
 }
 
 /**
- * Register signal columns ({-1, 0, 1}) as a histogram-bar indicator.
- * Each signal gets its own bar with dynamic color (green = 1, red = -1, gray = 0).
+ * Register signal columns in one pane. Discrete columns ({-1, 0, 1} and other
+ * integer codes) become histogram bars with dynamic color (green = 1, red = -1,
+ * gray = 0); continuous columns (ibs, zscore_*, ...) are drawn as lines.
  */
 export function registerFwbgSignalIndicator(
   indicatorId: string,
@@ -275,17 +277,33 @@ export function registerFwbgSignalIndicator(
   colors?: Record<string, string>
 ) {
   const shortNames = _shortenColumns(columns);
+  const discrete = new Set(discreteSignalColumns(response.data, columns));
+  const lineColumns = columns.filter((col) => !discrete.has(col));
+  const colorOf = (col: string) =>
+    colors?.[col] ?? LINE_COLORS[columns.indexOf(col) % LINE_COLORS.length]!;
 
   registerIndicator({
     name: indicatorId,
     shortName: indicatorId.replace(/^fwbg_/, "").replace(/_\d+$/, "") + " (sig)",
-    precision: 0,
+    precision: _detectPrecision(response, lineColumns),
     calcParams: [],
+    // klinecharts styles the line figures in order, so only line columns get an entry.
+    styles: {
+      lines: lineColumns.map((col) => ({
+        style: "solid" as const,
+        size: 1.5,
+        color: colorOf(col),
+        smooth: false,
+        dashedValue: [2, 2],
+      })),
+    },
     figures: columns.map((col, i) => {
-      const baseColor = colors?.[col] ?? LINE_COLORS[i % LINE_COLORS.length]!;
+      const title = `${shortNames[i]}: `;
+      if (!discrete.has(col)) return { key: col, title, type: "line" as const };
+      const baseColor = colorOf(col);
       return {
         key: col,
-        title: `${shortNames[i]}: `,
+        title,
         type: "bar" as const,
         baseValue: 0,
         styles: (params: { data: { current: Record<string, unknown> | null } }) => {

@@ -5,6 +5,7 @@ import {
   ensureSignalMarkerRegistered,
   updateSignalMarkerData,
 } from "~/composables/useChartIndicators";
+import { discreteSignalColumns } from "~/utils/signalColumns";
 
 /** Bearish signal column name patterns — transitions in these columns get negated */
 const BEARISH_PATTERNS = /(?:_down|_bear|_short|_sell)/i;
@@ -20,6 +21,7 @@ const RETEST_PATTERNS = /(?:_retest_)/i;
  * Signal type is encoded in magnitude: |value| >= 1 = breakout (triangle),
  * 0 < |value| < 1 = retest (circle).
  * Transitions to 0 (resets) are skipped — only actual signal firings are included.
+ * Continuous columns (ibs, zscore_*, ...) have no firings and are left out.
  */
 export function extractSignalTransitions(
   response: IndicatorResponse,
@@ -27,9 +29,10 @@ export function extractSignalTransitions(
 ): { timestamps: number[]; valueMap: Map<number, number> } {
   const timestamps: number[] = [];
   const valueMap = new Map<number, number>();
+  const eventColumns = discreteSignalColumns(response.data, columns);
   for (let i = 0; i < response.timestamps.length; i++) {
     let transitionValue: number | null = null;
-    for (const col of columns) {
+    for (const col of eventColumns) {
       const val = response.data[col]?.[i] ?? null;
       const prevVal = i > 0 ? (response.data[col]?.[i - 1] ?? null) : null;
       if (val === null || val === 0) continue;
