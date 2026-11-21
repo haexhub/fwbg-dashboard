@@ -17,14 +17,13 @@ const cardRef = ref<HTMLElement | null>(null);
 const { isDragging } = makeDraggable(
   cardRef,
   {
-    groups: [props.phase, "lane-reorder"],
+    type: "lane-reorder",
     data: () => ({
       source: "lane" as const,
       instanceId: props.instance.id,
       phase: props.phase,
     }),
   },
-  () => [0, [props.instance]],
 );
 
 // Show first 3 non-default params as preview
