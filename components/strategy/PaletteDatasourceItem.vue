@@ -16,10 +16,12 @@ const itemRef = ref<HTMLElement | null>(null);
 const { isDragging } = makeDraggable(
   itemRef,
   {
-    groups: ["datasource"],
-    data: () => ({ source: "palette-datasource" as const }),
+    type: "datasource",
+    data: () => ({
+      source: "palette-datasource" as const,
+      datasource: props.datasource,
+    }),
   },
-  () => [0, [props.datasource]],
 );
 </script>
 

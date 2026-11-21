@@ -16,18 +16,16 @@ const datasource = defineModel<string | undefined>("datasource");
 const collapsed = ref(false);
 const laneRef = ref<HTMLElement | null>(null);
 
-const { isDragOver } = makeDroppable(
+const { isOver } = makeDroppable(
   laneRef,
   {
-    groups: ["datasource"],
-    events: {
-      onDrop: (event) => {
-        const ds = event.draggedItems[0]?.item as DataSourceBase | undefined;
-        if (ds) datasource.value = ds.name;
-      },
+    accept: "datasource",
+    onDrop: (event) => {
+      const data = event.active.data as { datasource?: DataSourceBase } | undefined;
+      const ds = data?.datasource;
+      if (ds) datasource.value = ds.name;
     },
   },
-  (() => [datasource.value]) as any,
 );
 </script>
 
@@ -60,8 +58,8 @@ const { isDragOver } = makeDroppable(
     ref="laneRef"
     class="shrink-0 w-56 rounded-lg border flex flex-col transition-all"
     :class="{
-      'border-blue-500/50 bg-blue-500/5': isDragOver,
-      'border-gray-700 bg-gray-900/50': !isDragOver,
+      'border-blue-500/50 bg-blue-500/5': isOver,
+      'border-gray-700 bg-gray-900/50': !isOver,
     }"
   >
     <!-- Header (identical to KanbanLane) -->
@@ -116,7 +114,7 @@ const { isDragOver } = makeDroppable(
 
       <!-- Empty / drag-target state -->
       <div v-else class="text-center text-gray-600 text-xs py-4">
-        {{ isDragOver ? 'Loslassen zum Auswählen' : 'Datasource aus Palette ziehen' }}
+        {{ isOver ? 'Loslassen zum Auswählen' : 'Datasource aus Palette ziehen' }}
       </div>
     </div>
   </div>
