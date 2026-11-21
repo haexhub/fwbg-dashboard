@@ -19,22 +19,19 @@ const emit = defineEmits<{
 
 const paletteRef = ref<HTMLElement | null>(null);
 
-const { isDragOver } = makeDroppable(
+const { isOver } = makeDroppable(
   paletteRef,
   {
-    groups: ["lane-reorder"],
-    events: {
-      onDrop: (event) => {
-        const dropData = event.draggedItems[0]?.data as
-          | { source: "lane"; instanceId: string; phase: PipelinePhase }
-          | undefined;
-        if (dropData?.source === "lane") {
-          emit("removeLanePlugin", dropData.phase, dropData.instanceId);
-        }
-      },
+    accept: "lane-reorder",
+    onDrop: (event) => {
+      const dropData = event.active.data as
+        | { source: "lane"; instanceId: string; phase: PipelinePhase }
+        | undefined;
+      if (dropData?.source === "lane") {
+        emit("removeLanePlugin", dropData.phase, dropData.instanceId);
+      }
     },
   },
-  () => [props.plugins]
 );
 
 const searchQuery = ref("");
@@ -82,7 +79,7 @@ const phaseOptions = PIPELINE_PHASES.map((phase) => ({
   <div
     ref="paletteRef"
     class="flex flex-col h-full transition-colors"
-    :class="{ 'bg-red-950/30 border-red-500/40': isDragOver }"
+    :class="{ 'bg-red-950/30 border-red-500/40': isOver }"
   >
     <div class="space-y-2 p-3 border-b border-gray-800">
       <UInput

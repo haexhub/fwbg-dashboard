@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { makeDroppable } from "@vue-dnd-kit/core";
-import type { IDnDProviderExternal } from "@vue-dnd-kit/core";
+import { makeDroppable, useDnD } from "@vue-dnd-kit/core";
 import { PHASE_LABELS, PHASE_ICONS, PHASE_COLORS } from "~/types/strategy";
 import type {
   PluginInfo,
@@ -25,9 +24,9 @@ const collapsed = ref(false);
 const laneRef = ref<HTMLElement | null>(null);
 
 // ── Pointer tracking via requestAnimationFrame ──
-// The DnD provider's pointer ref may be mutated in-place, so
-// a Vue computed won't reliably re-evaluate. We poll instead.
-const activeProvider = shallowRef<IDnDProviderExternal | null>(null);
+// Pointer coordinates are mutable during a drag, so poll them while this lane is over.
+const dnd = useDnD();
+const tracking = ref(false);
 const dropInsertIndex = ref(0);
 let rafId: number | null = null;
 
@@ -46,8 +45,8 @@ function calcDropIndex(pointerY: number): number {
 
 function startTracking() {
   const tick = () => {
-    if (!activeProvider.value) return;
-    const y = activeProvider.value.pointer.value?.current?.y;
+    if (!tracking.value) return;
+    const y = dnd.pointer.value?.y;
     if (y != null) {
       dropInsertIndex.value = calcDropIndex(y);
     }
@@ -63,46 +62,38 @@ function stopTracking() {
   }
 }
 
-const { isDragOver } = makeDroppable(
+const { isOver } = makeDroppable(
   laneRef,
   {
-    groups: [props.phase, "lane-reorder"],
-    events: {
-      onEnter: (event) => {
-        activeProvider.value = event.provider;
-        startTracking();
-      },
-      onLeave: () => {
-        stopTracking();
-        activeProvider.value = null;
-      },
-      onDrop: (event) => {
-        const insertIndex = dropInsertIndex.value;
-        stopTracking();
-        activeProvider.value = null;
+    accept: [props.phase, "lane-reorder"],
+    onDragEnter: () => {
+      tracking.value = true;
+      startTracking();
+    },
+    onDragLeave: () => {
+      stopTracking();
+      tracking.value = false;
+    },
+    onDrop: (event) => {
+      const insertIndex = dropInsertIndex.value;
+      stopTracking();
+      tracking.value = false;
 
-        const dragged = event.draggedItems[0];
-        if (!dragged) return;
+      const data = event.active.data as
+        | { source: "palette"; plugin: PluginInfo }
+        | { source: "lane"; instanceId: string; phase: string }
+        | undefined;
+      if (!data) return;
 
-        const item = dragged.item;
-        const dropData = dragged.data as
-          | { source: "palette" }
-          | { source: "lane"; instanceId: string; phase: string }
-          | undefined;
-
-        if (!dropData || !item) return;
-
-        if (dropData.source === "palette") {
-          const idx =
-            insertIndex < props.items.length ? insertIndex : undefined;
-          emit("addPlugin", item as PluginInfo, idx);
-        } else if (dropData.source === "lane") {
-          emit("movePlugin", dropData.instanceId, insertIndex);
-        }
-      },
+      if (data.source === "palette") {
+        const idx =
+          insertIndex < props.items.length ? insertIndex : undefined;
+        emit("addPlugin", data.plugin, idx);
+      } else if (data.source === "lane") {
+        emit("movePlugin", data.instanceId, insertIndex);
+      }
     },
   },
-  () => [props.items, { phase: props.phase }]
 );
 
 onUnmounted(stopTracking);
@@ -121,7 +112,7 @@ const displayItems = computed<DisplayItem[]>(() => {
     instance: inst,
   }));
 
-  if (activeProvider.value) {
+  if (tracking.value && isOver.value) {
     result.splice(dropInsertIndex.value, 0, {
       key: "__drop_placeholder__",
       isPlaceholder: true,
@@ -168,8 +159,8 @@ const displayItems = computed<DisplayItem[]>(() => {
     ref="laneRef"
     class="shrink-0 w-56 rounded-lg border transition-all flex flex-col"
     :class="{
-      'border-blue-500/50 bg-blue-500/5': isDragOver,
-      'border-gray-700 bg-gray-900/50': !isDragOver,
+      'border-blue-500/50 bg-blue-500/5': isOver,
+      'border-gray-700 bg-gray-900/50': !isOver,
     }"
   >
     <!-- Lane Header -->
@@ -218,7 +209,7 @@ const displayItems = computed<DisplayItem[]>(() => {
       </div>
 
       <div
-        v-if="!items.length && !activeProvider"
+        v-if="!items.length && !tracking"
         key="__empty__"
         class="text-center text-gray-600 text-xs py-4"
       >
