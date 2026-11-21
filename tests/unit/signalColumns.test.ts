@@ -102,7 +102,7 @@ describe("registerFwbgSignalIndicator", () => {
       ["ibs_down", "bar"],
     ]);
     expect(indicator!.styles.lines).toHaveLength(1);
-    expect(indicator!.styles.lines[0].color).toBe("#111111");
+    expect(indicator!.styles.lines[0]!.color).toBe("#111111");
     expect(indicator!.precision).toBe(2);
   });
 
