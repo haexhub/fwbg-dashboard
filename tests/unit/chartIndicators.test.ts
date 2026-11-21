@@ -30,6 +30,7 @@ function makeResponse(
     columns: [],
     plot_columns: [],
     signal_columns: [],
+    discrete_signal_columns: Object.keys(overrides.data ?? {}),
     timestamps: [],
     data: {},
     ...overrides,

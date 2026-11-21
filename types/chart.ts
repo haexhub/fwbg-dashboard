@@ -63,6 +63,7 @@ export interface IndicatorResponse {
   columns: string[];
   plot_columns: string[];
   signal_columns: string[];
+  discrete_signal_columns: string[];
   overlay_columns?: string[];
   overlay_data?: Record<string, (number | null)[]>;
   timestamps: number[];

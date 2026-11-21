@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ParamSchema } from "~/types/strategy";
+import { sessionEntries, sessionRangesValue, type SessionEntry } from "~/utils/sessionRanges";
 
 const props = defineProps<{
   name: string;
@@ -88,40 +89,25 @@ function optionLabel(val: string | number): string {
 }
 
 // ── Session ranges editor ──
-type SessionEntry = { name: string; start: number; end: number };
-
-const sessionEntries = computed<SessionEntry[]>(() => {
-  const raw = value.value;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
-  return Object.entries(raw as Record<string, number[]>).map(([name, range]) => ({
-    name,
-    start: range[0] ?? 0,
-    end: range[1] ?? 0,
-  }));
-});
+const sessionRows = computed(() => sessionEntries(value.value));
 
 function emitSessions(entries: SessionEntry[]) {
-  const obj: Record<string, number[]> = {};
-  for (const e of entries) {
-    const key = e.name.trim().toLowerCase().replace(/\s+/g, "_");
-    if (key) obj[key] = [e.start, e.end];
-  }
-  emit("update:modelValue", obj);
+  emit("update:modelValue", sessionRangesValue(entries));
 }
 
 function updateSession(idx: number, field: keyof SessionEntry, val: string | number) {
-  const entries = [...sessionEntries.value];
-  const updated = { ...entries[idx], [field]: field === "name" ? val : Number(val) } as SessionEntry;
+  const entries = [...sessionRows.value];
+  const updated = { ...entries[idx], [field]: field === "name" || field === "timezone" ? val : Number(val) } as SessionEntry;
   entries[idx] = updated;
   emitSessions(entries);
 }
 
 function removeSession(idx: number) {
-  emitSessions(sessionEntries.value.filter((_, i) => i !== idx));
+  emitSessions(sessionRows.value.filter((_, i) => i !== idx));
 }
 
 function addSession() {
-  emitSessions([...sessionEntries.value, { name: "new_session", start: 0, end: 8 }]);
+  emitSessions([...sessionRows.value, { name: "new_session", start: 0, end: 8, timezone: "" }]);
 }
 
 const hourOptions = Array.from({ length: 24 }, (_, i) => ({
@@ -242,9 +228,9 @@ const hourOptions = Array.from({ length: 24 }, (_, i) => ({
     <!-- Session ranges editor -->
     <div v-if="schema.type === 'session_ranges' || schema.type === 'dict'" class="space-y-2 pt-1">
       <div
-        v-for="(entry, idx) in sessionEntries"
+        v-for="(entry, idx) in sessionRows"
         :key="idx"
-        class="flex items-center gap-2 rounded-lg bg-gray-800/50 px-3 py-2"
+        class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-800/50 px-3 py-2"
       >
         <UInput
           :model-value="entry.name"
@@ -269,6 +255,14 @@ const hourOptions = Array.from({ length: 24 }, (_, i) => ({
           size="sm"
           class="w-24"
           @update:model-value="updateSession(idx, 'end', $event)"
+        />
+        <UInput
+          :model-value="entry.timezone"
+          size="sm"
+          class="w-44"
+          placeholder="Zeitzone (optional)"
+          title="IANA-Zeitzone, z.B. America/New_York; leer = Uhr des Index (UTC)"
+          @update:model-value="updateSession(idx, 'timezone', String($event))"
         />
         <span class="text-[10px] text-gray-600 whitespace-nowrap">
           {{ entry.start < entry.end ? `${entry.end - entry.start}h` : `${24 - entry.start + entry.end}h ↻` }}

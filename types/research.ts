@@ -93,3 +93,15 @@ export interface RunStartBody {
   /** Develop up to the card's cutoff and evaluate once after it. */
   holdout?: boolean;
 }
+
+/** A signal preview of one asset: fwbg records it in the register like a run. */
+export interface PreviewBody {
+  strategy_name: string;
+  asset: string;
+  last_n_bars?: number;
+  research_id: string;
+  /** Single line, non-blank: what this preview is for. */
+  note: string;
+  /** Only for a deliberate repeat of an identical preview. */
+  reason?: string;
+}
