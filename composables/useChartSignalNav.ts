@@ -29,7 +29,7 @@ export function extractSignalTransitions(
 ): { timestamps: number[]; valueMap: Map<number, number> } {
   const timestamps: number[] = [];
   const valueMap = new Map<number, number>();
-  const eventColumns = discreteSignalColumns(response.data, columns);
+  const eventColumns = discreteSignalColumns(columns, response.discrete_signal_columns);
   for (let i = 0; i < response.timestamps.length; i++) {
     let transitionValue: number | null = null;
     for (const col of eventColumns) {

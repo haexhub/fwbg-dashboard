@@ -277,7 +277,7 @@ export function registerFwbgSignalIndicator(
   colors?: Record<string, string>
 ) {
   const shortNames = _shortenColumns(columns);
-  const discrete = new Set(discreteSignalColumns(response.data, columns));
+  const discrete = new Set(discreteSignalColumns(columns, response.discrete_signal_columns));
   const lineColumns = columns.filter((col) => !discrete.has(col));
   const colorOf = (col: string) =>
     colors?.[col] ?? LINE_COLORS[columns.indexOf(col) % LINE_COLORS.length]!;

@@ -15,54 +15,36 @@ vi.mock("klinecharts", () => ({
 
 import { registerFwbgSignalIndicator } from "../../composables/useChartIndicators";
 import { extractSignalTransitions } from "../../composables/useChartSignalNav";
-import { discreteSignalColumns, isDiscreteSignal } from "../../utils/signalColumns";
+import { discreteSignalColumns } from "../../utils/signalColumns";
 
 const TIMESTAMPS = [100, 200, 300, 400, 500];
 const IBS = [0.12, 0.8, 0.45, 0.97, 0.3];
 const IBS_DOWN = [null, 1, 1, 0, 1];
 
-function response(data: IndicatorResponse["data"]): IndicatorResponse {
+function response(data: IndicatorResponse["data"], discrete = Object.keys(data).filter((key) => key !== "ibs")): IndicatorResponse {
   return {
     fqn: "fwbg-core:ibs",
     columns: Object.keys(data),
     plot_columns: [],
     signal_columns: Object.keys(data),
+    discrete_signal_columns: discrete,
     timestamps: TIMESTAMPS,
     data,
   };
 }
 
-describe("isDiscreteSignal", () => {
-  it.each([
-    ["flags", [0, 1, 1, 0]],
-    ["directions", [-1, 0, 1]],
-    ["flags with a warm-up gap", [null, 1, 0]],
-    ["no values at all", [null, null]],
-    ["an empty column", []],
-  ])("treats %s as discrete", (_, values) => {
-    expect(isDiscreteSignal(values)).toBe(true);
-  });
-
-  it.each([
-    ["a ratio", IBS],
-    ["a z-score", [-1.7, 0, 2.1]],
-    ["a single fraction among flags", [0, 1, 0.5]],
-  ])("treats %s as continuous", (_, values) => {
-    expect(isDiscreteSignal(values)).toBe(false);
-  });
-});
-
 describe("discreteSignalColumns", () => {
   it("keeps only the discrete columns, in the given order", () => {
-    const data = { ibs: IBS, ibs_down: IBS_DOWN, ibs_above_prev_high: [0, 0, 1, 0, 0] };
-    expect(discreteSignalColumns(data, ["ibs", "ibs_down", "ibs_above_prev_high"])).toEqual([
+    expect(discreteSignalColumns(["ibs", "ibs_down", "ibs_above_prev_high"], ["ibs_down", "ibs_above_prev_high"])).toEqual([
       "ibs_down",
       "ibs_above_prev_high",
     ]);
   });
 
-  it("treats a column missing from the data as discrete", () => {
-    expect(discreteSignalColumns({}, ["gone"])).toEqual(["gone"]);
+  it("does not infer kind from an integer-only window of a continuous column", () => {
+    const integerWindow = response({ ibs: [0, 1, 0] }, []);
+    expect(discreteSignalColumns(["ibs"], integerWindow.discrete_signal_columns)).toEqual([]);
+    expect(extractSignalTransitions(integerWindow, ["ibs"]).timestamps).toEqual([]);
   });
 });
 

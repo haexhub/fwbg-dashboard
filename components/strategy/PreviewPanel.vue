@@ -50,17 +50,18 @@ const { listCards } = useResearch();
 const research = reactive<ResearchFields>({ researchId: undefined, note: "", reason: "" });
 const cardItems = ref<ResearchCardItem[]>([]);
 const loadingCards = ref(false);
+const cardErrorLines = ref<string[]>([]);
 
 async function loadCards() {
   loadingCards.value = true;
+  cardErrorLines.value = [];
   try {
     const { cards } = await listCards();
     cardItems.value = cards.map(researchCardItem);
     const selected = cardItems.value.find((item) => item.value === research.researchId);
     if (!selected || selected.disabled) research.researchId = undefined;
   } catch (e) {
-    panelStatus.value = "error";
-    errorLines.value = fetchErrorLines(e, "Research-Karten konnten nicht geladen werden");
+    cardErrorLines.value = fetchErrorLines(e, "Research-Karten konnten nicht geladen werden");
   } finally {
     loadingCards.value = false;
   }
@@ -245,6 +246,9 @@ async function startPreview() {
             :disabled="panelStatus === 'running'"
             class="w-full"
           />
+          <p v-if="cardErrorLines.length" class="mt-1 text-xs text-red-400">
+            {{ cardErrorLines.join(" · ") }}
+          </p>
           <template #help>Jede Vorschau zählt als Versuch der Karte und nutzt nur Daten vor ihrem Cutoff.</template>
         </UFormField>
 
