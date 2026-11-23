@@ -28,6 +28,7 @@ It does **not** fire for renames, in-place edits, trivial inline expressions, or
 1. **Classify the checkout exactly once, then bootstrap or refresh according to that class** (independent of any git hook running):
    - Apply this mutually exclusive precedence: a **linked worktree** is a checkout whose git directory is managed as a linked worktree; otherwise a **feature branch** is the branch carrying the current change or pull request, even when it has an upstream tracking ref; otherwise the checkout is a **tracked branch**. If the branch role is unclear, classify it as a feature branch.
    - A linked worktree or feature branch always uses the complete fork-point snapshot as-is. It never participates in current-`HEAD` freshness checks, even when its branch has an upstream remote or is also checked out in a repository that tracks it.
+   - Where the project requires authoring in a linked worktree, the worktree you author in is a linked worktree and takes the snapshot path. The tracked-branch bootstrap and refresh below apply to a checkout on a tracked branch, typically the primary one. Their only write is the git-ignored `graphify-out/` cache, which is generated output: it is not part of any change and not an instruction artifact.
    - On a tracked branch, if `graphify-out/` or its required `graph.json` is **absent**, run `graphify update <repo-root>` to build the graph before continuing. A directory without `graph.json` is not a usable graph.
    - On a tracked branch, if `graphify-out/.meta.json` is absent, invalid, or its `indexed_at_sha` does **not** match current `HEAD`, run `graphify update <repo-root>` to refresh incrementally.
    - On a feature branch or linked worktree, use a complete fork-point snapshot as-is. Do not compare its marker with the feature branch's advancing `HEAD`, and do not refresh it. If the snapshot lacks `graph.json`, warn and continue with the normal consultation failure handling.
@@ -36,7 +37,8 @@ It does **not** fire for renames, in-place edits, trivial inline expressions, or
 2. **Query the graph** for candidates using plain `graphify` CLI invocations — `graphify query "<intent>"`, `graphify path <from> <to>`, `graphify explain <symbol>`. Do **not** substitute any single harness's slash-command syntax; the rule reads correctly regardless of which harness loads it.
 3. **Evaluate every candidate** the graph returns, including artifacts that are **unexported**, **incomplete**, or **not currently reachable from public surfaces** — they still count. A candidate you cannot import from outside the module is still a candidate to extend, not a reason to duplicate.
 4. **Decide, transparently**:
-   - **Identical or near-identical** → propose extending the existing artifact using the Refactor Proposal Format below. Do not silently duplicate.
+   - **Already covered as-is** → an existing artifact does what you need without changes: use it directly. This is reuse, not authoring, so no proposal is needed; name the artifact you reused.
+   - **Identical or near-identical, but needs a change** → propose extending the existing artifact using the Refactor Proposal Format below. Do not silently duplicate.
    - **Borderline** (not clearly identical/near-identical, not clearly independent) — or extending the existing artifact would risk scope creep — → **stop and ask the operator**. Do not decide autonomously.
    - **Clearly independent** → author the new artifact; briefly note in the response which candidates you evaluated and why they did not match.
 

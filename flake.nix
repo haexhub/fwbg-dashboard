@@ -70,10 +70,15 @@
         nixpkgsRust = [ "rustc" "cargo" "clippy" "rustfmt" ];
         rustToolchain = pkgs.lib.optional hasRustToolchain
           (pkgs.rust-bin.fromRustupToolchainFile rustToolchainPath);
-        resolvedNames =
-          if hasRustToolchain
-          then builtins.filter (name: !(builtins.elem name nixpkgsRust)) packageNames
-          else packageNames;
+        hostPlatform = pkgs.stdenv.hostPlatform;
+        # CUDA's package set can fail before its platform metadata is available.
+        supportedNames = builtins.filter (name:
+          (name != "cudatoolkit" || hostPlatform.isLinux)
+          && (!hasRustToolchain || !(builtins.elem name nixpkgsRust))
+        ) packageNames;
+        resolvedNames = builtins.filter (name:
+          pkgs.lib.meta.availableOn hostPlatform (resolvePackage name)
+        ) supportedNames;
         packages = map resolvePackage resolvedNames ++ rustToolchain ++ extraPackages;
       in
       {
@@ -92,7 +97,7 @@
             # Append the inherited value only when non-empty: a trailing `:`
             # is an empty element, which makes ld.so search the working directory.
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath packages}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          '' + pkgs.lib.optionalString (builtins.elem "cudatoolkit" packageNames) ''
+          '' + pkgs.lib.optionalString (builtins.elem "cudatoolkit" resolvedNames) ''
             # `cudarc` (pulled in by `mistralrs/cuda`) looks for one of
             # CUDA_HOME/CUDA_PATH/CUDA_ROOT/CUDA_TOOLKIT_ROOT_DIR at build time to
             # find -lcudart/-lnvrtc/-lcurand/-lcublas/-lcublasLt — unlike
@@ -103,7 +108,7 @@
             # comparing derivations would evaluate cudatoolkit for every consumer,
             # and it does not evaluate on platforms nixpkgs does not support it on.
             export CUDA_ROOT="${pkgs.cudatoolkit}"
-          '' + pkgs.lib.optionalString (builtins.elem "llvmPackages.libclang.lib" packageNames) ''
+          '' + pkgs.lib.optionalString (builtins.elem "llvmPackages.libclang.lib" resolvedNames) ''
             # `bindgen` (via `clang-sys`, used by crates that build bindings at compile
             # time, e.g. `libsqlite3-sys` with rusqlite's `preupdate_hook`) loads
             # libclang at *build* time. Left to itself it takes the host's

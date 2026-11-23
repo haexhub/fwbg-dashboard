@@ -23,6 +23,9 @@ understand, verify, change, and remove safely.
   modifying files.
 - Keep the primary checkout reserved for inspection and worktree management;
   do not author changes there. Read-only inspection of any checkout is fine.
+- Regenerating git-ignored tool output or caches (for example a code-graph
+  index such as `graphify-out/`) is not authoring a change. It may run in any
+  checkout, including the primary one.
 - Keep each task isolated in its own worktree and topic branch so that changes
   can be reviewed, tested, committed, and removed independently.
 
