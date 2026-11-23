@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "checked": {
-    "source_hash": "2729a4c6c7df0a2e28e0394baf97b1afc1e7bb89dc8f5cac3a0e0807aca70c2c",
+    "source_hash": "4f1bfce54bb823d3d6e7165af762ba77badf89c5b4a816a8178f00c9500bc2a9",
     "prompt_hash": "aad1b9eb44b8d38d2bb92a30d9806c85710edad91159543012d0d3a0c686372a"
   },
   "decisions": {
@@ -25,6 +25,27 @@
       },
       "asked_at": "2026-11-22T23:36:34Z",
       "answered_at": "2026-11-22T23:36:34Z"
+    },
+    "43b3458be6ed92b0c0df225ecbc30af1957c2a2d4b0cceb373afad2029c52509": {
+      "kind": "duplicate",
+      "summary": "Both fragments instruct that /speckit-plan must check the spec/plan against the constitution's principles, restating the same enforcement rule.",
+      "passages": [
+        {
+          "scoped_id": "com.github.haexmas.atoms.spaex-constitution/constitution-enforcement-tooling",
+          "text_hash": "339ca1f7454a677481f70a239efbccca9bb3b78fa865a801fb5125f96aff29b0",
+          "text": "`/speckit-plan` and `/speckit-analyze` MUST check plans and cross-artifact consistency against this constitution. CI does not yet mechanically enforce this; when introduced, it MUST validate that no committed file violates the no-secrets-in-git, no-local-absolute-paths, or cross-repo-refs-pin-immutable-revisions principles."
+        },
+        {
+          "scoped_id": "com.github.haexmas.atoms.spaex-constitution/speckit-workflow-adherence",
+          "text_hash": "ca90eeb6cd9958d7adeed4abbb2160528be5fca24fd5429c33b7823801066a2d",
+          "text": "Every feature or spec created via `/speckit-specify` **MUST** be checked against this constitution's principles during `/speckit-plan`; any conflict is resolved by changing the plan or escalated to a constitution amendment, never silently accepted as an exception. The project's active speckit workflow, declared at `.specify/workflows/speckit/workflow.yml`, MUST be followed for every primary task landing, invoking the named commands at their corresponding stages; when that file is absent, the built-in speckit skills serve as the implicit default and MUST still be followed. Freehand edits against source files are permitted only for review-fix responses on an already-open PR, or follow-up doc-alignment surfaced during a walkthrough test, never for the primary task landing itself."
+        }
+      ],
+      "choice": {
+        "kind": "keep_all"
+      },
+      "asked_at": "2026-11-23T08:04:48Z",
+      "answered_at": "2026-11-23T08:04:48Z"
     },
     "88f7125a990ed5b7534e225eba71294704ac677631b6cc475f06fa717f2ebe67": {
       "kind": "duplicate",

@@ -2,9 +2,19 @@
   "compounds": [
     {
       "molecules": [
+        "com.github.haexmas.atoms.ast-grep",
+        "com.github.haexmas.atoms.coding-guideline-go",
         "com.github.haexmas.atoms.coding-guideline-javascript-typescript",
+        "com.github.haexmas.atoms.coding-guideline-python",
+        "com.github.haexmas.atoms.coding-guideline-rust",
         "com.github.haexmas.atoms.general-coding",
+        "com.github.haexmas.atoms.graphify-first-authoring",
+        "com.github.haexmas.atoms.haex-vault",
+        "com.github.haexmas.atoms.nix-devshell-base",
+        "com.github.haexmas.atoms.nix-nodejs",
+        "com.github.haexmas.atoms.nix-rust",
         "com.github.haexmas.atoms.ponytail",
+        "com.github.haexmas.atoms.spaex-constitution",
         "com.github.haexmas.atoms.speckit"
       ],
       "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",

@@ -1,8 +1,46 @@
 {
-  "generation_id": "g_20261122T233432Z_e3b0",
+  "content_hashes": {
+    ".devshell/packages.nix": "sha256:4edbaf5b777827477780f629da1314f9151c4917e62e5cc453ec5dc4020cbf85",
+    ".devshell/rust-toolchain.toml": "sha256:0550015b8dafb87595eef1c6c8ab7f90fc87305bf02e7c9e3e61a6a56132a073",
+    ".envrc": "sha256:1d26c74fd25a4c3dbb09e029fc609588da499fd4af2a41c88f6316c7f8c54cf1",
+    "flake.nix": "sha256:c490517f267e287fd399e79c01a44bec0de84786223e56a366f680c7913242a6"
+  },
+  "generation_id": "g_20261123T080133Z_e3b0",
   "molecules": [
     {
+      "id": "com.github.haexmas.atoms.ast-grep",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.coding-guideline-go",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
       "id": "com.github.haexmas.atoms.coding-guideline-javascript-typescript",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.coding-guideline-python",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.coding-guideline-rust",
       "paths": [
         ".spaex/constitution.md"
       ],
@@ -18,7 +56,61 @@
       "source": "https://github.com/haexmas/atoms"
     },
     {
+      "hook_status": "failed",
+      "id": "com.github.haexmas.atoms.graphify-first-authoring",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.haex-vault",
+      "paths": [
+        ".devshell/packages.nix",
+        ".devshell/rust-toolchain.toml",
+        ".spaex/constitution.md",
+        ".spaex/generated/nix-packages.json"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "hook_status": "ok",
+      "id": "com.github.haexmas.atoms.nix-devshell-base",
+      "paths": [
+        ".envrc",
+        "flake.nix"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.nix-nodejs",
+      "paths": [
+        ".spaex/generated/nix-packages.json"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.nix-rust",
+      "paths": [
+        ".spaex/generated/nix-packages.json"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
       "id": "com.github.haexmas.atoms.ponytail",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "d70bb8fd408458bd104ca6e7101d9f146d45adb3",
+      "source": "https://github.com/haexmas/atoms"
+    },
+    {
+      "id": "com.github.haexmas.atoms.spaex-constitution",
       "paths": [
         ".spaex/constitution.md"
       ],
