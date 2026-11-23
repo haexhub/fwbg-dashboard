@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "checked": {
-    "source_hash": "2729a4c6c7df0a2e28e0394baf97b1afc1e7bb89dc8f5cac3a0e0807aca70c2c",
+    "source_hash": "2794b46bcee6ab66dabbee444dfab2cfdc40014d595b5aecbc5690bfcebf48d9",
     "prompt_hash": "aad1b9eb44b8d38d2bb92a30d9806c85710edad91159543012d0d3a0c686372a"
   },
   "decisions": {
@@ -26,6 +26,27 @@
       "asked_at": "2026-11-22T23:36:34Z",
       "answered_at": "2026-11-22T23:36:34Z"
     },
+    "43b3458be6ed92b0c0df225ecbc30af1957c2a2d4b0cceb373afad2029c52509": {
+      "kind": "duplicate",
+      "summary": "Both fragments instruct that /speckit-plan must check the spec/plan against the constitution's principles, restating the same enforcement rule.",
+      "passages": [
+        {
+          "scoped_id": "com.github.haexmas.atoms.spaex-constitution/constitution-enforcement-tooling",
+          "text_hash": "339ca1f7454a677481f70a239efbccca9bb3b78fa865a801fb5125f96aff29b0",
+          "text": "`/speckit-plan` and `/speckit-analyze` MUST check plans and cross-artifact consistency against this constitution. CI does not yet mechanically enforce this; when introduced, it MUST validate that no committed file violates the no-secrets-in-git, no-local-absolute-paths, or cross-repo-refs-pin-immutable-revisions principles."
+        },
+        {
+          "scoped_id": "com.github.haexmas.atoms.spaex-constitution/speckit-workflow-adherence",
+          "text_hash": "ca90eeb6cd9958d7adeed4abbb2160528be5fca24fd5429c33b7823801066a2d",
+          "text": "Every feature or spec created via `/speckit-specify` **MUST** be checked against this constitution's principles during `/speckit-plan`; any conflict is resolved by changing the plan or escalated to a constitution amendment, never silently accepted as an exception. The project's active speckit workflow, declared at `.specify/workflows/speckit/workflow.yml`, MUST be followed for every primary task landing, invoking the named commands at their corresponding stages; when that file is absent, the built-in speckit skills serve as the implicit default and MUST still be followed. Freehand edits against source files are permitted only for review-fix responses on an already-open PR, or follow-up doc-alignment surfaced during a walkthrough test, never for the primary task landing itself."
+        }
+      ],
+      "choice": {
+        "kind": "keep_all"
+      },
+      "asked_at": "2026-11-23T08:04:48Z",
+      "answered_at": "2026-11-23T08:04:48Z"
+    },
     "88f7125a990ed5b7534e225eba71294704ac677631b6cc475f06fa717f2ebe67": {
       "kind": "duplicate",
       "summary": "Both fragments give the identical testing principle that tests must verify observable behavior/contracts rather than private implementation details.",
@@ -46,6 +67,48 @@
       },
       "asked_at": "2026-11-22T23:36:34Z",
       "answered_at": "2026-11-22T23:36:34Z"
+    },
+    "c087a2d64bb582e4a92f0e0c7f5e987ad36e7c5f767f6a08654ca7c595e5e022": {
+      "kind": "duplicate",
+      "summary": "Both fragments give the same instruction against speculative or premature abstraction based on superficial similarity, permitting it only when grounded in real shared behavior, ownership, or duplication.",
+      "passages": [
+        {
+          "scoped_id": "com.github.haexmas.atoms.general-coding/general-coding",
+          "text_hash": "8613b227dbf67ae438c4504cb917f472a3794cb67d9198fb012bbdbaf84f2637",
+          "text": "- Do not abstract two things merely because they look similar. First establish\n  that they have the same behavior, ownership, change reason, and invariants.\n  A small amount of local duplication is preferable to a premature generic\n  abstraction that couples unrelated callers."
+        },
+        {
+          "scoped_id": "com.github.haexmas.atoms.ponytail/ponytail",
+          "text_hash": "762e24a72676f77dd6c37bbe977676817ac4012c63ec2d09cff09a3b67f565eb",
+          "text": "- Do not introduce speculative abstractions or abstractions solely because a\n  change might be reusable. A concrete, domain-owned abstraction that\n  improves cohesion, removes real duplication, or makes a branch independently\n  testable is not premature; use it when the code evidence supports it, even\n  when the task did not name the extraction. Keep it as small as possible."
+        }
+      ],
+      "choice": {
+        "kind": "keep_all"
+      },
+      "asked_at": "2026-11-23T10:38:19Z",
+      "answered_at": "2026-11-23T10:38:19Z"
+    },
+    "d92572fdcd86a53939f9bd11050d62966b024f000d20b3bb088864c5f452ad38": {
+      "kind": "duplicate",
+      "summary": "Both fragments instruct not to call asyncio.run() from code already running inside an event loop, restating the identical rule once for general Python code and once for test code.",
+      "passages": [
+        {
+          "scoped_id": "com.github.haexmas.atoms.coding-guideline-python/python",
+          "text_hash": "864f54a76640337abb57121119d15d045a5b01c71c510c153969ce10fd390c19",
+          "text": "- Keep async code non-blocking. Do not call blocking I/O or CPU-heavy work\n  directly from an event loop; use an appropriate async API or explicitly move\n  the work to a worker. Do not call `asyncio.run()` from code that may already\n  be running inside an event loop."
+        },
+        {
+          "scoped_id": "com.github.haexmas.atoms.coding-guideline-python/python-testing",
+          "text_hash": "8a0e07fac184da1d85882955ae909b79e2fbd3056c9eedae8f0f21a99a908e96",
+          "text": "- For async code, test coroutines with the project's supported async test\n  tooling. Do not call `asyncio.run()` inside an already-running event loop,\n  and do not use sleeps to wait for concurrency. Test cancellation, timeout,\n  cleanup, and ordering assumptions when they affect correctness."
+        }
+      ],
+      "choice": {
+        "kind": "keep_all"
+      },
+      "asked_at": "2026-11-23T10:38:19Z",
+      "answered_at": "2026-11-23T10:38:19Z"
     }
   }
 }

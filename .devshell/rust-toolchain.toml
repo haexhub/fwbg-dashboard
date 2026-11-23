@@ -1,0 +1,13 @@
+# The Rust toolchain of haex-vault's devShell (read by `nix-devshell-base`'s `flake.nix` through
+# rust-overlay). The channel matches the nixpkgs `rustc` the shell had before, so desktop builds see
+# the same compiler; the targets are the four Android ABIs `tauri android build` compiles for.
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
+targets = [
+  "aarch64-linux-android",
+  "armv7-linux-androideabi",
+  "i686-linux-android",
+  "x86_64-linux-android",
+]
